@@ -53,6 +53,11 @@ export class AuthService {
     return user;
   }
 
+  async registerPushToken(u: { id: string; deviceId: string }, pushToken: string, platform?: string) {
+    await this.prisma.device.upsert({ where: { userId_deviceId: { userId: u.id, deviceId: u.deviceId } }, update: { pushToken, platform, lastSeen: new Date() }, create: { userId: u.id, deviceId: u.deviceId, pushToken, platform } });
+    return { ok: true };
+  }
+
   async refresh(refreshToken: string) {
     const row = await this.prisma.refreshToken.findUnique({ where: { tokenHash: sha(refreshToken) }, include: { user: true } });
     if (!row || row.revokedAt || row.expiresAt < new Date()) throw new UnauthorizedException();

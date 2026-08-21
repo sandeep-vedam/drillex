@@ -4,7 +4,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState, type ReactNode } from 'react';
 import { Wordmark } from './Brand';
 import { I } from './Icons';
-import { getUser, signOut, type SessionUser } from '@/lib/api';
+import { api, getUser, signOut, type SessionUser } from '@/lib/api';
 
 const NAV = [
   { href: '/dashboard', label: 'Dashboard', icon: I.Dashboard, roles: ['*'] },
@@ -27,6 +27,8 @@ export function Shell({ children, title, actions }: { children: ReactNode; title
   const path = usePathname();
   const router = useRouter();
   const [user, setUser] = useState<SessionUser | null>(null);
+  const [unread, setUnread] = useState(0);
+  useEffect(() => { const f = () => api<{ count: number }>('/notifications/unread-count').then((r) => setUnread(r.count)).catch(() => {}); f(); const t = setInterval(f, 30_000); window.addEventListener('notifications:changed', f); return () => { clearInterval(t); window.removeEventListener('notifications:changed', f); }; }, []);
   useEffect(() => { const u = getUser(); if (!u) router.replace('/login'); else if (u.mustChangePassword) router.replace('/change-password'); else setUser(u); }, [router]);
 
   const Item = ({ href, label, icon: Icon }: { href: string; label: string; icon: typeof I.Dashboard }) => {
@@ -59,7 +61,7 @@ export function Shell({ children, title, actions }: { children: ReactNode; title
           <h1 className="font-display text-[26px] font-semibold text-navy-800 tracking-wide">{title}</h1>
           <div className="flex items-center gap-2">
             <span className="hidden md:inline-flex items-center gap-1.5 text-[12px] text-muted px-2.5 py-1 border border-line bg-surface"><span className="h-1.5 w-1.5 rounded-full bg-ok" />Live · synced</span>
-            <button className="btn-ghost" aria-label="Notifications"><I.Bell /></button>
+            <Link href="/notifications" className="btn-ghost relative" aria-label={`Notifications${unread ? `, ${unread} unread` : ''}`}><I.Bell />{unread > 0 && <span className="absolute -top-0.5 right-0 min-w-[18px] h-[18px] px-1 grid place-items-center bg-hazard text-white text-[10px] font-bold tnum">{unread > 99 ? '99+' : unread}</span>}</Link>
             {actions}
           </div>
         </header>

@@ -17,11 +17,13 @@ export default function HomeScreen({ navigation }: Props) {
   const [who, setWho] = useState<{ employeeId: string; role: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [unread, setUnread] = useState(0);
 
   const load = useCallback(async () => {
     try {
       const [a, sm, sess] = await Promise.all([cached('assets', () => api<Asset[]>('/assets')), cached('summary', () => api<Summary>('/dashboard/summary')), loadSession()]);
       setAssets(a.data); setSummary(sm.data); setWho(sess?.user ?? null); setError(a.fromCache ? 'Offline — showing last synced data.' : null);
+      api<{ count: number }>('/notifications/unread-count').then((r) => setUnread(r.count)).catch(() => {});
     } catch (e) { setError((e as Error).message); }
   }, []);
   useEffect(() => { load(); }, [load]);
@@ -46,7 +48,10 @@ export default function HomeScreen({ navigation }: Props) {
         <View style={{ gap: 12 }}>
           <View style={s.head}>
             <View><Eyebrow>{greeting}</Eyebrow><Text style={s.h1}>{who?.employeeId ?? '—'}</Text><Text style={s.role}>{who?.role ?? ''}</Text></View>
-            <Pressable onPress={signOut} hitSlop={10}><Text style={s.link}>Sign out</Text></Pressable>
+            <View style={{ alignItems: 'flex-end', gap: 6 }}>
+              <Pressable onPress={() => navigation.navigate('Notifications')} hitSlop={10} style={s.bell}><Text style={s.bellText}>🔔 {unread ? unread : ''}</Text></Pressable>
+              <Pressable onPress={signOut} hitSlop={10}><Text style={s.link}>Sign out</Text></Pressable>
+            </View>
           </View>
           {error && <Text style={s.err}>{error}</Text>}
           <View style={{ flexDirection: 'row', gap: 10 }}>
@@ -87,7 +92,8 @@ const s = StyleSheet.create({
   head: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', paddingTop: 8 },
   h1: { fontSize: 28, fontWeight: '800', color: colors.navy800, fontFamily: 'Menlo' },
   role: { color: colors.muted, fontSize: 12, letterSpacing: 1.2 },
-  link: { color: colors.navy700, fontWeight: '600', textDecorationLine: 'underline', marginTop: 8 },
+  link: { color: colors.navy700, fontWeight: '600', textDecorationLine: 'underline' },
+  bell: { borderWidth: 1, borderColor: colors.line, backgroundColor: colors.surface, paddingHorizontal: 10, paddingVertical: 6 }, bellText: { fontWeight: '800', color: colors.hazard },
   err: { color: colors.crit },
   taskTitle: { fontSize: 16, fontWeight: '700', color: colors.ink }, taskSub: { color: colors.muted, fontSize: 13, marginTop: 2 },
   num: { fontFamily: 'Menlo', fontWeight: '700', color: colors.navy800, fontSize: 15 },

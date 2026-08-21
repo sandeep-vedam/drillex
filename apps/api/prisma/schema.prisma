@@ -98,6 +98,13 @@ enum StockMovementType {
   OUT
   ADJUST
 }
+enum PurchaseRequestStatus {
+  OPEN
+  ORDERED
+  RECEIVED
+  CANCELLED
+}
+
 enum AttachmentKind {
   PHOTO
   DOCUMENT
@@ -365,6 +372,7 @@ model Part {
   movements  PartStockMovement[]
   jobCardParts JobCardPart[]
   scheduleParts MaintenanceSchedulePart[]
+  purchaseRequests PurchaseRequest[]
 }
 
 model JobCardPart {
@@ -374,6 +382,20 @@ model JobCardPart {
   part      Part    @relation(fields: [partId], references: [id])
   partId    String
   quantity  Int
+}
+
+model PurchaseRequest {
+  id          String                @id @default(uuid())
+  part        Part                  @relation(fields: [partId], references: [id])
+  partId      String
+  quantity    Int
+  status      PurchaseRequestStatus @default(OPEN)
+  requestedBy String
+  notes       String?
+  orderedAt   DateTime?
+  receivedAt  DateTime?
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
 }
 
 model PartStockMovement {
