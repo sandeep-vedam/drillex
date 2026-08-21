@@ -1,0 +1,457 @@
+// Drillex Ops — Prisma schema v1 (see docs/DEVELOPMENT_PLAN.md §4)
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  OPERATOR
+  TECHNICIAN
+  SUPERVISOR
+  MANAGER
+  ADMIN
+}
+enum UserStatus {
+  ACTIVE
+  DISABLED
+}
+enum AssetCategory {
+  DRILLING
+  HAULAGE
+  COMPRESSOR
+  ANCILLARY
+  OTHER
+}
+enum AssetStatus {
+  ACTIVE
+  UNDER_MAINTENANCE
+  IDLE
+  DECOMMISSIONED
+}
+enum Shift {
+  DAY
+  NIGHT
+}
+enum SubmissionStatus {
+  SUBMITTED
+  APPROVED
+  UNLOCKED
+}
+enum FluidLevel {
+  OK
+  LOW
+  ADD
+  CHANGE_REQUIRED
+}
+enum AirFilterCondition {
+  OK
+  BLOCKED
+  CHANGED
+}
+enum BatteryCondition {
+  OK
+  WEAK
+  FLAT
+}
+enum ChemicalUnit {
+  LITRES
+  KG
+  BAGS
+}
+enum ServiceType {
+  HR_250
+  HR_500
+  HR_1000
+  ANNUAL
+  CONDITION_BASED
+  AD_HOC
+}
+enum ScheduleStatus {
+  UPCOMING
+  DUE_NOW
+  OVERDUE
+  COMPLETED
+}
+enum JobType {
+  SCHEDULED_SERVICE
+  BREAKDOWN_REPAIR
+  MODIFICATION
+  INSPECTION
+}
+enum JobStatus {
+  OPEN
+  IN_PROGRESS
+  COMPLETED
+  AWAITING_PARTS
+}
+enum TestResult {
+  PASSED
+  FAILED
+  PENDING
+}
+enum StockMovementType {
+  IN
+  OUT
+  ADJUST
+}
+enum AttachmentKind {
+  PHOTO
+  DOCUMENT
+  SIGNATURE
+}
+
+model Site {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  latitude  Float?
+  longitude Float?
+  users     User[]
+  assets    Asset[]
+  shiftReports ShiftReport[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model User {
+  id           String     @id @default(uuid())
+  employeeId   String     @unique
+  name         String
+  role         Role
+  status       UserStatus @default(ACTIVE)
+  passwordHash String
+  totpSecret   String?
+  totpEnabled  Boolean    @default(false)
+  mustChangePassword Boolean @default(false)
+  site         Site?      @relation(fields: [siteId], references: [id])
+  siteId       String?
+  devices      Device[]
+  loginEvents  LoginEvent[]
+  refreshTokens RefreshToken[]
+  assetAssignments AssetOperator[]
+  shiftReports ShiftReport[]
+  dailyReadings DailyReading[]
+  notifications Notification[]
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+}
+
+model Device {
+  id        String   @id @default(uuid())
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+  deviceId  String
+  platform  String?
+  pushToken String?
+  approved  Boolean  @default(true)
+  lastSeen  DateTime @default(now())
+  @@unique([userId, deviceId])
+}
+
+model LoginEvent {
+  id        String   @id @default(uuid())
+  user      User?    @relation(fields: [userId], references: [id])
+  userId    String?
+  employeeId String
+  deviceId  String
+  success   Boolean
+  ip        String?
+  createdAt DateTime @default(now())
+  @@index([employeeId, createdAt])
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+  tokenHash String   @unique
+  deviceId  String
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime @default(now())
+}
+
+model Asset {
+  id                String        @id @default(uuid())
+  assetNumber       String        @unique // immutable (SRS 3.1)
+  name              String
+  category          AssetCategory
+  make              String
+  model             String
+  serialNumber      String
+  yearOfManufacture Int
+  commissionedAt    DateTime
+  site              Site          @relation(fields: [siteId], references: [id])
+  siteId            String
+  status            AssetStatus   @default(ACTIVE)
+  notes             String?
+  operators         AssetOperator[]
+  shiftReports      ShiftReport[]
+  dailyReadings     DailyReading[]
+  maintenanceSchedules MaintenanceSchedule[]
+  jobCards          JobCard[]
+  alerts            Alert[]
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  deletedAt         DateTime?
+}
+
+model AssetOperator {
+  asset     Asset    @relation(fields: [assetId], references: [id])
+  assetId   String
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+  validFrom DateTime @default(now())
+  validTo   DateTime?
+  @@id([assetId, userId])
+}
+
+model Chemical {
+  id          String       @id @default(uuid())
+  name        String       @unique
+  defaultUnit ChemicalUnit
+  unitCost    Decimal?     @db.Decimal(12, 2)
+  monthlyBudget Decimal?   @db.Decimal(12, 2)
+  entries     ShiftReportChemical[]
+}
+
+model ShiftReport {
+  id               String           @id @default(uuid())
+  asset            Asset            @relation(fields: [assetId], references: [id])
+  assetId          String
+  user             User             @relation(fields: [userId], references: [id])
+  userId           String
+  site             Site             @relation(fields: [siteId], references: [id])
+  siteId           String
+  date             DateTime         @db.Date
+  shift            Shift
+  holeRef          String
+  startDepth       Decimal          @db.Decimal(10, 2)
+  endDepth         Decimal          @db.Decimal(10, 2)
+  totalMeters      Decimal          @db.Decimal(10, 2) // server-computed
+  holesCompleted   Int
+  holeDiameterMm   Decimal          @db.Decimal(8, 2)
+  rockType         String
+  penetrationRate  Decimal          @db.Decimal(8, 2)
+  downtimeHours    Decimal          @default(0) @db.Decimal(6, 2)
+  downtimeReason   String?
+  status           SubmissionStatus @default(SUBMITTED)
+  signatureId      String?
+  submittedAt      DateTime         @default(now())
+  approvedById     String?
+  approvedAt       DateTime?
+  chemicals        ShiftReportChemical[]
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  deletedAt        DateTime?
+  @@unique([assetId, date, shift])
+  @@index([siteId, date])
+}
+
+model ShiftReportChemical {
+  id            String       @id @default(uuid())
+  shiftReport   ShiftReport  @relation(fields: [shiftReportId], references: [id], onDelete: Cascade)
+  shiftReportId String
+  chemical      Chemical     @relation(fields: [chemicalId], references: [id])
+  chemicalId    String
+  quantity      Decimal      @db.Decimal(10, 2)
+  unit          ChemicalUnit
+  purpose       String?
+  stockOnHand   Decimal?     @db.Decimal(10, 2)
+}
+
+model DailyReading {
+  id                   String             @id @default(uuid())
+  asset                Asset              @relation(fields: [assetId], references: [id])
+  assetId              String
+  user                 User               @relation(fields: [userId], references: [id])
+  userId               String
+  date                 DateTime           @db.Date
+  hourMeter            Decimal            @db.Decimal(10, 1)
+  fuelStart            Decimal            @db.Decimal(8, 2)
+  fuelEnd              Decimal            @db.Decimal(8, 2)
+  fuelConsumed         Decimal            @db.Decimal(8, 2) // server-computed
+  engineOil            FluidLevel
+  hydraulicOil         FluidLevel
+  coolant              FluidLevel
+  airFilter            AirFilterCondition
+  tyrePressures        Json               @default("{}")
+  battery              BatteryCondition
+  warningLights        Boolean
+  warningLightsNote    String?
+  unusualNoises        Boolean
+  unusualNoisesNote    String?
+  leaks                Boolean
+  leaksNote            String?
+  preStartChecklistDone Boolean
+  conditionRating      Int
+  notes                String?
+  signatureId          String?
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+  deletedAt            DateTime?
+  @@unique([assetId, date])
+}
+
+model MaintenanceSchedule {
+  id               String         @id @default(uuid())
+  asset            Asset          @relation(fields: [assetId], references: [id])
+  assetId          String
+  serviceType      ServiceType
+  description      String
+  intervalHours    Int?
+  intervalDays     Int?
+  lastServiceAt    DateTime?
+  lastServiceHours Decimal?       @db.Decimal(10, 1)
+  nextDueAt        DateTime?
+  nextDueHours     Decimal?       @db.Decimal(10, 1)
+  reminderLeadDays Int            @default(3)
+  status           ScheduleStatus @default(UPCOMING)
+  estDowntimeHours Decimal?       @db.Decimal(6, 2)
+  notes            String?
+  technicianIds    String[]
+  parts            MaintenanceSchedulePart[]
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  deletedAt        DateTime?
+}
+
+model MaintenanceSchedulePart {
+  id         String              @id @default(uuid())
+  schedule   MaintenanceSchedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  scheduleId String
+  part       Part                @relation(fields: [partId], references: [id])
+  partId     String
+  quantity   Int
+}
+
+model JobCard {
+  id              String      @id @default(uuid())
+  jobNo           String      @unique
+  asset           Asset       @relation(fields: [assetId], references: [id])
+  assetId         String
+  date            DateTime    @db.Date
+  jobType         JobType
+  reportedFault   String?
+  workPerformed   String
+  hourMeter       Decimal?    @db.Decimal(10, 1)
+  labourHours     Decimal?    @db.Decimal(6, 2)
+  technicianIds   String[]
+  toolsUsed       String?
+  conditionBefore Int?
+  conditionAfter  Int?
+  testResult      TestResult?
+  nextAction      String?
+  status          JobStatus   @default(OPEN)
+  techSignatureId String?
+  approvedById    String?
+  approvedAt      DateTime?
+  parts           JobCardPart[]
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  deletedAt       DateTime?
+}
+
+model Part {
+  id         String   @id @default(uuid())
+  partNo     String   @unique
+  name       String
+  qtyOnHand  Int      @default(0)
+  minQty     Int      @default(0)
+  unitCost   Decimal? @db.Decimal(12, 2)
+  movements  PartStockMovement[]
+  jobCardParts JobCardPart[]
+  scheduleParts MaintenanceSchedulePart[]
+}
+
+model JobCardPart {
+  id        String  @id @default(uuid())
+  jobCard   JobCard @relation(fields: [jobCardId], references: [id], onDelete: Cascade)
+  jobCardId String
+  part      Part    @relation(fields: [partId], references: [id])
+  partId    String
+  quantity  Int
+}
+
+model PartStockMovement {
+  id        String            @id @default(uuid())
+  part      Part              @relation(fields: [partId], references: [id])
+  partId    String
+  type      StockMovementType
+  quantity  Int
+  reference String?
+  createdAt DateTime          @default(now())
+}
+
+model Attachment {
+  id         String         @id @default(uuid())
+  ownerType  String
+  ownerId    String
+  kind       AttachmentKind
+  storageKey String
+  mimeType   String?
+  sha256     String?
+  createdBy  String
+  createdAt  DateTime       @default(now())
+  @@index([ownerType, ownerId])
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+  type      String
+  title     String
+  body      String?
+  payload   Json?
+  readAt    DateTime?
+  createdAt DateTime @default(now())
+  @@index([userId, readAt])
+}
+
+model Alert {
+  id         String    @id @default(uuid())
+  asset      Asset     @relation(fields: [assetId], references: [id])
+  assetId    String
+  source     String
+  severity   String
+  message    String
+  resolvedAt DateTime?
+  createdAt  DateTime  @default(now())
+}
+
+model Report {
+  id          String   @id @default(uuid())
+  type        String
+  periodStart DateTime
+  periodEnd   DateTime
+  pdfKey      String?
+  xlsxKey     String?
+  generatedBy String?
+  generatedAt DateTime @default(now())
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  actorId   String?
+  deviceId  String?
+  entity    String
+  entityId  String
+  action    String
+  diff      Json?
+  createdAt DateTime @default(now())
+  @@index([entity, entityId])
+}
+
+model SyncConflict {
+  id         String    @id @default(uuid())
+  entity     String
+  entityId   String
+  versions   Json
+  resolvedBy String?
+  resolvedAt DateTime?
+  createdAt  DateTime  @default(now())
+}

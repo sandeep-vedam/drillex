@@ -1,0 +1,25 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root { --canvas: 242 245 249; --surface: 255 255 255; --ink: 24 35 47; --muted: 91 104 119; --line: 214 222 232; }
+.dark { --canvas: 14 20 27; --surface: 22 31 41; --ink: 230 236 242; --muted: 151 166 182; --line: 40 52 63; }
+
+body { @apply bg-canvas text-ink font-sans antialiased; }
+.tnum { font-variant-numeric: tabular-nums; }
+.blueprint {
+  background-color: #0B1B30;
+  background-image:
+    linear-gradient(rgba(255,255,255,.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.045) 1px, transparent 1px),
+    linear-gradient(rgba(255,255,255,.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.08) 1px, transparent 1px);
+  background-size: 24px 24px, 24px 24px, 120px 120px, 120px 120px;
+}
+@layer components {
+.eyebrow { @apply font-display uppercase tracking-[.14em] text-[11px] font-semibold text-muted; }
+.input { @apply w-full bg-surface border border-line px-3 py-2.5 text-[15px] outline-none transition focus:border-navy-600 focus:ring-2 focus:ring-navy-600/20 placeholder:text-muted/70; }
+.btn-primary { @apply inline-flex items-center justify-center gap-2 bg-navy-800 text-white px-4 py-2.5 font-semibold tracking-wide transition hover:bg-navy-700 active:bg-navy-900 disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-hazard focus-visible:outline-none; }
+.btn-ghost { @apply inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-ink/80 hover:bg-navy-100/60 transition; }
+.card { @apply bg-surface border border-line shadow-card; }
+}

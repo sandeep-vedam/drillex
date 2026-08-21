@@ -1,0 +1,29 @@
+name: CI
+on:
+  push: { branches: [main, master] }
+  pull_request:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env: { POSTGRES_USER: drillex, POSTGRES_PASSWORD: drillex, POSTGRES_DB: drillex }
+        ports: ['5432:5432']
+        options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
+    env:
+      DATABASE_URL: postgresql://drillex:drillex@localhost:5432/drillex?schema=public
+      JWT_ACCESS_SECRET: ci
+      JWT_REFRESH_SECRET: ci
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 9.15.4 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @drillex/api prisma generate
+      - run: pnpm --filter @drillex/api prisma migrate deploy
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm --filter @drillex/api --filter @drillex/web build
