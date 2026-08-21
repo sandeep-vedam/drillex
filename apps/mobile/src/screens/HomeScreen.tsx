@@ -7,7 +7,7 @@ import { Card, Eyebrow, Stat, StatusChip } from '../ui';
 import { colors } from '../ui/theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
-type Asset = { id: string; assetNumber: string; name: string; status: string; make: string; model: string };
+type Asset = { id: string; assetNumber: string; name: string; status: string; make: string; model: string; siteId: string; category: string };
 type Summary = { readingsToday: number; pendingApprovals: number; openAlerts: number; assets: { total: number } };
 
 export default function HomeScreen({ navigation }: Props) {
@@ -62,16 +62,17 @@ export default function HomeScreen({ navigation }: Props) {
       }
       ListEmptyComponent={!error ? <Card><Text style={{ color: colors.muted }}>No assets assigned to you yet.</Text></Card> : undefined}
       renderItem={({ item }) => (
-        <Pressable onPress={() => navigation.navigate('DailyReading', { assetId: item.id, assetNumber: item.assetNumber, assetName: item.name })}>
         <Card>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
             <Text style={s.num}>{item.assetNumber}</Text><StatusChip status={item.status} />
           </View>
           <Text style={s.name}>{item.name}</Text>
           <Text style={s.meta}>{item.make} {item.model}</Text>
-          <Text style={s.cta}>Submit daily reading →</Text>
+          <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
+            <Pressable style={s.action} onPress={() => navigation.navigate('DailyReading', { assetId: item.id, assetNumber: item.assetNumber, assetName: item.name })}><Text style={s.actionText}>Daily reading</Text></Pressable>
+            {item.category === 'DRILLING' && <Pressable style={[s.action, { backgroundColor: colors.hazard }]} onPress={() => navigation.navigate('ShiftReport', { assetId: item.id, assetNumber: item.assetNumber, assetName: item.name, siteId: item.siteId })}><Text style={s.actionText}>Shift report</Text></Pressable>}
+          </View>
         </Card>
-        </Pressable>
       )}
     />
   );
@@ -86,5 +87,5 @@ const s = StyleSheet.create({
   taskTitle: { fontSize: 16, fontWeight: '700', color: colors.ink }, taskSub: { color: colors.muted, fontSize: 13, marginTop: 2 },
   num: { fontFamily: 'Menlo', fontWeight: '700', color: colors.navy800, fontSize: 15 },
   name: { fontSize: 17, fontWeight: '600', color: colors.ink, marginTop: 6 }, meta: { color: colors.muted, fontSize: 13, marginTop: 2 },
-  cta: { color: colors.navy700, fontWeight: '700', fontSize: 13, marginTop: 10 },
+  action: { flex: 1, backgroundColor: colors.navy800, paddingVertical: 10, alignItems: 'center' }, actionText: { color: '#fff', fontWeight: '700', fontSize: 13 },
 });
