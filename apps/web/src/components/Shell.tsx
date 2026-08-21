@@ -14,7 +14,7 @@ const NAV = [
   { href: '/maintenance', label: 'Maintenance', icon: I.Wrench, roles: ['TECHNICIAN', 'SUPERVISOR', 'MANAGER'] },
   { href: '/job-cards', label: 'Job cards', icon: I.Card, roles: ['TECHNICIAN', 'SUPERVISOR', 'MANAGER'] },
   { href: '/parts', label: 'Parts inventory', icon: I.Box, roles: ['TECHNICIAN', 'MANAGER', 'ADMIN'] },
-  { href: '/reports', label: 'Reports', icon: I.Report, roles: ['SUPERVISOR', 'MANAGER'] },
+  { href: '/reports', label: 'Reports', icon: I.Report, roles: ['SUPERVISOR', 'MANAGER', 'TECHNICIAN', 'ADMIN'] },
 ];
 const ADMIN = [
   { href: '/sync-conflicts', label: 'Sync conflicts', icon: I.Sync, roles: ['SUPERVISOR', 'MANAGER'] },

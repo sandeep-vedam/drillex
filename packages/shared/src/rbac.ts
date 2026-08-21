@@ -37,6 +37,7 @@ export const RBAC: Matrix = {
     'maintenance:read': 'self', 'maintenance:complete': 'self',
     'job_card:create': 'self', 'job_card:read': 'self',
     'parts:read': 'all', 'parts:write': 'all',
+    'report:read': 'site',
     'notification:read': 'self',
   },
   SUPERVISOR: {
