@@ -2,7 +2,9 @@
   "name": "drillex",
   "private": true,
   "packageManager": "pnpm@9.15.4",
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "dev": "turbo run dev",
     "build": "turbo run build",
@@ -12,7 +14,8 @@
     "db:migrate": "pnpm --filter @drillex/api prisma migrate dev",
     "db:seed": "pnpm --filter @drillex/api db:seed",
     "infra:up": "docker compose -f infra/docker-compose.yml up -d",
-    "infra:down": "docker compose -f infra/docker-compose.yml down"
+    "infra:down": "docker compose -f infra/docker-compose.yml down",
+    "db:demo": "pnpm --filter @drillex/api db:demo"
   },
   "devDependencies": {
     "turbo": "^2.3.3",

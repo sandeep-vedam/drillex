@@ -24,6 +24,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @drillex/api prisma generate
       - run: pnpm --filter @drillex/api prisma migrate deploy
+      - run: pnpm --filter @drillex/api db:seed
+        env: { DATABASE_URL: "postgresql://drillex:drillex@localhost:5432/drillex?schema=public" }
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm --filter @drillex/api --filter @drillex/web build

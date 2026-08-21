@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import argon2 from 'argon2';
 import { createHash, randomBytes } from 'crypto';
@@ -22,10 +22,12 @@ export class AuthService {
       if (!user.totpEnabled) return { requires2faSetup: true, userId: user.id };
       if (!input.totp || !authenticator.check(input.totp, user.totpSecret!)) throw new UnauthorizedException('2FA code required');
     }
-    await this.prisma.device.upsert({
+    const required = process.env.DEVICE_REGISTRATION_REQUIRED === 'true';
+    const device = await this.prisma.device.upsert({
       where: { userId_deviceId: { userId: user.id, deviceId: input.deviceId } },
-      update: { lastSeen: new Date() }, create: { userId: user.id, deviceId: input.deviceId },
+      update: { lastSeen: new Date() }, create: { userId: user.id, deviceId: input.deviceId, approved: !required },
     });
+    if (required && !device.approved) throw new ForbiddenException('This device is not approved. Ask your administrator to approve it.');
     return this.issueTokens(user, input.deviceId);
   }
 
@@ -61,6 +63,7 @@ export class AuthService {
   async refresh(refreshToken: string) {
     const row = await this.prisma.refreshToken.findUnique({ where: { tokenHash: sha(refreshToken) }, include: { user: true } });
     if (!row || row.revokedAt || row.expiresAt < new Date()) throw new UnauthorizedException();
+    if (process.env.DEVICE_REGISTRATION_REQUIRED === 'true') { const dev = await this.prisma.device.findUnique({ where: { userId_deviceId: { userId: row.userId, deviceId: row.deviceId } } }); if (!dev?.approved) throw new ForbiddenException('Device not approved'); }
     await this.prisma.refreshToken.update({ where: { id: row.id }, data: { revokedAt: new Date() } }); // rotation
     return this.issueTokens(row.user, row.deviceId);
   }

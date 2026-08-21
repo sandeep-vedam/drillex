@@ -6,12 +6,22 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import { join } from 'path';
 import { AppModule } from './app.module';
 
+function assertProdConfig() {
+  if (process.env.NODE_ENV !== 'production') return;
+  const weak = ['JWT_ACCESS_SECRET', 'JWT_REFRESH_SECRET'].filter((k) => !process.env[k] || process.env[k]!.length < 32 || process.env[k]!.startsWith('change-me'));
+  if (weak.length) throw new Error(`Refusing to start: weak/missing secrets ${weak.join(', ')} (need ≥32 random chars)`);
+  if (process.env.STORAGE_DRIVER !== 's3') console.warn('[config] STORAGE_DRIVER is not s3 — local disk storage is not suitable for production');
+}
+
 async function bootstrap() {
+  assertProdConfig();
   const app = await NestFactory.create<NestExpressApplication>(AppModule, { bodyParser: true, rawBody: false });
   app.useBodyParser('json', { limit: '12mb' });
   app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
   app.useStaticAssets(process.env.UPLOAD_DIR ?? join(process.cwd(), 'uploads'), { prefix: '/uploads/' });
-  app.enableCors({ origin: true, credentials: true });
+  const origins = process.env.CORS_ORIGINS?.split(',').map((o) => o.trim()).filter(Boolean);
+  app.enableCors({ origin: origins?.length ? origins : true, credentials: true });
+  app.enableShutdownHooks();
   app.setGlobalPrefix('api/v1');
   const doc = SwaggerModule.createDocument(app, new DocumentBuilder().setTitle('Drillex Ops API').setVersion('0.1').addBearerAuth().build());
   SwaggerModule.setup('api/docs', app, doc);

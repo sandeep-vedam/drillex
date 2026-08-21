@@ -264,3 +264,11 @@ A lean variant (1 RN dev + 1 full-stack + lead, ~9 months) would land around **$
 - No third-party ERP/accounting integrations in v1 (Phase 4 "API integrations" scoped as webhooks only).
 - Stakeholders supply master data (assets, chemicals, parts) and are available for UAT at each phase gate.
 - Hardware (tablets, phones) is **not** included.
+
+---
+
+## 13. Build status (as of 2026-08-21)
+
+All ten implementation steps delivered in the initial build: foundation & auth (incl. 2FA, password reset, idle lock/biometrics), asset register, daily readings with alerts, shift production with approval/unlock, offline outbox sync + attachments/signatures/photos, maintenance schedules with reminders/digest, job cards with parts deduction and asset-status automation, parts inventory + purchase requests + push transport + notification centres, seven reports (PDF/XLSX, archive, email, month-end cron), and release hardening (device registration, integration tests in CI, load-test script, prod config guards, signing config).
+
+Open items needing client inputs: Firebase/APNs credentials for native push, SMTP and S3 credentials, production hosting, real chemical/parts master data with costs & budgets, store listings.

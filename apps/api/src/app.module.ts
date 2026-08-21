@@ -19,6 +19,7 @@ import { JobCardsModule } from './job-cards/job-cards.module';
 import { PartsModule } from './parts/parts.module';
 import { PushModule } from './push/push.module';
 import { ReportsModule } from './reports/reports.module';
+import { DevicesModule } from './devices/devices.module';
 import { HealthController } from './common/health.controller';
 import { SitesController } from './common/sites.controller';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
@@ -29,7 +30,7 @@ import { RbacGuard } from './auth/rbac.guard';
     ConfigModule.forRoot({ isGlobal: true }),
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 120 }]),
     ScheduleModule.forRoot(),
-    PrismaModule, AuthModule, UsersModule, AssetsModule, DashboardModule, NotificationsModule, DailyReadingsModule, ShiftReportsModule, StorageModule, AttachmentsModule, SyncModule, MaintenanceModule, JobCardsModule, PartsModule, PushModule, ReportsModule,
+    PrismaModule, AuthModule, UsersModule, AssetsModule, DashboardModule, NotificationsModule, DailyReadingsModule, ShiftReportsModule, StorageModule, AttachmentsModule, SyncModule, MaintenanceModule, JobCardsModule, PartsModule, PushModule, ReportsModule, DevicesModule,
   ],
   controllers: [HealthController, SitesController],
   providers: [

@@ -19,6 +19,7 @@ const NAV = [
 const ADMIN = [
   { href: '/sync-conflicts', label: 'Sync conflicts', icon: I.Sync, roles: ['SUPERVISOR', 'MANAGER'] },
   { href: '/users', label: 'User management', icon: I.Users, roles: ['ADMIN'] },
+  { href: '/devices', label: 'Devices', icon: I.Settings, roles: ['ADMIN'] },
   { href: '/settings', label: 'Settings', icon: I.Settings, roles: ['*'] },
 ];
 const visible = (role: string | undefined) => (n: { roles: string[] }) => n.roles.includes('*') || (role ? n.roles.includes(role) : false);
