@@ -15,6 +15,8 @@ import { StorageModule } from './storage/storage.module';
 import { AttachmentsModule } from './attachments/attachments.module';
 import { SyncModule } from './sync/sync.module';
 import { MaintenanceModule } from './maintenance/maintenance.module';
+import { JobCardsModule } from './job-cards/job-cards.module';
+import { PartsModule } from './parts/parts.module';
 import { HealthController } from './common/health.controller';
 import { SitesController } from './common/sites.controller';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
@@ -25,7 +27,7 @@ import { RbacGuard } from './auth/rbac.guard';
     ConfigModule.forRoot({ isGlobal: true }),
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 120 }]),
     ScheduleModule.forRoot(),
-    PrismaModule, AuthModule, UsersModule, AssetsModule, DashboardModule, NotificationsModule, DailyReadingsModule, ShiftReportsModule, StorageModule, AttachmentsModule, SyncModule, MaintenanceModule,
+    PrismaModule, AuthModule, UsersModule, AssetsModule, DashboardModule, NotificationsModule, DailyReadingsModule, ShiftReportsModule, StorageModule, AttachmentsModule, SyncModule, MaintenanceModule, JobCardsModule, PartsModule,
   ],
   controllers: [HealthController, SitesController],
   providers: [

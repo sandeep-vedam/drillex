@@ -9,6 +9,9 @@ const map: Record<string, { label: string; cls: string; dot: string }> = {
   DUE_NOW: { label: 'Due now', cls: 'bg-hazard/10 text-hazard', dot: 'bg-hazard' },
   UPCOMING: { label: 'Upcoming', cls: 'bg-navy-100 text-navy-800', dot: 'bg-navy-600' },
   COMPLETED: { label: 'Completed', cls: 'bg-ok/10 text-ok', dot: 'bg-ok' },
+  OPEN: { label: 'Open', cls: 'bg-navy-100 text-navy-800', dot: 'bg-navy-600' },
+  IN_PROGRESS: { label: 'In progress', cls: 'bg-hazard/10 text-hazard', dot: 'bg-hazard' },
+  AWAITING_PARTS: { label: 'Awaiting parts', cls: 'bg-warn/10 text-warn', dot: 'bg-warn' },
   UNLOCKED: { label: 'Unlocked', cls: 'bg-hazard/10 text-hazard', dot: 'bg-hazard' },
 };
 export function StatusChip({ status }: { status: string }) {

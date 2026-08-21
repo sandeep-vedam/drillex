@@ -30,7 +30,7 @@ export default function HomeScreen({ navigation }: Props) {
   const greeting = new Date().getHours() < 12 ? 'Good morning' : new Date().getHours() < 17 ? 'Good afternoon' : 'Good evening';
   const isTech = who?.role === 'TECHNICIAN' || who?.role === 'SUPERVISOR';
   const tasks = [
-    ...(isTech ? [{ key: 'maint', title: 'Maintenance services', sub: 'View assigned services · mark completed', tone: colors.hazard, onPress: () => navigation.navigate('Maintenance') }] : []),
+    ...(isTech ? [{ key: 'maint', title: 'Maintenance services', sub: 'View assigned services · mark completed', tone: colors.hazard, onPress: () => navigation.navigate('Maintenance') }, { key: 'jc', title: 'Job cards', sub: 'Record work done on a machine', tone: colors.navy700, onPress: () => navigation.navigate('JobCards') }] : []),
     { key: 'reading', title: 'Daily machine readings', sub: summary ? (summary.readingsToday ? 'Submitted today' : 'Due today — not yet submitted') : '—', tone: summary?.readingsToday ? colors.ok : colors.hazard },
     { key: 'shift', title: 'Shift production report', sub: 'Submit at end of shift', tone: colors.navy700 },
   ];

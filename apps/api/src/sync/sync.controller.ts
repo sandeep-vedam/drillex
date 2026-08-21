@@ -1,15 +1,16 @@
 import { Body, Controller, Get, Param, Post } from '@nestjs/common';
 import { z } from 'zod';
-import { DailyReadingSchema, ShiftReportSchema } from '@drillex/shared';
+import { DailyReadingSchema, JobCardSchema, ShiftReportSchema } from '@drillex/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { DailyReadingsService } from '../daily-readings/daily-readings.service';
 import { ShiftReportsService } from '../shift-reports/shift-reports.service';
+import { JobCardsService } from '../job-cards/job-cards.service';
 import { AttachmentsService } from '../attachments/attachments.service';
 import { AttachmentSchema } from '../attachments/attachments.controller';
 import { AuthUser, CurrentUser, RequirePermission } from '../auth/decorators';
 import { ZodPipe } from '../common/zod.pipe';
 
-const OpSchema = z.object({ opId: z.string().min(1), kind: z.enum(['attachment', 'daily_reading', 'shift_report']), payload: z.unknown(), queuedAt: z.string().optional() });
+const OpSchema = z.object({ opId: z.string().min(1), kind: z.enum(['attachment', 'daily_reading', 'shift_report', 'job_card']), payload: z.unknown(), queuedAt: z.string().optional() });
 const PushSchema = z.object({ ops: z.array(OpSchema).max(200) });
 type Result = { opId: string; status: 'applied' | 'duplicate' | 'conflict' | 'rejected'; error?: string; id?: string };
 
@@ -20,7 +21,7 @@ type Result = { opId: string; status: 'applied' | 'duplicate' | 'conflict' | 're
  */
 @Controller('sync')
 export class SyncController {
-  constructor(private prisma: PrismaService, private readings: DailyReadingsService, private shifts: ShiftReportsService, private attachments: AttachmentsService) {}
+  constructor(private prisma: PrismaService, private readings: DailyReadingsService, private shifts: ShiftReportsService, private attachments: AttachmentsService, private jobCards: JobCardsService) {}
 
   @Post('push')
   async push(@CurrentUser() u: AuthUser, @Body(new ZodPipe(PushSchema)) b: z.infer<typeof PushSchema>) {
@@ -43,6 +44,12 @@ export class SyncController {
           if (d.id && (await this.prisma.shiftReport.findUnique({ where: { id: d.id } }))) { results.push({ opId: op.opId, status: 'duplicate', id: d.id }); continue; }
           try { const r = await this.shifts.create(u, d); results.push({ opId: op.opId, status: 'applied', id: r.id }); }
           catch (e) { if ((e as { status?: number }).status === 409) { await this.conflict(u, 'ShiftReport', d.id, d); results.push({ opId: op.opId, status: 'conflict', error: (e as Error).message }); } else throw e; }
+          continue;
+        }
+        if (op.kind === 'job_card') {
+          const d = JobCardSchema.parse(op.payload);
+          if (d.id && (await this.prisma.jobCard.findUnique({ where: { id: d.id } }))) { results.push({ opId: op.opId, status: 'duplicate', id: d.id }); continue; }
+          const r = await this.jobCards.create(u, d); results.push({ opId: op.opId, status: 'applied', id: r.id });
         }
       } catch (e) {
         const err = e as { message?: string; response?: { message?: unknown } };

@@ -7,7 +7,7 @@ import { api } from '../lib/api';
  * Offline outbox (SRS §4.3, §9.2): every submission is written here first, then pushed in order to /sync/push.
  * Ops carry client-generated UUIDs so retries are idempotent; the server answers applied/duplicate/conflict/rejected.
  */
-export type OpKind = 'attachment' | 'daily_reading' | 'shift_report';
+export type OpKind = 'attachment' | 'daily_reading' | 'shift_report' | 'job_card';
 export type Op = { opId: string; kind: OpKind; payload: unknown; queuedAt: string; attempts: number; error?: string; label: string };
 export type SyncState = { online: boolean; syncing: boolean; pending: number; failed: number; lastSyncAt?: string };
 

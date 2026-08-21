@@ -25,6 +25,9 @@ async function main() {
   for (const c of [['Bentonite', 'KG'], ['Polymer', 'LITRES'], ['Foam', 'LITRES']] as const) {
     await prisma.chemical.upsert({ where: { name: c[0] }, update: {}, create: { name: c[0], defaultUnit: c[1] } });
   }
+  for (const [partNo, name, qty, min, cost] of [['FLT-OIL-01', 'Engine oil filter', 12, 4, 18.5], ['FLT-HYD-02', 'Hydraulic return filter', 6, 2, 42], ['FLT-AIR-03', 'Air filter element', 3, 4, 35], ['OIL-15W40-20L', 'Engine oil 15W40 (20 L)', 10, 3, 95], ['GRS-EP2-18KG', 'EP2 grease (18 kg)', 4, 2, 70], ['BLT-ALT-07', 'Alternator belt', 2, 2, 28]] as const) {
+    await prisma.part.upsert({ where: { partNo }, update: {}, create: { partNo, name, qtyOnHand: qty, minQty: min, unitCost: cost } });
+  }
   console.log('Seeded. Logins: ADM001/MGR001/SUP001/TEC001/OPR001 with password Password123');
 }
 main().finally(() => prisma.$disconnect());
