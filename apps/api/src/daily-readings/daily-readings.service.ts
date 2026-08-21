@@ -2,13 +2,14 @@ import { ForbiddenException, Injectable, ConflictException } from '@nestjs/commo
 import { DailyReadingInput, fuelConsumed, readingAlerts } from '@drillex/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { StorageService } from '../storage/storage.service';
 import { AuthUser } from '../auth/decorators';
 
 const ALERT_LABEL: Record<string, string> = { WARNING_LIGHTS: 'Warning lights active', LEAKS: 'Leak observed', UNUSUAL_NOISES: 'Unusual noise / vibration', MAINTENANCE_REVIEW: 'Condition rated poor — maintenance review' };
 
 @Injectable()
 export class DailyReadingsService {
-  constructor(private prisma: PrismaService, private notify: NotificationsService) {}
+  constructor(private prisma: PrismaService, private notify: NotificationsService, private storage: StorageService) {}
 
   private assetScope(u: AuthUser) {
     return u.scope === 'self' ? { operators: { some: { userId: u.id, validTo: null } } } : u.scope === 'site' ? { siteId: u.siteId ?? undefined } : {};
@@ -28,7 +29,10 @@ export class DailyReadingsService {
   }
 
   async get(u: AuthUser, id: string) {
-    return this.prisma.dailyReading.findFirstOrThrow({ where: { id, asset: this.assetScope(u) }, include: { asset: true, user: { select: { employeeId: true, name: true } } } });
+    const r = await this.prisma.dailyReading.findFirstOrThrow({ where: { id, asset: this.assetScope(u) }, include: { asset: true, user: { select: { employeeId: true, name: true } } } });
+    const atts = await this.prisma.attachment.findMany({ where: { ownerType: 'DailyReading', ownerId: id }, orderBy: { createdAt: 'asc' } });
+    const attachments = await Promise.all(atts.map(async (a) => ({ id: a.id, kind: a.kind, url: await this.storage.urlFor(a.storageKey) })));
+    return { ...r, attachments };
   }
 
   /** SRS §5: one reading per asset per day, only by an assigned operator; alerts per §5.3. */

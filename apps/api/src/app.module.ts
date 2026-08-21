@@ -10,6 +10,9 @@ import { DashboardModule } from './dashboard/dashboard.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { DailyReadingsModule } from './daily-readings/daily-readings.module';
 import { ShiftReportsModule } from './shift-reports/shift-reports.module';
+import { StorageModule } from './storage/storage.module';
+import { AttachmentsModule } from './attachments/attachments.module';
+import { SyncModule } from './sync/sync.module';
 import { HealthController } from './common/health.controller';
 import { SitesController } from './common/sites.controller';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
@@ -19,7 +22,7 @@ import { RbacGuard } from './auth/rbac.guard';
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 120 }]),
-    PrismaModule, AuthModule, UsersModule, AssetsModule, DashboardModule, NotificationsModule, DailyReadingsModule, ShiftReportsModule,
+    PrismaModule, AuthModule, UsersModule, AssetsModule, DashboardModule, NotificationsModule, DailyReadingsModule, ShiftReportsModule, StorageModule, AttachmentsModule, SyncModule,
   ],
   controllers: [HealthController, SitesController],
   providers: [

@@ -134,7 +134,7 @@ All syncable tables carry `id (uuid)`, `created_at`, `updated_at`, `deleted_at`,
 
 **RBAC** — a single permission matrix in `packages/shared/rbac.ts` (e.g. `shift_report:create` → OPERATOR on own assigned asset; `shift_report:approve` → SUPERVISOR same site, MANAGER all). Enforced by Nest guards + row-level scoping (site/asset/self); the same matrix hides UI in both clients.
 
-**Offline** — every form writes to WatermelonDB first; a background sync task runs on connectivity change and app foreground; header badge shows *Synced / Pending (n) / Conflict*. Submission is "final" locally (read-only) but stays pending until the server acks. Server rejects invalid rows and returns per-row errors which the app surfaces.
+**Offline** — *(Decision 2026-08-21: implemented as an outbox queue instead of WatermelonDB — our records are append-only submissions, so a client-UUID outbox + idempotent `/sync/push` gives the same SRS guarantees with no native DB setup; WatermelonDB remains the upgrade path if bidirectional offline editing is ever needed.)* Every form writes to the local outbox first; a background sync task runs on connectivity change and app foreground; header badge shows *Synced / Pending (n) / Conflict*. Submission is "final" locally (read-only) but stays pending until the server acks. Server rejects invalid rows and returns per-row errors which the app surfaces.
 
 **Signatures** — captured as PNG via `react-native-signature-canvas`, stored as attachments, hashed into the audit record.
 

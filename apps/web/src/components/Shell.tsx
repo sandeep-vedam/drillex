@@ -17,6 +17,7 @@ const NAV = [
   { href: '/reports', label: 'Reports', icon: I.Report, roles: ['SUPERVISOR', 'MANAGER'] },
 ];
 const ADMIN = [
+  { href: '/sync-conflicts', label: 'Sync conflicts', icon: I.Sync, roles: ['SUPERVISOR', 'MANAGER'] },
   { href: '/users', label: 'User management', icon: I.Users, roles: ['ADMIN'] },
   { href: '/settings', label: 'Settings', icon: I.Settings, roles: ['*'] },
 ];

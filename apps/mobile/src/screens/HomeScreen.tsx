@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, FlatList, StyleSheet, Pressable, RefreshControl } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { api, clearSession, loadSession } from '../lib/api';
+import { cached } from '../sync/cache';
 import type { RootStackParamList } from '../navigation';
 import { Card, Eyebrow, Stat, StatusChip } from '../ui';
 import { colors } from '../ui/theme';
@@ -19,8 +20,8 @@ export default function HomeScreen({ navigation }: Props) {
 
   const load = useCallback(async () => {
     try {
-      const [a, sm, sess] = await Promise.all([api<Asset[]>('/assets'), api<Summary>('/dashboard/summary'), loadSession()]);
-      setAssets(a); setSummary(sm); setWho(sess?.user ?? null); setError(null);
+      const [a, sm, sess] = await Promise.all([cached('assets', () => api<Asset[]>('/assets')), cached('summary', () => api<Summary>('/dashboard/summary')), loadSession()]);
+      setAssets(a.data); setSummary(sm.data); setWho(sess?.user ?? null); setError(a.fromCache ? 'Offline — showing last synced data.' : null);
     } catch (e) { setError((e as Error).message); }
   }, []);
   useEffect(() => { load(); }, [load]);

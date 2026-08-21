@@ -8,6 +8,9 @@ import HomeScreen from './src/screens/HomeScreen';
 import LockScreen from './src/screens/LockScreen';
 import DailyReadingScreen from './src/screens/DailyReadingScreen';
 import ShiftReportScreen from './src/screens/ShiftReportScreen';
+import OutboxScreen from './src/screens/OutboxScreen';
+import { SyncBadge } from './src/ui/SyncBadge';
+import { startSyncLoop } from './src/sync/outbox';
 import { loadSession } from './src/lib/api';
 import type { RootStackParamList } from './src/navigation';
 import { IdleLockProvider, useIdleLock } from './src/security/IdleLock';
@@ -24,7 +27,8 @@ function Root({ initial }: { initial: 'Login' | 'Home' }) {
       <NavigationContainer ref={navRef} onStateChange={() => setRoute(navRef.getCurrentRoute()?.name)}>
         <Stack.Navigator initialRouteName={initial} screenOptions={{ headerStyle: { backgroundColor: '#0B1B30' }, headerTintColor: '#fff', headerTitleStyle: { fontWeight: '700' } }}>
           <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
-          <Stack.Screen name="Home" component={HomeScreen} options={{ title: 'Drillex Ops' }} />
+          <Stack.Screen name="Home" component={HomeScreen} options={{ title: 'Drillex Ops', headerRight: () => <SyncBadge onPress={() => navRef.navigate('Outbox')} /> }} />
+          <Stack.Screen name="Outbox" component={OutboxScreen} options={{ title: 'Sync queue' }} />
           <Stack.Screen name="DailyReading" component={DailyReadingScreen} options={{ title: 'Daily reading' }} />
           <Stack.Screen name="ShiftReport" component={ShiftReportScreen} options={{ title: 'Shift production report' }} />
         </Stack.Navigator>
@@ -40,7 +44,7 @@ function Root({ initial }: { initial: 'Login' | 'Home' }) {
 
 export default function App() {
   const [initial, setInitial] = useState<'Login' | 'Home' | null>(null);
-  useEffect(() => { loadSession().then((s) => setInitial(s ? 'Home' : 'Login')).catch(() => setInitial('Login')); }, []);
+  useEffect(() => { loadSession().then((s) => setInitial(s ? 'Home' : 'Login')).catch(() => setInitial('Login')); return startSyncLoop(); }, []);
   if (!initial) return <View style={{ flex: 1, justifyContent: 'center' }}><ActivityIndicator /></View>;
   return (
     <SafeAreaProvider>

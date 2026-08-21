@@ -2,7 +2,9 @@ import React, { useMemo, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { DailyReadingSchema, readingAlerts, fuelConsumed } from '@drillex/shared';
-import { api } from '../lib/api';
+import { enqueue, uuid } from '../sync/outbox';
+import { SignaturePad } from '../ui/SignaturePad';
+import { PhotoPicker, Photo } from '../ui/PhotoPicker';
 import type { RootStackParamList } from '../navigation';
 import { Button, Card, Eyebrow } from '../ui';
 import { NumberField, Rating, Section, Segmented, Toggle } from '../ui/form';
@@ -24,14 +26,17 @@ export default function DailyReadingScreen({ route, navigation }: Props) {
   const set = <K extends keyof typeof f>(k: K, v: (typeof f)[K]) => setF((x) => ({ ...x, [k]: v }));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [signature, setSignature] = useState<string | null>(null);
+  const [photos, setPhotos] = useState<Photo[]>([]);
 
   const consumed = useMemo(() => (f.fuelStart && f.fuelEnd ? fuelConsumed(Number(f.fuelStart), Number(f.fuelEnd)) : null), [f.fuelStart, f.fuelEnd]);
   const alerts = readingAlerts({ warningLights: f.warningLights, leaks: f.leaks, unusualNoises: f.unusualNoises, conditionRating: f.conditionRating || 5 });
 
   async function submit() {
     setError(null);
+    const readingId = uuid(); const sigId = signature ? uuid() : undefined;
     const payload = {
-      assetId, date: new Date().toISOString().slice(0, 10),
+      id: readingId, assetId, date: new Date().toISOString().slice(0, 10), signatureAttachmentId: sigId,
       hourMeter: Number(f.hourMeter), fuelStart: Number(f.fuelStart), fuelEnd: Number(f.fuelEnd),
       engineOil: f.engineOil, hydraulicOil: f.hydraulicOil, coolant: f.coolant, airFilter: f.airFilter, battery: f.battery,
       tyrePressures: Object.fromEntries(Object.entries(f.tyres).filter(([, v]) => v !== '').map(([k, v]) => [k, Number(v)])),
@@ -44,10 +49,14 @@ export default function DailyReadingScreen({ route, navigation }: Props) {
     if (!parsed.success) { const first = parsed.error.issues[0]; setError(`${first.path.join('.') || 'Form'}: ${first.message}`); return; }
     if (!f.hourMeter || !f.fuelStart || !f.fuelEnd) { setError('Hour meter and fuel levels are required.'); return; }
     if (!f.conditionRating) { setError('Please rate the machine condition.'); return; }
+    if (!signature) { setError('Please sign the reading.'); return; }
     setBusy(true);
     try {
-      const r = await api<{ alerts: string[] }>('/daily-readings', { method: 'POST', body: JSON.stringify(payload) });
-      Alert.alert('Reading submitted', r.alerts.length ? `Supervisor and maintenance have been alerted (${r.alerts.length} flag${r.alerts.length > 1 ? 's' : ''}).` : 'No issues flagged. Thank you.', [{ text: 'OK', onPress: () => navigation.goBack() }]);
+      // Attachments first, then the record — all idempotent by client UUID; synced in order when online.
+      await enqueue('attachment', { id: sigId, ownerType: 'DailyReading', ownerId: readingId, kind: 'SIGNATURE', contentType: 'image/png', base64: signature.replace(/^data:image\/png;base64,/, '') }, `${assetNumber} · signature`);
+      for (const p of photos) await enqueue('attachment', { id: uuid(), ownerType: 'DailyReading', ownerId: readingId, kind: 'PHOTO', contentType: p.type, base64: p.base64 }, `${assetNumber} · photo`);
+      await enqueue('daily_reading', payload, `${assetNumber} · daily reading ${payload.date}`);
+      Alert.alert('Reading saved', alerts.length ? `Supervisor and maintenance will be alerted (${alerts.length} flag${alerts.length > 1 ? 's' : ''}). It will sync automatically.` : 'Saved on this device and will sync automatically.', [{ text: 'OK', onPress: () => navigation.goBack() }]);
     } catch (e) { setError((e as Error).message); } finally { setBusy(false); }
   }
 
@@ -92,10 +101,15 @@ export default function DailyReadingScreen({ route, navigation }: Props) {
           <TextInput style={s.notes} value={f.notes} onChangeText={(v) => set('notes', v)} placeholder="Operator notes / observations" placeholderTextColor="#9AA6B3" multiline />
         </Section>
 
+        <Section title="Photos & sign-off">
+          <PhotoPicker photos={photos} onChange={setPhotos} max={5} label="Photos of any issues" />
+          <SignaturePad value={signature} onChange={setSignature} />
+        </Section>
+
         {alerts.length > 0 && <View style={s.alertBox}><Text style={s.alertTitle}>This reading will alert the supervisor &amp; maintenance team</Text><Text style={s.alertBody}>{alerts.join(' · ').replace(/_/g, ' ').toLowerCase()}</Text></View>}
         {error && <Text style={s.err}>{error}</Text>}
         <Button title={busy ? 'Submitting…' : 'Sign & submit reading'} onPress={submit} disabled={busy} />
-        <Text style={s.help}>Signature capture and photo attachments arrive with the sync/attachments increment. Submission is final; edits require a supervisor unlock.</Text>
+        <Text style={s.help}>Works offline — saved on this device and synced when you have signal. Submission is final; edits require a supervisor unlock.</Text>
       </ScrollView>
     </KeyboardAvoidingView>
   );

@@ -26,6 +26,8 @@ export default function ReadingsPage() {
   const [q, setQ] = useState('');
   const [sel, setSel] = useState<Reading | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [atts, setAtts] = useState<{ id: string; kind: string; url: string }[]>([]);
+  useEffect(() => { if (!sel) { setAtts([]); return; } api<{ attachments: { id: string; kind: string; url: string }[] }>(`/daily-readings/${sel.id}`).then((d) => setAtts(d.attachments ?? [])).catch(() => setAtts([])); }, [sel]);
   useEffect(() => { api<Reading[]>(`/daily-readings${onlyFlagged ? '?flagged=1' : ''}`).then(setRows).catch((e) => setError(e.message)); }, [onlyFlagged]);
   const list = useMemo(() => rows.filter((r) => `${r.asset.assetNumber} ${r.asset.name} ${r.user.employeeId}`.toLowerCase().includes(q.toLowerCase())), [rows, q]);
   const nFlag = rows.filter(flagged).length;
@@ -68,6 +70,8 @@ export default function ReadingsPage() {
             <div className="flex flex-col gap-1.5"><Flag on={sel.warningLights} label="Warning lights" note={sel.warningLightsNote} /><Flag on={sel.leaks} label="Leaks" note={sel.leaksNote} /><Flag on={sel.unusualNoises} label="Unusual noises / vibration" note={sel.unusualNoisesNote} /></div>
             <div className="flex items-center justify-between"><span className="text-[13px] text-muted">Machine condition</span><Stars n={sel.conditionRating} /></div>
             {sel.notes && <div className="text-[13px] border-l-2 border-line pl-3 text-muted">“{sel.notes}”</div>}
+            {atts.some((a) => a.kind === 'PHOTO') && <div><div className="eyebrow mb-1">Photos</div><div className="flex flex-wrap gap-2">{atts.filter((a) => a.kind === 'PHOTO').map((a) => <a key={a.id} href={a.url} target="_blank" rel="noreferrer"><img src={a.url} alt="Reading photo" className="h-20 w-20 object-cover border border-line" /></a>)}</div></div>}
+            {atts.filter((a) => a.kind === 'SIGNATURE').map((a) => <div key={a.id}><div className="eyebrow mb-1">Operator signature</div><img src={a.url} alt="Operator signature" className="h-16 border border-line bg-white" /></div>)}
           </aside>
         )}
       </div>

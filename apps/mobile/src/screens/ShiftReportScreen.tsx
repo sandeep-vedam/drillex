@@ -3,6 +3,9 @@ import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleShee
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { ShiftReportSchema, totalMetersDrilled } from '@drillex/shared';
 import { api } from '../lib/api';
+import { enqueue, uuid } from '../sync/outbox';
+import { cached } from '../sync/cache';
+import { SignaturePad } from '../ui/SignaturePad';
 import type { RootStackParamList } from '../navigation';
 import { Button, Card, Eyebrow } from '../ui';
 import { NumberField, Section, Segmented } from '../ui/form';
@@ -23,7 +26,8 @@ export default function ShiftReportScreen({ route, navigation }: Props) {
   const [rows, setRows] = useState<Row[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  useEffect(() => { api<Chemical[]>('/chemicals').then(setChems).catch(() => {}); }, []);
+  const [signature, setSignature] = useState<string | null>(null);
+  useEffect(() => { cached('chemicals', () => api<Chemical[]>('/chemicals')).then((r) => setChems(r.data)).catch(() => {}); }, []);
 
   const total = useMemo(() => (f.startDepth && f.endDepth ? totalMetersDrilled(Number(f.startDepth), Number(f.endDepth)) : null), [f.startDepth, f.endDepth]);
   const depthBad = f.startDepth !== '' && f.endDepth !== '' && Number(f.endDepth) < Number(f.startDepth);
@@ -32,8 +36,9 @@ export default function ShiftReportScreen({ route, navigation }: Props) {
 
   async function submit() {
     setError(null);
+    const reportId = uuid(); const sigId = signature ? uuid() : undefined;
     const payload = {
-      assetId, siteId, date: new Date().toISOString().slice(0, 10), shift: f.shift, holeRef: f.holeRef,
+      id: reportId, signatureAttachmentId: sigId, assetId, siteId, date: new Date().toISOString().slice(0, 10), shift: f.shift, holeRef: f.holeRef,
       startDepth: Number(f.startDepth), endDepth: Number(f.endDepth), holesCompleted: Number(f.holesCompleted), holeDiameterMm: Number(f.holeDiameterMm),
       rockType: f.rockType === 'Other' ? f.rockOther : f.rockType, penetrationRate: Number(f.penetrationRate), downtimeHours: Number(f.downtimeHours || 0),
       downtimeReason: f.downtimeReason === 'None' ? undefined : f.downtimeReason === 'Other' ? f.downtimeOther : f.downtimeReason,
@@ -41,10 +46,12 @@ export default function ShiftReportScreen({ route, navigation }: Props) {
     };
     const parsed = ShiftReportSchema.safeParse(payload);
     if (!parsed.success) { const i = parsed.error.issues[0]; setError(`${i.path.join('.') || 'Form'}: ${i.message}`); return; }
+    if (!signature) { setError('Please sign the report.'); return; }
     setBusy(true);
     try {
-      const r = await api<{ totalMeters: string }>('/shift-reports', { method: 'POST', body: JSON.stringify(payload) });
-      Alert.alert('Shift report submitted', `${Number(r.totalMeters)} m recorded. Your supervisor has been notified to approve it.`, [{ text: 'OK', onPress: () => navigation.goBack() }]);
+      await enqueue('attachment', { id: sigId, ownerType: 'ShiftReport', ownerId: reportId, kind: 'SIGNATURE', contentType: 'image/png', base64: signature.replace(/^data:image\/png;base64,/, '') }, `${assetNumber} · signature`);
+      await enqueue('shift_report', payload, `${assetNumber} · ${f.shift.toLowerCase()} shift ${payload.date}`);
+      Alert.alert('Shift report saved', `${total ?? 0} m recorded. It will sync and your supervisor will be asked to approve it.`, [{ text: 'OK', onPress: () => navigation.goBack() }]);
     } catch (e) { setError((e as Error).message); } finally { setBusy(false); }
   }
 
@@ -95,9 +102,10 @@ export default function ShiftReportScreen({ route, navigation }: Props) {
           <Button title="+ Add chemical row" onPress={addRow} variant="ghost" />
         </Section>
 
+        <Section title="Sign-off"><SignaturePad value={signature} onChange={setSignature} /></Section>
         {error && <Text style={s.err}>{error}</Text>}
-        <Button title={busy ? 'Submitting…' : 'Sign & submit shift report'} onPress={submit} disabled={busy || depthBad} />
-        <Text style={s.help}>Submission is final. Corrections require a supervisor unlock and are audit-logged.</Text>
+        <Button title={busy ? 'Saving…' : 'Sign & submit shift report'} onPress={submit} disabled={busy || depthBad} />
+        <Text style={s.help}>Works offline — saved on this device and synced when you have signal. Submission is final; corrections require a supervisor unlock and are audit-logged.</Text>
       </ScrollView>
     </KeyboardAvoidingView>
   );
