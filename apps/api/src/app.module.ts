@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { ScheduleModule } from '@nestjs/schedule';
 import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
@@ -13,6 +14,7 @@ import { ShiftReportsModule } from './shift-reports/shift-reports.module';
 import { StorageModule } from './storage/storage.module';
 import { AttachmentsModule } from './attachments/attachments.module';
 import { SyncModule } from './sync/sync.module';
+import { MaintenanceModule } from './maintenance/maintenance.module';
 import { HealthController } from './common/health.controller';
 import { SitesController } from './common/sites.controller';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
@@ -22,7 +24,8 @@ import { RbacGuard } from './auth/rbac.guard';
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 120 }]),
-    PrismaModule, AuthModule, UsersModule, AssetsModule, DashboardModule, NotificationsModule, DailyReadingsModule, ShiftReportsModule, StorageModule, AttachmentsModule, SyncModule,
+    ScheduleModule.forRoot(),
+    PrismaModule, AuthModule, UsersModule, AssetsModule, DashboardModule, NotificationsModule, DailyReadingsModule, ShiftReportsModule, StorageModule, AttachmentsModule, SyncModule, MaintenanceModule,
   ],
   controllers: [HealthController, SitesController],
   providers: [

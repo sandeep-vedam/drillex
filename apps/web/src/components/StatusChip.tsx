@@ -6,6 +6,10 @@ const map: Record<string, { label: string; cls: string; dot: string }> = {
   SUBMITTED: { label: 'Awaiting approval', cls: 'bg-warn/10 text-warn', dot: 'bg-warn' },
   APPROVED: { label: 'Approved', cls: 'bg-ok/10 text-ok', dot: 'bg-ok' },
   OVERDUE: { label: 'Overdue', cls: 'bg-crit/10 text-crit', dot: 'bg-crit' },
+  DUE_NOW: { label: 'Due now', cls: 'bg-hazard/10 text-hazard', dot: 'bg-hazard' },
+  UPCOMING: { label: 'Upcoming', cls: 'bg-navy-100 text-navy-800', dot: 'bg-navy-600' },
+  COMPLETED: { label: 'Completed', cls: 'bg-ok/10 text-ok', dot: 'bg-ok' },
+  UNLOCKED: { label: 'Unlocked', cls: 'bg-hazard/10 text-hazard', dot: 'bg-hazard' },
 };
 export function StatusChip({ status }: { status: string }) {
   const m = map[status] ?? { label: status, cls: 'bg-steel/10 text-steel', dot: 'bg-steel' };

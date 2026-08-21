@@ -9,6 +9,7 @@ import LockScreen from './src/screens/LockScreen';
 import DailyReadingScreen from './src/screens/DailyReadingScreen';
 import ShiftReportScreen from './src/screens/ShiftReportScreen';
 import OutboxScreen from './src/screens/OutboxScreen';
+import MaintenanceScreen from './src/screens/MaintenanceScreen';
 import { SyncBadge } from './src/ui/SyncBadge';
 import { startSyncLoop } from './src/sync/outbox';
 import { loadSession } from './src/lib/api';
@@ -29,6 +30,7 @@ function Root({ initial }: { initial: 'Login' | 'Home' }) {
           <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
           <Stack.Screen name="Home" component={HomeScreen} options={{ title: 'Drillex Ops', headerRight: () => <SyncBadge onPress={() => navRef.navigate('Outbox')} /> }} />
           <Stack.Screen name="Outbox" component={OutboxScreen} options={{ title: 'Sync queue' }} />
+          <Stack.Screen name="Maintenance" component={MaintenanceScreen} options={{ title: 'Maintenance' }} />
           <Stack.Screen name="DailyReading" component={DailyReadingScreen} options={{ title: 'Daily reading' }} />
           <Stack.Screen name="ShiftReport" component={ShiftReportScreen} options={{ title: 'Shift production report' }} />
         </Stack.Navigator>

@@ -28,7 +28,9 @@ export default function HomeScreen({ navigation }: Props) {
   async function signOut() { await clearSession(); navigation.replace('Login'); }
 
   const greeting = new Date().getHours() < 12 ? 'Good morning' : new Date().getHours() < 17 ? 'Good afternoon' : 'Good evening';
+  const isTech = who?.role === 'TECHNICIAN' || who?.role === 'SUPERVISOR';
   const tasks = [
+    ...(isTech ? [{ key: 'maint', title: 'Maintenance services', sub: 'View assigned services · mark completed', tone: colors.hazard, onPress: () => navigation.navigate('Maintenance') }] : []),
     { key: 'reading', title: 'Daily machine readings', sub: summary ? (summary.readingsToday ? 'Submitted today' : 'Due today — not yet submitted') : '—', tone: summary?.readingsToday ? colors.ok : colors.hazard },
     { key: 'shift', title: 'Shift production report', sub: 'Submit at end of shift', tone: colors.navy700 },
   ];
@@ -54,9 +56,11 @@ export default function HomeScreen({ navigation }: Props) {
           </View>
           <Eyebrow>Today</Eyebrow>
           {tasks.map((t) => (
-            <Card key={t.key} stripe={t.tone} style={{ paddingLeft: 18 }}>
-              <Text style={s.taskTitle}>{t.title}</Text><Text style={s.taskSub}>{t.sub}</Text>
-            </Card>
+            <Pressable key={t.key} onPress={'onPress' in t ? t.onPress : undefined} disabled={!('onPress' in t)}>
+              <Card stripe={t.tone} style={{ paddingLeft: 18 }}>
+                <Text style={s.taskTitle}>{t.title}{'onPress' in t ? '  →' : ''}</Text><Text style={s.taskSub}>{t.sub}</Text>
+              </Card>
+            </Pressable>
           ))}
           <Eyebrow>My assets</Eyebrow>
         </View>
