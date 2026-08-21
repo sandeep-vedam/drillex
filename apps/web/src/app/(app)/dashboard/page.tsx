@@ -7,7 +7,7 @@ import { StatusChip } from '@/components/StatusChip';
 import { I } from '@/components/Icons';
 import { api } from '@/lib/api';
 
-type Summary = { assets: { total: number; active: number; underMaintenance: number; idle: number; decommissioned: number }; readingsToday: number; pendingApprovals: number; openAlerts: number; overdueMaintenance: number; recentActivity: { employeeId: string; success: boolean; deviceId: string; createdAt: string }[] };
+type Summary = { assets: { total: number; active: number; underMaintenance: number; idle: number; decommissioned: number }; readingsToday: number; pendingApprovals: number; openAlerts: number; overdueMaintenance: number; recentActivity: { employeeId: string; success: boolean; deviceId: string; createdAt: string }[]; alerts: { id: string; severity: string; message: string; createdAt: string; asset: { assetNumber: string; name: string } }[] };
 type Asset = { id: string; assetNumber: string; name: string; category: string; status: string; make: string; model: string };
 
 export default function Dashboard() {
@@ -52,6 +52,20 @@ export default function Dashboard() {
             </table>
           </div>
         </section>
+        <div className="flex flex-col gap-6">
+        <section className="card">
+          <header className="flex items-center justify-between px-5 py-4 border-b border-line"><h2 className="font-display font-semibold text-[20px] text-navy-800">Machine alerts</h2><Link href="/readings" className="text-[13px] text-navy-600 hover:underline">Readings →</Link></header>
+          <ul className="divide-y divide-line">
+            {(s?.alerts ?? []).map((a) => (
+              <li key={a.id} className="px-5 py-3 flex items-start gap-3 text-[13px]">
+                <span className={`mt-1.5 h-2 w-2 shrink-0 ${a.severity === 'HIGH' ? 'bg-crit' : 'bg-hazard'}`} />
+                <div className="flex-1 min-w-0"><span className="font-mono font-medium">{a.asset.assetNumber}</span> <span className="text-muted">{a.asset.name}</span><div className="font-medium">{a.message}</div></div>
+                <time className="text-muted tnum whitespace-nowrap">{new Date(a.createdAt).toLocaleDateString(undefined, { day: '2-digit', month: 'short' })}</time>
+              </li>
+            ))}
+            {s && !s.alerts.length && <li className="px-5 py-6 text-center text-muted text-sm">No open alerts — fleet is clear.</li>}
+          </ul>
+        </section>
         <section className="card">
           <header className="px-5 py-4 border-b border-line"><h2 className="font-display font-semibold text-[20px] text-navy-800">Recent activity</h2></header>
           <ul className="divide-y divide-line">
@@ -66,6 +80,7 @@ export default function Dashboard() {
             {!s && <li className="px-5 py-10 text-center text-muted text-sm">Loading…</li>}
           </ul>
         </section>
+        </div>
       </div>
     </Shell>
   );

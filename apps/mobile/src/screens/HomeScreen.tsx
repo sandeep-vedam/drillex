@@ -62,13 +62,16 @@ export default function HomeScreen({ navigation }: Props) {
       }
       ListEmptyComponent={!error ? <Card><Text style={{ color: colors.muted }}>No assets assigned to you yet.</Text></Card> : undefined}
       renderItem={({ item }) => (
+        <Pressable onPress={() => navigation.navigate('DailyReading', { assetId: item.id, assetNumber: item.assetNumber, assetName: item.name })}>
         <Card>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
             <Text style={s.num}>{item.assetNumber}</Text><StatusChip status={item.status} />
           </View>
           <Text style={s.name}>{item.name}</Text>
           <Text style={s.meta}>{item.make} {item.model}</Text>
+          <Text style={s.cta}>Submit daily reading →</Text>
         </Card>
+        </Pressable>
       )}
     />
   );
@@ -83,4 +86,5 @@ const s = StyleSheet.create({
   taskTitle: { fontSize: 16, fontWeight: '700', color: colors.ink }, taskSub: { color: colors.muted, fontSize: 13, marginTop: 2 },
   num: { fontFamily: 'Menlo', fontWeight: '700', color: colors.navy800, fontSize: 15 },
   name: { fontSize: 17, fontWeight: '600', color: colors.ink, marginTop: 6 }, meta: { color: colors.muted, fontSize: 13, marginTop: 2 },
+  cta: { color: colors.navy700, fontWeight: '700', fontSize: 13, marginTop: 10 },
 });
