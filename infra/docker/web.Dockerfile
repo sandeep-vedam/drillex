@@ -15,7 +15,8 @@ COPY packages/shared packages/shared
 COPY apps/web apps/web
 ARG NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
-RUN pnpm --filter @drillex/shared build \
+RUN mkdir -p apps/web/public \
+ && pnpm --filter @drillex/shared build \
  && pnpm --filter @drillex/web build
 
 FROM node:20-slim AS runner
