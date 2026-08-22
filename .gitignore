@@ -8,5 +8,6 @@ coverage/
 .env
 .env.*
 !.env.example
+!.env.prod.example
 .DS_Store
 apps/api/generated/

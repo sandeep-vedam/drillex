@@ -39,6 +39,18 @@ k6 run -e API=http://localhost:4000/api/v1 infra/load/k6-smoke.js   # 200-VU loa
 ```
 CI (`.github/workflows/ci.yml`) runs install → migrate → seed → typecheck → tests → API/web builds on every push/PR.
 
+## Deploy to a VPS (Docker Compose + Caddy)
+Works on any Linux VPS (Hostinger KVM, DigitalOcean, Hetzner, EC2, …) — Caddy auto-issues Let's Encrypt certs for whatever domains you point at it.
+```bash
+# On a fresh Ubuntu/Debian VPS, as root:
+curl -fsSL https://raw.githubusercontent.com/sandeep-vedam/drillex/master/infra/setup-vps.sh | bash
+# Point DNS A records for api.yourdomain.com and app.yourdomain.com at the VPS IP, then:
+cd /opt/drillex/infra
+cp .env.prod.example .env.prod && nano .env.prod   # fill in your domains + generated secrets
+./deploy.sh
+```
+`deploy.sh` builds and starts Postgres, Redis, MinIO, the API (runs `prisma migrate deploy` on boot), the web app, and Caddy. Re-run `./deploy.sh` after `git push` to redeploy. See `infra/docker-compose.prod.yml`.
+
 ## Production checklist
 - `NODE_ENV=production`, 32+ char `JWT_ACCESS_SECRET`/`JWT_REFRESH_SECRET` (server refuses weak secrets), `CORS_ORIGINS`
 - `STORAGE_DRIVER=s3` + bucket creds (MinIO/R2/S3); `SMTP_*` for report email; `FCM_*` for push
