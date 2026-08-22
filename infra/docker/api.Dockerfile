@@ -1,6 +1,9 @@
 # apps/api — NestJS + Prisma. Build from the monorepo root: `docker build -f infra/docker/api.Dockerfile .`
 FROM node:20-slim AS base
 RUN corepack enable
+# openssl must be present so `prisma generate` correctly detects the engine target
+# (debian-openssl-3.0.x, matching the runner stage) instead of guessing 1.1.x.
+RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates && rm -rf /var/lib/apt/lists/*
 WORKDIR /repo
 
 FROM base AS deps
