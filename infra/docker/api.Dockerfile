@@ -27,4 +27,4 @@ COPY --from=build /out/dist ./dist
 COPY --from=build /out/prisma ./prisma
 COPY --from=build /out/package.json ./package.json
 EXPOSE 4000
-CMD ["sh", "-c", "node_modules/.bin/prisma migrate deploy && node dist/main.js"]
+CMD ["sh", "-c", "node_modules/.bin/prisma migrate deploy && node dist/src/main.js"]
