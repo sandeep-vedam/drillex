@@ -1,5 +1,6 @@
-import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { z } from 'zod';
+import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthUser, CurrentUser, RequirePermission } from '../auth/decorators';
 import { ZodPipe } from '../common/zod.pipe';
@@ -9,6 +10,13 @@ const PartSchema = z.object({ partNo: z.string().min(1), name: z.string().min(1)
 const PRSchema = z.object({ partId: z.string().uuid(), quantity: z.number().int().positive(), notes: z.string().optional() });
 const PRStatusSchema = z.object({ status: z.enum(['ORDERED', 'RECEIVED', 'CANCELLED']) });
 const MoveSchema = z.object({ type: z.enum(['IN', 'OUT', 'ADJUST']), quantity: z.number().int(), reference: z.string().optional() });
+
+/** Throws if decrementing `partId` by `qty` would take qtyOnHand below zero. Must run inside the same transaction as the decrement. */
+export async function assertSufficientStock(tx: Prisma.TransactionClient, partId: string, qty: number) {
+  if (qty <= 0) return;
+  const part = await tx.part.findUniqueOrThrow({ where: { id: partId } });
+  if (part.qtyOnHand < qty) throw new BadRequestException(`Insufficient stock for ${part.partNo} (${part.qtyOnHand} on hand, ${qty} requested)`);
+}
 
 @Controller('parts')
 export class PartsController {
@@ -22,6 +30,7 @@ export class PartsController {
   async move(@CurrentUser() u: AuthUser, @Param('id') id: string, @Body(new ZodPipe(MoveSchema)) b: z.infer<typeof MoveSchema>) {
     const delta = b.type === 'IN' ? Math.abs(b.quantity) : b.type === 'OUT' ? -Math.abs(b.quantity) : b.quantity;
     const part = await this.prisma.$transaction(async (tx) => {
+      if (delta < 0) await assertSufficientStock(tx, id, -delta);
       await tx.partStockMovement.create({ data: { partId: id, type: b.type, quantity: delta, reference: b.reference ?? `${u.employeeId}` } });
       return tx.part.update({ where: { id }, data: { qtyOnHand: { increment: delta } } });
     });

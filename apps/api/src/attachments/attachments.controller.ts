@@ -10,5 +10,5 @@ export const AttachmentSchema = z.object({ id: z.string().uuid().optional(), own
 export class AttachmentsController {
   constructor(private svc: AttachmentsService) {}
   @Post() upload(@CurrentUser() u: AuthUser, @Body(new ZodPipe(AttachmentSchema)) b: z.infer<typeof AttachmentSchema>) { return this.svc.upload(u, b); }
-  @Get() list(@Query('ownerType') t: string, @Query('ownerId') id: string) { return this.svc.listFor(t, id); }
+  @Get() list(@CurrentUser() u: AuthUser, @Query('ownerType') t: string, @Query('ownerId') id: string) { return this.svc.listFor(u, t, id); }
 }

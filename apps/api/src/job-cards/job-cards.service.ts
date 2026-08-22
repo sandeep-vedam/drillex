@@ -5,6 +5,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { StorageService } from '../storage/storage.service';
 import { AuthUser } from '../auth/decorators';
+import { assertSufficientStock } from '../parts/parts.controller';
 
 @Injectable()
 export class JobCardsService {
@@ -40,6 +41,7 @@ export class JobCardsService {
       const jobNo = await this.nextJobNo(tx);
       const row = await tx.jobCard.create({ data: { ...(id ? { id } : {}), ...rest, date: d, jobNo, technicianIds: techIds, techSignatureId: techSignatureAttachmentId ?? null, parts: { create: parts } }, include: this.include });
       for (const p of parts) {
+        await assertSufficientStock(tx, p.partId, p.quantity);
         await tx.partStockMovement.create({ data: { partId: p.partId, type: 'OUT', quantity: -p.quantity, reference: jobNo } });
         await tx.part.update({ where: { id: p.partId }, data: { qtyOnHand: { decrement: p.quantity } } });
       }
@@ -62,7 +64,7 @@ export class JobCardsService {
       if (parts) {
         for (const p of jc.parts) { await tx.part.update({ where: { id: p.partId }, data: { qtyOnHand: { increment: p.quantity } } }); await tx.partStockMovement.create({ data: { partId: p.partId, type: 'IN', quantity: p.quantity, reference: `${jc.jobNo} (revised)` } }); }
         await tx.jobCardPart.deleteMany({ where: { jobCardId: id } });
-        for (const p of parts) { await tx.jobCardPart.create({ data: { jobCardId: id, partId: p.partId, quantity: p.quantity } }); await tx.part.update({ where: { id: p.partId }, data: { qtyOnHand: { decrement: p.quantity } } }); await tx.partStockMovement.create({ data: { partId: p.partId, type: 'OUT', quantity: -p.quantity, reference: jc.jobNo } }); }
+        for (const p of parts) { await assertSufficientStock(tx, p.partId, p.quantity); await tx.jobCardPart.create({ data: { jobCardId: id, partId: p.partId, quantity: p.quantity } }); await tx.part.update({ where: { id: p.partId }, data: { qtyOnHand: { decrement: p.quantity } } }); await tx.partStockMovement.create({ data: { partId: p.partId, type: 'OUT', quantity: -p.quantity, reference: jc.jobNo } }); }
       }
       const row = await tx.jobCard.update({ where: { id }, data: { ...rest, ...(date ? { date: new Date(date) } : {}), ...(techSignatureAttachmentId ? { techSignatureId: techSignatureAttachmentId } : {}) }, include: this.include });
       await this.syncAssetStatus(tx, jc.assetId);

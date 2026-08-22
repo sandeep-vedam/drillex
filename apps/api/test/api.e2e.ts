@@ -11,7 +11,15 @@ import { PrismaService } from '../src/prisma/prisma.service';
  */
 let app: INestApplication; let prisma: PrismaService;
 const PW = 'Password123';
-async function login(employeeId: string, deviceId = 'e2e') { const r = await request(app.getHttpServer()).post('/api/v1/auth/login').send({ employeeId, password: PW, deviceId }); return r.body.accessToken as string; }
+const tokenCache = new Map<string, string>(); // the login route is throttled (10/60s) — most tests just need *a* valid token, not a fresh login
+async function loginRaw(employeeId: string, deviceId = 'e2e') { return request(app.getHttpServer()).post('/api/v1/auth/login').send({ employeeId, password: PW, deviceId }); }
+async function login(employeeId: string, deviceId = 'e2e') {
+  const key = `${employeeId}:${deviceId}`;
+  if (deviceId === 'e2e' && tokenCache.has(key)) return tokenCache.get(key)!;
+  const t = (await loginRaw(employeeId, deviceId)).body.accessToken as string;
+  if (deviceId === 'e2e') tokenCache.set(key, t);
+  return t;
+}
 const auth = (t: string) => ({ Authorization: `Bearer ${t}` });
 const today = new Date(); const day = (offset: number) => new Date(today.getTime() - offset * 864e5).toISOString().slice(0, 10);
 
@@ -98,5 +106,53 @@ describe('offline sync (SRS §9.2)', () => {
     const c = await request(app.getHttpServer()).post('/api/v1/sync/push').set(auth(t)).send({ ops: [{ opId: 'b', kind: 'daily_reading', payload: { ...payload, id: crypto.randomUUID() } }] });
     expect(c.body.results[0].status).toBe('conflict');
     await prisma.syncConflict.deleteMany({ where: { entity: 'DailyReading', versions: { path: ['incoming', 'notes'], equals: '[e2e] sync' } } });
+  });
+
+  it('one malformed op envelope is rejected individually — it does not fail the whole batch', async () => {
+    const t = await login('OPR001');
+    const asset = await prisma.asset.findFirstOrThrow({ where: { assetNumber: 'DRL-002' } });
+    const date = day(403);
+    await prisma.dailyReading.deleteMany({ where: { assetId: asset.id, date: new Date(date) } });
+    const good = { id: crypto.randomUUID(), assetId: asset.id, date, hourMeter: 1, fuelStart: 2, fuelEnd: 1, engineOil: 'OK', hydraulicOil: 'OK', coolant: 'OK', airFilter: 'OK', battery: 'OK', preStartChecklistDone: true, warningLights: false, unusualNoises: false, leaks: false, conditionRating: 5, notes: '[e2e] batch' };
+    const r = await request(app.getHttpServer()).post('/api/v1/sync/push').set(auth(t)).send({ ops: [{ opId: 'bad-1', kind: 'not_a_real_kind' }, { opId: 'good-1', kind: 'daily_reading', payload: good }] });
+    expect(r.status).toBe(201);
+    expect(r.body.results.find((x: { opId: string }) => x.opId === 'bad-1').status).toBe('rejected');
+    expect(r.body.results.find((x: { opId: string }) => x.opId === 'good-1').status).toBe('applied');
+    await prisma.dailyReading.deleteMany({ where: { assetId: asset.id, date: new Date(date) } });
+  });
+});
+
+describe('negative-scenario hardening', () => {
+  it('rejects a parts stock movement that would take qtyOnHand below zero', async () => {
+    const t = await login('TEC001'); // TECHNICIAN has parts:write; SUPERVISOR does not
+    const part = await prisma.part.findUniqueOrThrow({ where: { partNo: 'FLT-OIL-01' } });
+    const r = await request(app.getHttpServer()).post(`/api/v1/parts/${part.id}/movements`).set(auth(t)).send({ type: 'OUT', quantity: part.qtyOnHand + 1000 });
+    expect(r.status).toBe(400);
+    expect(await prisma.part.findUniqueOrThrow({ where: { id: part.id } })).toMatchObject({ qtyOnHand: part.qtyOnHand }); // untouched
+  });
+
+  it('rejects a job card whose parts usage exceeds stock on hand, without deducting anything', async () => {
+    const t = await login('TEC001');
+    const asset = await prisma.asset.findFirstOrThrow({ where: { assetNumber: 'DRL-001' } });
+    const part = await prisma.part.findUniqueOrThrow({ where: { partNo: 'BLT-ALT-07' } }); // seeded qtyOnHand: 2
+    const r = await request(app.getHttpServer()).post('/api/v1/job-cards').set(auth(t)).send({ assetId: asset.id, date: day(0), jobType: 'CORRECTIVE', workPerformed: '[e2e] insufficient stock test', parts: [{ partId: part.id, quantity: part.qtyOnHand + 50 }] });
+    expect(r.status).toBe(400);
+    expect(await prisma.part.findUniqueOrThrow({ where: { id: part.id } })).toMatchObject({ qtyOnHand: part.qtyOnHand });
+  });
+
+  it('rejects an invalid user status value instead of 500ing', async () => {
+    const admin = await login('ADM001'); const target = await prisma.user.findUniqueOrThrow({ where: { employeeId: 'OPR001' } });
+    const r = await request(app.getHttpServer()).patch(`/api/v1/users/${target.id}/status`).set(auth(admin)).send({ status: 'NOT_A_REAL_STATUS' });
+    expect(r.status).toBe(400);
+  });
+
+  it('attachment access requires the same permission/scope as the owning record — not just any authenticated user', async () => {
+    const reading = await prisma.dailyReading.findFirstOrThrow();
+    const tec = await login('TEC001'); // TECHNICIAN has no daily_reading:read at all
+    const denied = await request(app.getHttpServer()).get(`/api/v1/attachments?ownerType=DailyReading&ownerId=${reading.id}`).set(auth(tec));
+    expect(denied.status).toBe(403);
+    const sup = await login('SUP001'); // SUPERVISOR has site-scoped daily_reading:read
+    const allowed = await request(app.getHttpServer()).get(`/api/v1/attachments?ownerType=DailyReading&ownerId=${reading.id}`).set(auth(sup));
+    expect(allowed.status).toBe(200);
   });
 });

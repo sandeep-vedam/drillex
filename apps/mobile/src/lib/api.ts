@@ -6,9 +6,9 @@ import { Platform } from 'react-native';
 // A physical device in dev can use `adb reverse tcp:4000 tcp:4000` (then 10.0.2.2 won't work — use localhost).
 const DEV_HOST = Platform.OS === 'android' ? '10.0.2.2' : 'localhost';
 // Release / standalone installs: the API server reachable from the device's network.
-// Currently the dev Mac's Wi-Fi IP; replace with the real server host for production builds.
-const RELEASE_HOST = '192.168.29.194';
-export const API_URL = `http://${__DEV__ ? DEV_HOST : RELEASE_HOST}:4000/api/v1`;
+// Served through nginx on port 80 (not 4000 — that port is firewalled off), so no port suffix here.
+const RELEASE_HOST = '15.252.162.136';
+export const API_URL = __DEV__ ? `http://${DEV_HOST}:4000/api/v1` : `http://${RELEASE_HOST}/api/v1`;
 
 const SERVICE = 'drillex.session';
 

@@ -7,6 +7,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AuthUser, CurrentUser, RequirePermission } from '../auth/decorators';
 import { ZodPipe } from '../common/zod.pipe';
 
+const StatusSchema = z.object({ status: z.enum(['ACTIVE', 'DISABLED']) });
+
 @Controller('users')
 export class UsersController {
   constructor(private prisma: PrismaService) {}
@@ -34,7 +36,7 @@ export class UsersController {
     return { temporaryPassword: temp };
   }
   @Patch(':id/status') @RequirePermission('user:manage')
-  async setStatus(@Param('id') id: string, @Body() b: { status: 'ACTIVE' | 'DISABLED' }, @CurrentUser() actor: AuthUser) {
+  async setStatus(@Param('id') id: string, @Body(new ZodPipe(StatusSchema)) b: z.infer<typeof StatusSchema>, @CurrentUser() actor: AuthUser) {
     if (id === actor.id) throw new ForbiddenException('You cannot disable your own account');
     const u = await this.prisma.user.update({ where: { id }, data: { status: b.status } });
     await this.prisma.auditLog.create({ data: { actorId: actor.id, entity: 'User', entityId: id, action: `STATUS_${b.status}` } });

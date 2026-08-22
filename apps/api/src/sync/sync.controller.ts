@@ -11,7 +11,8 @@ import { AuthUser, CurrentUser, RequirePermission } from '../auth/decorators';
 import { ZodPipe } from '../common/zod.pipe';
 
 const OpSchema = z.object({ opId: z.string().min(1), kind: z.enum(['attachment', 'daily_reading', 'shift_report', 'job_card']), payload: z.unknown(), queuedAt: z.string().optional() });
-const PushSchema = z.object({ ops: z.array(OpSchema).max(200) });
+// ops are unknown at this layer so one malformed envelope (bad opId/kind) rejects only that op, not the whole batch — validated per-op below.
+const PushSchema = z.object({ ops: z.array(z.unknown()).max(200) });
 type Result = { opId: string; status: 'applied' | 'duplicate' | 'conflict' | 'rejected'; error?: string; id?: string };
 
 /**
@@ -26,7 +27,14 @@ export class SyncController {
   @Post('push')
   async push(@CurrentUser() u: AuthUser, @Body(new ZodPipe(PushSchema)) b: z.infer<typeof PushSchema>) {
     const results: Result[] = [];
-    for (const op of b.ops) {
+    for (const raw of b.ops) {
+      const parsed = OpSchema.safeParse(raw);
+      if (!parsed.success) {
+        const opId = typeof (raw as { opId?: unknown })?.opId === 'string' ? (raw as { opId: string }).opId : 'unknown';
+        results.push({ opId, status: 'rejected', error: 'Malformed op envelope' });
+        continue;
+      }
+      const op = parsed.data;
       try {
         if (op.kind === 'attachment') {
           const a = AttachmentSchema.parse(op.payload); const r = await this.attachments.upload(u, a);
