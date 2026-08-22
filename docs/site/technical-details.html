@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Drillex Ops — Technical Details</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="brand"><span class="dot"></span> Drillex Ops</div>
+    <p class="tagline">Documentation hub</p>
+    <nav>
+      <div class="group-label">Overview</div>
+      <a href="index.html"><span class="icon">&#8962;</span> Home</a>
+      <a href="presentation.html"><span class="icon">&#9673;</span> Presentation</a>
+      <div class="group-label">Product</div>
+      <a href="prd.html"><span class="icon">&#9998;</span> PRD</a>
+      <a href="srs.html"><span class="icon">&#9776;</span> SRS</a>
+      <a href="wireframes.html"><span class="icon">&#9635;</span> Wireframes</a>
+      <div class="group-label">Engineering</div>
+      <a href="architecture.html"><span class="icon">&#9881;</span> Architecture</a>
+      <a href="technical-details.html" class="active"><span class="icon">&#9000;</span> Technical Details</a>
+    </nav>
+  </aside>
+  <main class="content">
+    <p class="page-kicker">Technical Reference</p>
+    <h1>Technical Details</h1>
+    <p class="subtitle">Tech stack per app, full Prisma data model, API surface by module, environment variables, native modules, and testing/CI.</p>
+
+    <div class="toc">
+      <div class="toc-title">On this page</div>
+      <ul>
+        <li><a href="#stack">Tech stack per app</a></li>
+        <li><a href="#data-model">Data model</a></li>
+        <li><a href="#api">API surface by module</a></li>
+        <li><a href="#mobile">Mobile: native modules &amp; offline layer</a></li>
+        <li><a href="#env">Environment variables</a></li>
+        <li><a href="#testing">Testing &amp; CI</a></li>
+      </ul>
+    </div>
+
+    <h2 id="stack" style="margin-top:8px;border-top:none;padding-top:0;">Tech stack per app</h2>
+
+    <h3>apps/api — @drillex/api</h3>
+    <table>
+      <tr><th>Concern</th><th>Choice</th></tr>
+      <tr><td>Framework</td><td>NestJS 10 (<code>@nestjs/common</code>/<code>core</code>/<code>platform-express</code>)</td></tr>
+      <tr><td>ORM / DB</td><td>Prisma 6.2 → PostgreSQL</td></tr>
+      <tr><td>Auth</td><td>Custom JWT (access + rotating refresh), Argon2 password hashing, otplib TOTP 2FA</td></tr>
+      <tr><td>Validation</td><td>Zod (shared schemas from <code>@drillex/shared</code>)</td></tr>
+      <tr><td>Rate limiting / security</td><td><code>@nestjs/throttler</code>, Helmet</td></tr>
+      <tr><td>Scheduling</td><td><code>@nestjs/schedule</code> (in-process cron)</td></tr>
+      <tr><td>File storage</td><td>AWS SDK v3 S3 client + presigner (S3/MinIO), local-disk fallback</td></tr>
+      <tr><td>Reporting</td><td>pdfkit (PDF), exceljs (XLSX)</td></tr>
+      <tr><td>Push</td><td>google-auth-library against FCM HTTP v1</td></tr>
+      <tr><td>Email</td><td>nodemailer (SMTP)</td></tr>
+      <tr><td>API docs</td><td>@nestjs/swagger, served at <code>/api/docs</code></td></tr>
+      <tr><td>Testing</td><td>vitest + supertest (e2e-style, real Postgres)</td></tr>
+    </table>
+
+    <h3>apps/web — @drillex/web</h3>
+    <table>
+      <tr><th>Concern</th><th>Choice</th></tr>
+      <tr><td>Framework</td><td>Next.js 15 (App Router, route groups), React 19</td></tr>
+      <tr><td>Styling</td><td>Tailwind CSS 3</td></tr>
+      <tr><td>State/session</td><td>No Redux/Zustand/React Query — a small hand-written fetch wrapper (<code>src/lib/api.ts</code>) with localStorage-based JWT storage</td></tr>
+      <tr><td>Validation</td><td>Zod (shared)</td></tr>
+      <tr><td>Testing</td><td>None configured — <code>lint</code>/<code>typecheck</code>/<code>build</code> only</td></tr>
+    </table>
+
+    <h3>apps/mobile — @drillex/mobile</h3>
+    <table>
+      <tr><th>Concern</th><th>Choice</th></tr>
+      <tr><td>Framework</td><td>React Native 0.87.0, bare CLI (not Expo), React 19</td></tr>
+      <tr><td>Navigation</td><td>React Navigation (native-stack)</td></tr>
+      <tr><td>Offline layer</td><td>Custom AsyncStorage-backed outbox queue (not WatermelonDB)</td></tr>
+      <tr><td>Validation</td><td>Zod (shared)</td></tr>
+      <tr><td>Testing</td><td>Jest 29 + @react-native/jest-preset configured; no test files present yet</td></tr>
+      <tr><td>Node requirement</td><td>≥22.11.0 (stricter than the ≥20 root requirement)</td></tr>
+    </table>
+
+    <h3>packages/shared — @drillex/shared</h3>
+    <p>Pure TypeScript library (compiled via <code>tsc</code>), dependency-free aside from Zod. Provides: <code>enums.ts</code>, <code>schemas.ts</code> (Zod schemas for every domain input — logins, readings, shift reports, job cards, maintenance), <code>rbac.ts</code> (the permission matrix), <code>jobcards.ts</code> / <code>maintenance.ts</code> (business calculation helpers e.g. <code>nextCycle</code>, <code>scheduleStatus</code>), plus its own vitest unit tests.</p>
+
+    <h2 id="data-model">Data model</h2>
+    <p>Source: <code>apps/api/prisma/schema.prisma</code> (PostgreSQL, 22 models). Three migrations applied to date: initial schema, forced-password-change flag, purchase requests.</p>
+    <table>
+      <tr><th>Model</th><th>Purpose / key fields</th><th>Key relations</th></tr>
+      <tr><td><code>Site</code></td><td>name, coordinates</td><td>1–N Users, Assets, ShiftReports</td></tr>
+      <tr><td><code>User</code></td><td>employeeId (unique), role, passwordHash, TOTP fields, mustChangePassword, siteId</td><td>1–N Devices, LoginEvents, RefreshTokens, AssetOperator, ShiftReports, DailyReadings, Notifications</td></tr>
+      <tr><td><code>Device</code></td><td>userId+deviceId (unique), platform, pushToken, approved, lastSeen</td><td>belongs to User</td></tr>
+      <tr><td><code>LoginEvent</code></td><td>employeeId, deviceId, success, ip</td><td>optional User FK</td></tr>
+      <tr><td><code>RefreshToken</code></td><td>tokenHash (unique), deviceId, expiresAt, revokedAt</td><td>belongs to User</td></tr>
+      <tr><td><code>Asset</code></td><td>assetNumber (unique, immutable), category, make/model/serial/year, status, siteId, soft-delete</td><td>1–N AssetOperator, ShiftReports, DailyReadings, MaintenanceSchedules, JobCards, Alerts</td></tr>
+      <tr><td><code>AssetOperator</code></td><td>composite PK (assetId, userId), validFrom/To</td><td>join Asset↔User</td></tr>
+      <tr><td><code>Chemical</code></td><td>name (unique), defaultUnit, unitCost, monthlyBudget</td><td>1–N ShiftReportChemical</td></tr>
+      <tr><td><code>ShiftReport</code></td><td>asset+userId+siteId, date+shift (unique w/ asset), depths/meters, holesCompleted, rockType, penetrationRate, downtime, status, signatureId, approvedBy/At, soft-delete</td><td>1–N ShiftReportChemical</td></tr>
+      <tr><td><code>ShiftReportChemical</code></td><td>quantity, unit, purpose, stockOnHand</td><td>belongs to ShiftReport, Chemical</td></tr>
+      <tr><td><code>DailyReading</code></td><td>asset+date (unique), hour meter, fuel, fluid levels, tyre pressures (JSON), fault flags, condition rating, signatureId</td><td>belongs to Asset, User</td></tr>
+      <tr><td><code>MaintenanceSchedule</code></td><td>asset, serviceType, interval hours/days, last/next due, reminderLeadDays, status, technicianIds[]</td><td>1–N MaintenanceSchedulePart</td></tr>
+      <tr><td><code>MaintenanceSchedulePart</code></td><td>scheduleId, partId, quantity</td><td>join table</td></tr>
+      <tr><td><code>JobCard</code></td><td>jobNo (unique, auto), asset, jobType, fault/work narrative, hourMeter, labourHours, technicianIds[], condition before/after, testResult, status, techSignatureId, approvedBy/At</td><td>1–N JobCardPart</td></tr>
+      <tr><td><code>Part</code></td><td>partNo (unique), qtyOnHand, minQty, unitCost</td><td>1–N PartStockMovement, JobCardPart, MaintenanceSchedulePart, PurchaseRequest</td></tr>
+      <tr><td><code>JobCardPart</code></td><td>jobCardId, partId, quantity</td><td>join table, cascade delete</td></tr>
+      <tr><td><code>PurchaseRequest</code></td><td>partId, quantity, status, requestedBy, orderedAt/receivedAt</td><td>belongs to Part</td></tr>
+      <tr><td><code>PartStockMovement</code></td><td>type (IN/OUT/ADJUST), quantity, reference</td><td>belongs to Part — audit trail</td></tr>
+      <tr><td><code>Attachment</code></td><td>ownerType/ownerId (polymorphic), kind (PHOTO/DOCUMENT/SIGNATURE), storageKey, sha256, createdBy</td><td>indexed (ownerType, ownerId)</td></tr>
+      <tr><td><code>Notification</code></td><td>userId, type, title, body, payload (JSON), readAt</td><td>indexed (userId, readAt)</td></tr>
+      <tr><td><code>Alert</code></td><td>assetId, source, severity, message, resolvedAt</td><td>belongs to Asset</td></tr>
+      <tr><td><code>Report</code></td><td>type, periodStart/End, pdfKey, xlsxKey, generatedBy, generatedAt</td><td>generic archive row</td></tr>
+      <tr><td><code>AuditLog</code></td><td>actorId, deviceId, entity, entityId, action, diff (JSON)</td><td>append-only, indexed (entity, entityId)</td></tr>
+      <tr><td><code>SyncConflict</code></td><td>entity, entityId, versions (JSON), resolvedBy/At</td><td>conflict review queue</td></tr>
+    </table>
+
+    <h2 id="api">API surface by module</h2>
+    <p>Base path <code>/api/v1</code>. Every route requires a valid JWT and passes through the RBAC guard unless explicitly public (login, health).</p>
+    <table>
+      <tr><th>Module</th><th>Responsibility</th></tr>
+      <tr><td><code>auth</code></td><td>Login, 2FA setup/enable, token refresh, forced password change</td></tr>
+      <tr><td><code>devices</code></td><td>Device registration &amp; admin approval</td></tr>
+      <tr><td><code>users</code></td><td>User CRUD (admin)</td></tr>
+      <tr><td><code>common</code></td><td>Health check, sites list</td></tr>
+      <tr><td><code>assets</code></td><td>Asset register CRUD, operator assignment</td></tr>
+      <tr><td><code>daily-readings</code></td><td>Submit/list daily equipment readings, alert triggering</td></tr>
+      <tr><td><code>shift-reports</code></td><td>Submit/approve/unlock shift production reports</td></tr>
+      <tr><td><code>maintenance</code></td><td>Schedule CRUD, complete, status computation</td></tr>
+      <tr><td><code>job-cards</code></td><td>Job card CRUD, parts consumption, approval, asset-status sync</td></tr>
+      <tr><td><code>parts</code></td><td>Inventory CRUD, stock movements, purchase requests</td></tr>
+      <tr><td><code>attachments</code></td><td>Upload/link photos, documents, signatures</td></tr>
+      <tr><td><code>storage</code></td><td>Presigned URL issuance (S3/MinIO) / local file serving</td></tr>
+      <tr><td><code>notifications</code></td><td>In-app notification list, mark-read</td></tr>
+      <tr><td><code>push</code></td><td>FCM dispatch, stale-token cleanup</td></tr>
+      <tr><td><code>reports</code></td><td>Generate/preview/email the 7 report types, archive, month-end cron</td></tr>
+      <tr><td><code>dashboard</code></td><td>Summary KPIs for the web dashboard</td></tr>
+      <tr><td><code>sync</code></td><td><code>POST /sync/push</code> (batched offline ops), conflict list/resolve</td></tr>
+    </table>
+    <p class="dim">Full request/response schemas are published live via Swagger UI at <code>/api/docs</code> on a running instance.</p>
+
+    <h2 id="mobile">Mobile: native modules &amp; offline layer</h2>
+    <table>
+      <tr><th>Module</th><th>Used for</th></tr>
+      <tr><td>react-native-biometrics</td><td>Biometric app unlock</td></tr>
+      <tr><td>react-native-keychain</td><td>Secure token/credential storage</td></tr>
+      <tr><td>react-native-device-info</td><td>Device identification for registration/approval</td></tr>
+      <tr><td>react-native-image-picker</td><td>Photo capture on readings/job cards</td></tr>
+      <tr><td>react-native-signature-canvas</td><td>Sign-off capture</td></tr>
+      <tr><td>@react-native-community/netinfo</td><td>Connectivity detection driving outbox flush</td></tr>
+      <tr><td>@react-native-async-storage/async-storage</td><td>Outbox &amp; cache persistence</td></tr>
+      <tr><td>react-native-get-random-values</td><td>CSPRNG polyfill for client-side UUIDs</td></tr>
+    </table>
+    <p>Key screens: Home, Login, Lock (15-minute idle-lock via <code>security/IdleLock.tsx</code>), Daily Reading, Shift Report, Maintenance, Job Cards (list + new), Notifications, Outbox (pending/failed sync items), Reports.</p>
+    <div class="callout warn">
+      <strong>Push not wired by default</strong>
+      Server-side FCM sending is fully implemented, but the mobile client does not yet include <code>@react-native-firebase/messaging</code> or platform config files (<code>google-services.json</code>, APNs key) — these are a manual post-clone step per the project README.
+    </div>
+
+    <h2 id="env">Environment variables (API)</h2>
+    <table>
+      <tr><th>Variable</th><th>Purpose</th></tr>
+      <tr><td><code>DATABASE_URL</code></td><td>PostgreSQL connection string</td></tr>
+      <tr><td><code>JWT_ACCESS_SECRET</code> / <code>JWT_REFRESH_SECRET</code></td><td>Token signing — must be ≥32 chars in production or boot fails</td></tr>
+      <tr><td><code>JWT_ACCESS_TTL</code> / <code>JWT_REFRESH_TTL</code></td><td>Token lifetimes (default 15m / 30d)</td></tr>
+      <tr><td><code>CORS_ORIGINS</code></td><td>Comma-separated allow-list; unset = allow all</td></tr>
+      <tr><td><code>STORAGE_DRIVER</code></td><td><code>s3</code> or local disk</td></tr>
+      <tr><td><code>UPLOAD_DIR</code></td><td>Local disk fallback path</td></tr>
+      <tr><td><code>DEVICE_REGISTRATION_REQUIRED</code></td><td>Gate login/refresh on admin device approval</td></tr>
+      <tr><td><code>SMTP_HOST/PORT/SECURE/USER/PASS/FROM</code></td><td>Email transport for report sharing</td></tr>
+      <tr><td><code>FCM_PROJECT_ID</code> / <code>FCM_SERVICE_ACCOUNT_JSON</code></td><td>Push notification credentials</td></tr>
+      <tr><td><code>PORT</code> / <code>NODE_ENV</code></td><td>Server port and environment mode</td></tr>
+    </table>
+    <p class="dim"><code>apps/web</code> uses <code>NEXT_PUBLIC_API_URL</code> to locate the API (default <code>http://localhost:4000/api/v1</code>).</p>
+
+    <h2 id="testing">Testing &amp; CI</h2>
+    <div class="grid-2">
+      <div class="card">
+        <h3 style="margin-top:0;">What's covered</h3>
+        <ul style="margin-bottom:0;">
+          <li><code>apps/api/test/api.e2e.ts</code> — vitest + supertest against a live Postgres: auth/RBAC, daily readings + alerts, shift reports + approval, offline sync idempotency/conflicts</li>
+          <li><code>packages/shared/src/schemas.test.ts</code> — vitest unit tests for Zod schemas and calc helpers</li>
+          <li><code>infra/load/k6-smoke.js</code> — 200 VU load test against the §9.5 NFR thresholds (run manually/CI-optional)</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3 style="margin-top:0;">Gaps</h3>
+        <ul style="margin-bottom:0;">
+          <li><code>apps/web</code> has no test suite configured</li>
+          <li><code>apps/mobile</code> has Jest configured but no test files present</li>
+          <li>CI builds/tests API and web only — mobile isn't built or tested in CI</li>
+        </ul>
+      </div>
+    </div>
+    <p><strong>CI pipeline</strong> (<code>.github/workflows/ci.yml</code>, Node 22 / pnpm 9.15.4, Postgres 16 service container):</p>
+    <pre><code>pnpm install --frozen-lockfile
+prisma generate &amp;&amp; prisma migrate deploy &amp;&amp; db:seed
+pnpm typecheck
+pnpm test
+pnpm --filter @drillex/api --filter @drillex/web build</code></pre>
+
+    <div class="footer-nav">
+      <a href="architecture.html">← Architecture</a>
+      <a href="index.html">Back to Home</a>
+    </div>
+  </main>
+</div>
+</body>
+</html>

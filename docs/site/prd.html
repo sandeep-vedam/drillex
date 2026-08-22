@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Drillex Ops — PRD</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="brand"><span class="dot"></span> Drillex Ops</div>
+    <p class="tagline">Documentation hub</p>
+    <nav>
+      <div class="group-label">Overview</div>
+      <a href="index.html"><span class="icon">&#8962;</span> Home</a>
+      <a href="presentation.html"><span class="icon">&#9673;</span> Presentation</a>
+      <div class="group-label">Product</div>
+      <a href="prd.html" class="active"><span class="icon">&#9998;</span> PRD</a>
+      <a href="srs.html"><span class="icon">&#9776;</span> SRS</a>
+      <a href="wireframes.html"><span class="icon">&#9635;</span> Wireframes</a>
+      <div class="group-label">Engineering</div>
+      <a href="architecture.html"><span class="icon">&#9881;</span> Architecture</a>
+      <a href="technical-details.html"><span class="icon">&#9000;</span> Technical Details</a>
+    </nav>
+  </aside>
+  <main class="content">
+    <p class="page-kicker">Product Requirements Document</p>
+    <h1>Drillex Ops PRD</h1>
+    <p class="subtitle">Version 1.0 · derived from the DrillexOps App Requirements Blueprint and the current shipped implementation as of 2026-08-22.</p>
+
+    <div class="toc">
+      <div class="toc-title">On this page</div>
+      <ul>
+        <li><a href="#vision">1. Vision &amp; problem statement</a></li>
+        <li><a href="#personas">2. Personas &amp; roles</a></li>
+        <li><a href="#goals">3. Goals &amp; non-goals</a></li>
+        <li><a href="#epics">4. Feature epics</a></li>
+        <li><a href="#metrics">5. Success metrics</a></li>
+        <li><a href="#status">6. Release status</a></li>
+        <li><a href="#risks">7. Risks &amp; open questions</a></li>
+      </ul>
+    </div>
+
+    <h2 id="vision">1. Vision &amp; problem statement</h2>
+    <p><strong>Vision:</strong> a single system of record for a drilling site's equipment and crew operations, usable offline from the field, so every reading, shift report, maintenance action and part movement is captured once, correctly, and visible to the people who need it.</p>
+    <p><strong>Problem:</strong> field data (pre-start checks, shift production, faults) is currently captured on paper or ad hoc spreadsheets, maintenance is tracked informally, and management reporting requires manually reconciling numbers from multiple sources. This causes delayed fault response, missed maintenance intervals, inventory stockouts, and reporting that lags the actual state of the site by days.</p>
+
+    <h2 id="personas">2. Personas &amp; roles</h2>
+    <table>
+      <tr><th>Role</th><th>Who</th><th>Primary surface</th><th>Core needs</th></tr>
+      <tr><td><strong>OPERATOR</strong></td><td>Equipment operator on an assigned asset</td><td>Mobile</td><td>Fast daily readings and shift reports, works offline, low friction</td></tr>
+      <tr><td><strong>TECHNICIAN</strong></td><td>Maintenance / repair crew</td><td>Mobile</td><td>Job card list, parts lookup, maintenance due list, sign-off capture</td></tr>
+      <tr><td><strong>SUPERVISOR</strong></td><td>Site-level supervisor</td><td>Web (+ mobile)</td><td>Approve/unlock shift reports, resolve sync conflicts, site-scoped visibility</td></tr>
+      <tr><td><strong>MANAGER</strong></td><td>Operations / site manager</td><td>Web</td><td>Cross-site reporting, maintenance digest, purchase requests, notifications</td></tr>
+      <tr><td><strong>ADMIN</strong></td><td>System administrator</td><td>Web</td><td>User &amp; device management, full RBAC scope, audit trail</td></tr>
+    </table>
+    <p class="dim">MANAGER and ADMIN accounts require mandatory TOTP two-factor authentication.</p>
+
+    <h2 id="goals">3. Goals &amp; non-goals</h2>
+    <div class="grid-2">
+      <div class="card">
+        <h3 style="margin-top:0;">Goals</h3>
+        <ul style="margin-bottom:0;">
+          <li>Replace paper daily-reading and shift-report sheets with a mobile form that works with no signal</li>
+          <li>Automate maintenance due-tracking from real hour-meter data, not memory</li>
+          <li>Tie parts consumption to job cards so stock levels stay accurate</li>
+          <li>Give managers on-demand and scheduled reports without manual reconciliation</li>
+          <li>Enforce accountability: every submission is attributable, every approval is audited</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3 style="margin-top:0;">Non-goals (current phase)</h3>
+        <ul style="margin-bottom:0;">
+          <li>Predictive/ML-based maintenance forecasting</li>
+          <li>Financial/procurement system integration beyond purchase-request tracking</li>
+          <li>Real-time equipment telemetry / IoT sensor ingestion</li>
+          <li>Multi-tenant SaaS packaging (currently single-organization, multi-site)</li>
+        </ul>
+      </div>
+    </div>
+
+    <h2 id="epics">4. Feature epics</h2>
+
+    <h3>4.1 Authentication &amp; device management</h3>
+    <p>Employee-ID + password login, TOTP 2FA required for managers/admins, rotating refresh tokens, optional device pre-approval so a new phone can't sign in until an admin approves it, forced password change on first login.</p>
+
+    <h3>4.2 Asset register</h3>
+    <p>Site-scoped registry of drilling, haulage, compressor and ancillary equipment with an immutable asset number, assigned operator(s), and a status that automatically reflects open maintenance work.</p>
+
+    <h3>4.3 Daily equipment readings</h3>
+    <p>Per-asset, per-day pre-start check: hour meter, fuel, fluid levels, tyre pressures, warning lights/noises/leaks, condition rating, photo/signature — submitted from the field, one per asset per day, auto-flagging alerts on faults.</p>
+
+    <h3>4.4 Shift production reporting</h3>
+    <p>Drilling shift report: hole reference, depth range (server-computed meters drilled), holes completed, rock type, penetration rate, downtime, and chemicals consumed against a master chemical list with cost tracking. Goes through submit → approve → (optional) unlock-for-correction.</p>
+
+    <h3>4.5 Maintenance scheduling</h3>
+    <p>Per-asset schedules driven by hour-meter interval, calendar interval, or condition; automatic status (upcoming/due/overdue) computed daily; reminder notifications to assigned technicians and supervisors; weekly digest to managers.</p>
+
+    <h3>4.6 Job cards &amp; parts</h3>
+    <p>Work orders for scheduled service, breakdown repair, modification or inspection, with auto-generated job numbers, technician sign-off, and a parts-used list that deducts from inventory transactionally and triggers low-stock notifications.</p>
+
+    <h3>4.7 Parts inventory &amp; purchasing</h3>
+    <p>Stock levels with a full movement audit trail, minimum-quantity thresholds, and a purchase-request workflow (open → ordered → received) for replenishment.</p>
+
+    <h3>4.8 Notifications</h3>
+    <p>In-app notification centre plus mobile push (FCM), covering maintenance due/overdue, approval requests, job card approvals, machine alerts, report-ready, and low-stock events, targeted by role and site.</p>
+
+    <h3>4.9 Reporting</h3>
+    <p>Seven report types (production, utilisation, maintenance summary, job card history, chemical usage, asset health, employee activity), each role-gated, exportable as PDF and XLSX, shareable by email, generated on demand or automatically at month-end, archived for 24 months.</p>
+
+    <h3>4.10 Offline sync</h3>
+    <p>The mobile app queues all writes locally and replays them once connectivity returns; the server treats replays idempotently and routes genuine conflicts (e.g. two people editing the same day's reading) to a supervisor review queue rather than silently overwriting data.</p>
+
+    <h2 id="metrics">5. Success metrics</h2>
+    <table>
+      <tr><th>Metric</th><th>Target</th></tr>
+      <tr><td>Daily reading / shift report submitted digitally vs. paper</td><td>100% of active assets, daily</td></tr>
+      <tr><td>Maintenance performed within due window</td><td>&gt;95% of scheduled services not overdue at completion</td></tr>
+      <tr><td>Stockouts on parts with an open job card</td><td>Trending down quarter over quarter via purchase-request lead time</td></tr>
+      <tr><td>Manager report turnaround (month-end)</td><td>Same day of month-end close, automated</td></tr>
+      <tr><td>API availability under field load</td><td>&lt;1% failed requests at 200 concurrent users (see NFR-PERF in SRS)</td></tr>
+    </table>
+
+    <h2 id="status">6. Release status</h2>
+    <p>Per <code>docs/DEVELOPMENT_PLAN.md</code> §13 (as of 2026-08-21), all ten planned phases are implemented: foundation/auth incl. 2FA, asset register, daily readings + alerts, shift production + approval/unlock, offline outbox sync, maintenance schedules + reminders, job cards + parts + asset-status automation, parts inventory + purchase requests + push + notification centres, the 7-report suite with PDF/XLSX/email/month-end cron, and release hardening (device registration, integration tests in CI, k6 load test, production config guards, Android release signing, demo data, README runbook).</p>
+    <p>Known gaps carried forward: mobile push requires a manual post-clone step to add Firebase config files and the <code>@react-native-firebase/messaging</code> dependency (server-side FCM sending is fully implemented); no production Dockerfiles exist yet for the API or web app; the web app has no automated test suite.</p>
+
+    <h2 id="risks">7. Risks &amp; open questions</h2>
+    <ul>
+      <li><strong>Connectivity risk:</strong> field sites may have long offline windows — the outbox is FIFO and caps batches at 50-200 ops per flush; very long offline periods should be validated against real-world queue sizes.</li>
+      <li><strong>Conflict resolution UX:</strong> sync conflicts currently require manual supervisor review; if conflict volume grows, this queue needs monitoring.</li>
+      <li><strong>Redis is provisioned but unused</strong> by the current API (cron runs in-process) — decide whether to formally drop it from infra or adopt it for a job queue as the plan originally intended.</li>
+      <li><strong>Containerized deployment</strong> for API/web is not yet defined in-repo; needed before a production rollout beyond the documented manual runbook.</li>
+    </ul>
+
+    <div class="footer-nav">
+      <a href="presentation.html">← Presentation</a>
+      <a href="srs.html">Next: Software Requirements (SRS) →</a>
+    </div>
+  </main>
+</div>
+</body>
+</html>

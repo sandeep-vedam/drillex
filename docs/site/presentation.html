@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Drillex Ops — Presentation</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="brand"><span class="dot"></span> Drillex Ops</div>
+    <p class="tagline">Documentation hub</p>
+    <nav>
+      <div class="group-label">Overview</div>
+      <a href="index.html"><span class="icon">&#8962;</span> Home</a>
+      <a href="presentation.html" class="active"><span class="icon">&#9673;</span> Presentation</a>
+      <div class="group-label">Product</div>
+      <a href="prd.html"><span class="icon">&#9998;</span> PRD</a>
+      <a href="srs.html"><span class="icon">&#9776;</span> SRS</a>
+      <a href="wireframes.html"><span class="icon">&#9635;</span> Wireframes</a>
+      <div class="group-label">Engineering</div>
+      <a href="architecture.html"><span class="icon">&#9881;</span> Architecture</a>
+      <a href="technical-details.html"><span class="icon">&#9000;</span> Technical Details</a>
+    </nav>
+  </aside>
+  <main class="content">
+    <p class="page-kicker">Executive Overview</p>
+    <h1>Drillex Ops</h1>
+    <p class="subtitle">A single platform that takes a drilling site off paper: operators log equipment and production from the field, supervisors approve, technicians run maintenance, and managers get the reports — all from the same data.</p>
+
+    <h2 style="margin-top:8px;border-top:none;padding-top:0;">The problem</h2>
+    <p>Drilling-site operations run on a mix of paper log sheets, spreadsheets and phone calls: pre-start equipment checks on clipboards, shift production totals re-typed at the end of the day, maintenance tracked from memory or a whiteboard, spare parts counted by walking the store. Nothing is connected — a fault noticed at 6am doesn't reach the maintenance team until someone happens to mention it, and a manager wanting last month's chemical usage has to chase five different people for five different numbers.</p>
+
+    <h2>The solution</h2>
+    <p>Drillex Ops gives every role one app that fits how they already work:</p>
+    <div class="grid-3">
+      <div class="stat">
+        <div class="label" style="margin-bottom:6px;">Field crew (mobile)</div>
+        <div style="font-size:13.5px;">Operators and technicians work offline-first on a phone — daily readings, shift reports, job cards, all queued and synced automatically.</div>
+      </div>
+      <div class="stat">
+        <div class="label" style="margin-bottom:6px;">Supervisors &amp; managers (web)</div>
+        <div style="font-size:13.5px;">A browser dashboard to approve shift reports, track maintenance due, action low stock, and review 7 report types.</div>
+      </div>
+      <div class="stat">
+        <div class="label" style="margin-bottom:6px;">Admins (web)</div>
+        <div style="font-size:13.5px;">User and device management, role-based access, and audit trail across the whole site.</div>
+      </div>
+    </div>
+
+    <h2>How data flows through a shift</h2>
+    <div class="diagram">
+      <svg viewBox="0 0 920 200" xmlns="http://www.w3.org/2000/svg" font-family="inherit">
+        <defs>
+          <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="var(--text-faint)"></path>
+          </marker>
+        </defs>
+        <style>
+          .box { fill: var(--bg-elevated); stroke: var(--border); rx: 10; }
+          .lbl { fill: var(--text); font-size: 13px; font-weight: 600; }
+          .sub { fill: var(--text-dim); font-size: 10.5px; }
+          .flow { stroke: var(--text-faint); stroke-width: 1.4; fill: none; marker-end: url(#arrow); }
+        </style>
+        <rect class="box" x="10" y="60" width="150" height="70"></rect>
+        <text class="lbl" x="30" y="90">Operator</text>
+        <text class="sub" x="30" y="108">logs reading (phone)</text>
+
+        <rect class="box" x="205" y="60" width="150" height="70"></rect>
+        <text class="lbl" x="225" y="90">Outbox queue</text>
+        <text class="sub" x="225" y="108">offline-safe, syncs on reconnect</text>
+
+        <rect class="box" x="400" y="60" width="150" height="70"></rect>
+        <text class="lbl" x="420" y="84">API</text>
+        <text class="sub" x="420" y="100">validates + alerts</text>
+        <text class="sub" x="420" y="114">on fault flags</text>
+
+        <rect class="box" x="595" y="0" width="150" height="65"></rect>
+        <text class="lbl" x="615" y="28">Supervisor</text>
+        <text class="sub" x="615" y="46">approves (web)</text>
+
+        <rect class="box" x="595" y="120" width="150" height="65"></rect>
+        <text class="lbl" x="615" y="148">Technician</text>
+        <text class="sub" x="615" y="166">gets job card</text>
+
+        <rect class="box" x="790" y="60" width="120" height="70"></rect>
+        <text class="lbl" x="808" y="90">Manager</text>
+        <text class="sub" x="808" y="108">reports (PDF/XLSX)</text>
+
+        <path class="flow" d="M160,95 H205"></path>
+        <path class="flow" d="M355,95 H400"></path>
+        <path class="flow" d="M475,60 C475,40 520,32 595,32"></path>
+        <path class="flow" d="M475,130 C475,150 520,152 595,152"></path>
+        <path class="flow" d="M550,95 H790"></path>
+      </svg>
+    </div>
+
+    <h2>Core workflow areas</h2>
+    <div class="grid-2">
+      <div class="card">
+        <h3 style="margin-top:0;">Field data capture</h3>
+        <ul style="margin-bottom:0;">
+          <li>Daily pre-start equipment readings, with automatic alerts on faults</li>
+          <li>Drilling shift production reports (depth, meters, chemicals used)</li>
+          <li>Photo &amp; signature capture, all queued offline</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3 style="margin-top:0;">Maintenance &amp; parts</h3>
+        <ul style="margin-bottom:0;">
+          <li>Hour-meter and calendar-based maintenance schedules with reminders</li>
+          <li>Job cards with parts consumption, auto stock deduction</li>
+          <li>Low-stock alerts and purchase-request workflow</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3 style="margin-top:0;">Approvals &amp; accountability</h3>
+        <ul style="margin-bottom:0;">
+          <li>Supervisor approve / unlock workflow on shift reports</li>
+          <li>Role-based access down to 5 roles, mandatory 2FA for managers</li>
+          <li>Full audit trail on every mutating action</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3 style="margin-top:0;">Reporting</h3>
+        <ul style="margin-bottom:0;">
+          <li>7 report types: production, utilisation, maintenance, job history, chemical usage, asset health, employee activity</li>
+          <li>PDF + XLSX export, email share, automated month-end run</li>
+          <li>24-month archive retention</li>
+        </ul>
+      </div>
+    </div>
+
+    <h2>Where the build stands</h2>
+    <p>Per the development plan's status log (2026-08-21), all ten planned build phases have shipped: foundation &amp; auth (incl. 2FA), asset register, daily readings, shift production + approval, offline outbox sync, maintenance schedules + reminders, job cards + parts automation, parts inventory + notifications, the 7-report suite, and release hardening (device approval, integration tests, load testing, production config guards, Android release signing).</p>
+    <p>
+      <span class="badge green">Shipped</span> Core workflow, RBAC, offline sync, reports, notifications &nbsp;
+      <span class="badge warn">Manual step</span> Firebase push client wiring on mobile (server-side FCM is ready) &nbsp;
+      <span class="badge warn">Not yet in repo</span> Production Dockerfiles for API/Web
+    </p>
+
+    <h2>Why this stack</h2>
+    <p>NestJS + Prisma + PostgreSQL gives a strongly-typed, RBAC-guarded API with a single schema shared by every client. A bare React&nbsp;Native app (not Expo) with a hand-rolled offline outbox keeps the mobile build small and gives full control over sync semantics for a site with unreliable connectivity. Next.js serves both the supervisor/manager dashboard and the admin console as one role-gated web app. A shared <code>@drillex/shared</code> package keeps validation rules (Zod) and the permission matrix identical across all three surfaces, so a rule only has to be written once.</p>
+
+    <div class="footer-nav">
+      <span></span>
+      <a href="prd.html">Next: Product Requirements (PRD) →</a>
+    </div>
+  </main>
+</div>
+</body>
+</html>

@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Drillex Ops — Documentation</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="brand"><span class="dot"></span> Drillex Ops</div>
+    <p class="tagline">Documentation hub</p>
+    <nav>
+      <div class="group-label">Overview</div>
+      <a href="index.html" class="active"><span class="icon">&#8962;</span> Home</a>
+      <a href="presentation.html"><span class="icon">&#9673;</span> Presentation</a>
+      <div class="group-label">Product</div>
+      <a href="prd.html"><span class="icon">&#9998;</span> PRD</a>
+      <a href="srs.html"><span class="icon">&#9776;</span> SRS</a>
+      <a href="wireframes.html"><span class="icon">&#9635;</span> Wireframes</a>
+      <div class="group-label">Engineering</div>
+      <a href="architecture.html"><span class="icon">&#9881;</span> Architecture</a>
+      <a href="technical-details.html"><span class="icon">&#9000;</span> Technical Details</a>
+    </nav>
+  </aside>
+  <main class="content">
+    <p class="page-kicker">Documentation Set</p>
+    <h1>Drillex Ops</h1>
+    <p class="subtitle">Mobile operations &amp; equipment management platform for drilling-site field crews — daily equipment checks, shift production, maintenance, job cards, parts inventory, and management reporting across a Postgres/NestJS API, a Next.js web console, and a bare React&nbsp;Native mobile app.</p>
+
+    <div class="grid-3">
+      <div class="stat"><div class="num">3</div><div class="label">Apps — API, Web, Mobile</div></div>
+      <div class="stat"><div class="num">22</div><div class="label">Prisma data models</div></div>
+      <div class="stat"><div class="num">7</div><div class="label">Management report types</div></div>
+    </div>
+
+    <h2 style="margin-top:8px; border-top:none; padding-top:0;">Documents</h2>
+    <div class="card-grid">
+      <a class="doc-card" href="presentation.html">
+        <div class="icon-badge">&#9673;</div>
+        <h3>Presentation</h3>
+        <p>Executive overview — the problem, the solution, the workflow, and where the build stands today.</p>
+        <span class="go">Open →</span>
+      </a>
+      <a class="doc-card" href="prd.html">
+        <div class="icon-badge">&#9998;</div>
+        <h3>Product Requirements (PRD)</h3>
+        <p>Vision, personas, goals, feature epics by area, and success metrics.</p>
+        <span class="go">Open →</span>
+      </a>
+      <a class="doc-card" href="srs.html">
+        <div class="icon-badge">&#9776;</div>
+        <h3>Software Requirements (SRS)</h3>
+        <p>Numbered functional and non-functional requirements per module, plus data and interface requirements.</p>
+        <span class="go">Open →</span>
+      </a>
+      <a class="doc-card" href="wireframes.html">
+        <div class="icon-badge">&#9635;</div>
+        <h3>Wireframes</h3>
+        <p>Low-fidelity screen layouts for daily readings, shift reports, the mobile home screen, and the web Reports page.</p>
+        <span class="go">Open →</span>
+      </a>
+      <a class="doc-card" href="architecture.html">
+        <div class="icon-badge">&#9881;</div>
+        <h3>Architecture</h3>
+        <p>System diagram, monorepo layout, auth/RBAC design, offline sync, cron jobs, and deployment topology.</p>
+        <span class="go">Open →</span>
+      </a>
+      <a class="doc-card" href="technical-details.html">
+        <div class="icon-badge">&#9000;</div>
+        <h3>Technical Details</h3>
+        <p>Tech stack per app, full data model reference, API surface, environment variables, testing &amp; CI.</p>
+        <span class="go">Open →</span>
+      </a>
+    </div>
+
+    <h2>How this documentation set is organized</h2>
+    <p>The <strong>Presentation</strong> is the fastest read — start there for a stakeholder-level summary. The <strong>PRD</strong> and <strong>SRS</strong> describe <em>what</em> the product must do and for whom, at increasing levels of formality. The <strong>Architecture</strong> and <strong>Technical Details</strong> pages describe <em>how</em> it is actually built, sourced directly from the current codebase (Prisma schema, Nest modules, Next.js routes, React&nbsp;Native screens).</p>
+
+    <div class="callout">
+      <strong>Source of truth</strong>
+      This site is generated from the code and from <code>docs/DEVELOPMENT_PLAN.md</code> as of 2026-08-22. Where the original plan and the shipped implementation diverge (e.g. the mobile offline layer), the documents below describe what is actually implemented and call out the divergence explicitly.
+    </div>
+  </main>
+</div>
+</body>
+</html>

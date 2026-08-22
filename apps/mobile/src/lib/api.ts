@@ -2,8 +2,13 @@ import * as Keychain from 'react-native-keychain';
 import DeviceInfo from 'react-native-device-info';
 import { Platform } from 'react-native';
 
-// Android emulator reaches the host on 10.0.2.2; iOS simulator on localhost.
-export const API_URL = Platform.OS === 'android' ? 'http://10.0.2.2:4000/api/v1' : 'http://localhost:4000/api/v1';
+// Dev (emulator/simulator): Android emulator reaches the host on 10.0.2.2; iOS simulator on localhost.
+// A physical device in dev can use `adb reverse tcp:4000 tcp:4000` (then 10.0.2.2 won't work — use localhost).
+const DEV_HOST = Platform.OS === 'android' ? '10.0.2.2' : 'localhost';
+// Release / standalone installs: the API server reachable from the device's network.
+// Currently the dev Mac's Wi-Fi IP; replace with the real server host for production builds.
+const RELEASE_HOST = '192.168.29.194';
+export const API_URL = `http://${__DEV__ ? DEV_HOST : RELEASE_HOST}:4000/api/v1`;
 
 const SERVICE = 'drillex.session';
 

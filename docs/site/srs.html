@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Drillex Ops — SRS</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="brand"><span class="dot"></span> Drillex Ops</div>
+    <p class="tagline">Documentation hub</p>
+    <nav>
+      <div class="group-label">Overview</div>
+      <a href="index.html"><span class="icon">&#8962;</span> Home</a>
+      <a href="presentation.html"><span class="icon">&#9673;</span> Presentation</a>
+      <div class="group-label">Product</div>
+      <a href="prd.html"><span class="icon">&#9998;</span> PRD</a>
+      <a href="srs.html" class="active"><span class="icon">&#9776;</span> SRS</a>
+      <a href="wireframes.html"><span class="icon">&#9635;</span> Wireframes</a>
+      <div class="group-label">Engineering</div>
+      <a href="architecture.html"><span class="icon">&#9881;</span> Architecture</a>
+      <a href="technical-details.html"><span class="icon">&#9000;</span> Technical Details</a>
+    </nav>
+  </aside>
+  <main class="content">
+    <p class="page-kicker">Software Requirements Specification</p>
+    <h1>Drillex Ops SRS</h1>
+    <p class="subtitle">Version 1.0 · numbered requirements matching the <code>SRS §x.y</code> references used throughout the codebase and test suite.</p>
+
+    <div class="toc">
+      <div class="toc-title">Sections</div>
+      <ul>
+        <li><a href="#s1">§1 Scope</a></li>
+        <li><a href="#s2">§2 Auth &amp; devices</a></li>
+        <li><a href="#s3">§3 Asset register</a></li>
+        <li><a href="#s4">§4 Shift production</a></li>
+        <li><a href="#s5">§5 Daily readings</a></li>
+        <li><a href="#s6">§6 Maintenance</a></li>
+        <li><a href="#s7">§7 Job cards &amp; parts</a></li>
+        <li><a href="#s8">§8 Reporting</a></li>
+        <li><a href="#s9">§9 Cross-cutting &amp; NFRs</a></li>
+        <li><a href="#s10">§10 Data requirements</a></li>
+        <li><a href="#s11">§11 External interfaces</a></li>
+      </ul>
+    </div>
+
+    <h2 id="s1">§1 Scope</h2>
+    <p>This specification covers the API (<code>apps/api</code>), the web console (<code>apps/web</code>) and the mobile field app (<code>apps/mobile</code>) that together make up Drillex Ops, plus the shared validation/permission package (<code>packages/shared</code>). Out of scope: IoT telemetry ingestion, financial/ERP integration, multi-tenant SaaS operation.</p>
+
+    <h2 id="s2">§2 Authentication &amp; device management</h2>
+    <table>
+      <tr><th>ID</th><th>Requirement</th></tr>
+      <tr><td class="reqid">FR-2.1</td><td>The system shall authenticate users by employee ID and password, with passwords hashed using Argon2id.</td></tr>
+      <tr><td class="reqid">FR-2.2</td><td>The system shall record every login attempt (success and failure) with employee ID, device ID, IP, and timestamp.</td></tr>
+      <tr><td class="reqid">FR-2.3</td><td>The system shall require TOTP-based two-factor authentication for MANAGER and ADMIN roles before granting a session.</td></tr>
+      <tr><td class="reqid">FR-2.4</td><td>The system shall issue a short-lived JWT access token (default 15 min) and a rotating opaque refresh token (default 30 days, hashed at rest); each refresh shall revoke the prior token.</td></tr>
+      <tr><td class="reqid">FR-2.5</td><td>The system shall support an optional device-approval mode where an unapproved device cannot complete login or token refresh until an ADMIN approves it.</td></tr>
+      <tr><td class="reqid">FR-2.6</td><td>The system shall support a forced password-change flag that blocks normal use of the API until the user sets a new password.</td></tr>
+    </table>
+
+    <h2 id="s3">§3 Asset register</h2>
+    <table>
+      <tr><th>ID</th><th>Requirement</th></tr>
+      <tr><td class="reqid">FR-3.1</td><td>The system shall allow ADMIN/MANAGER/SUPERVISOR to create, read, update, and soft-delete assets scoped to their site(s).</td></tr>
+      <tr><td class="reqid">FR-3.2</td><td>Each asset shall have an immutable, unique asset number assigned at creation.</td></tr>
+      <tr><td class="reqid">FR-3.3</td><td>The system shall support assigning one or more operators to an asset for a validity period, and shall restrict daily-reading/shift-report submission for that asset to its assigned operator(s).</td></tr>
+      <tr><td class="reqid">FR-3.4</td><td>Asset status (ACTIVE / UNDER_MAINTENANCE / IDLE / DECOMMISSIONED) shall be automatically set to UNDER_MAINTENANCE while any job card on that asset is open, and reverted to ACTIVE when none remain open.</td></tr>
+    </table>
+
+    <h2 id="s4">§4 Shift production reporting</h2>
+    <table>
+      <tr><th>ID</th><th>Requirement</th></tr>
+      <tr><td class="reqid">FR-4.1</td><td>The system shall accept one shift report per asset per date+shift combination, capturing hole reference, start/end depth, holes completed, rock type, penetration rate, downtime hours/reason.</td></tr>
+      <tr><td class="reqid">FR-4.2</td><td>The system shall reject a shift report where end depth is less than start depth, and shall server-compute total meters drilled.</td></tr>
+      <tr><td class="reqid">FR-4.3</td><td>The system shall support recording multiple chemical line items per shift report against a master chemical list, with quantity, unit, purpose, and stock-on-hand.</td></tr>
+      <tr><td class="reqid">FR-4.4</td><td>A shift report shall progress SUBMITTED → APPROVED by a SUPERVISOR or MANAGER; an operator shall not be able to approve their own or any report.</td></tr>
+      <tr><td class="reqid">FR-4.5</td><td>An APPROVED report may be UNLOCKED by an authorized approver with a recorded reason, returning it for correction; the unlock action shall be audited.</td></tr>
+    </table>
+
+    <h2 id="s5">§5 Daily equipment readings</h2>
+    <table>
+      <tr><th>ID</th><th>Requirement</th></tr>
+      <tr><td class="reqid">FR-5.1</td><td>The system shall accept at most one daily reading per asset per calendar date.</td></tr>
+      <tr><td class="reqid">FR-5.2</td><td>A reading shall capture hour meter, fuel start/end (system computes consumption), fluid levels (engine oil, hydraulic oil, coolant), air filter condition, battery condition, tyre pressures, and boolean flags for warning lights / unusual noises / leaks with free-text notes.</td></tr>
+      <tr><td class="reqid">FR-5.3</td><td>The system shall automatically raise an alert when a reading is submitted with a condition rating at or below the configured threshold, or with any fault flag set to true.</td></tr>
+      <tr><td class="reqid">FR-5.4</td><td>The system shall support attaching a photo and/or signature to a reading.</td></tr>
+    </table>
+
+    <h2 id="s6">§6 Maintenance scheduling</h2>
+    <table>
+      <tr><th>ID</th><th>Requirement</th></tr>
+      <tr><td class="reqid">FR-6.1</td><td>The system shall support maintenance schedules per asset keyed by service type (HR_250, HR_500, HR_1000, ANNUAL, CONDITION_BASED, AD_HOC) with an hour-based or day-based interval.</td></tr>
+      <tr><td class="reqid">FR-6.2</td><td>The system shall compute schedule status (UPCOMING / DUE_NOW / OVERDUE) daily, using the latest recorded hour meter for hour-based schedules.</td></tr>
+      <tr><td class="reqid">FR-6.3</td><td>The system shall send reminder notifications to assigned technicians and site supervisors starting at a configurable lead time before due, de-duplicated within a 20-hour window.</td></tr>
+      <tr><td class="reqid">FR-6.4</td><td>The system shall send a weekly digest of all due/overdue schedules to all MANAGER users.</td></tr>
+      <tr><td class="reqid">FR-6.5</td><td>Completing a schedule shall roll a recurring schedule forward to its next cycle, or close a one-off schedule, and shall re-evaluate the asset's status.</td></tr>
+    </table>
+
+    <h2 id="s7">§7 Job cards &amp; parts</h2>
+    <table>
+      <tr><th>ID</th><th>Requirement</th></tr>
+      <tr><td class="reqid">FR-7.1</td><td>The system shall auto-generate a sequential, human-readable job number per calendar year (format <code>JC-YYYY-####</code>) for each job card.</td></tr>
+      <tr><td class="reqid">FR-7.2</td><td>A job card shall record job type (SCHEDULED_SERVICE / BREAKDOWN_REPAIR / MODIFICATION / INSPECTION), reported fault, work performed, hour meter, labour hours, assigned technician(s), before/after condition rating, and test result.</td></tr>
+      <tr><td class="reqid">FR-7.3</td><td>Adding parts to a job card shall transactionally deduct the used quantity from the corresponding part's stock-on-hand and record a stock movement; editing/removing shall reverse the movement.</td></tr>
+      <tr><td class="reqid">FR-7.4</td><td>The system shall notify MANAGER and TECHNICIAN roles when a part's stock-on-hand falls below its configured minimum quantity.</td></tr>
+      <tr><td class="reqid">FR-7.5</td><td>The system shall support a purchase-request workflow per part with states OPEN → ORDERED → RECEIVED (or CANCELLED).</td></tr>
+      <tr><td class="reqid">FR-7.6</td><td>A job card shall require technician sign-off (signature attachment) and, per role policy, supervisor approval before considered complete.</td></tr>
+    </table>
+
+    <h2 id="s8">§8 Reporting</h2>
+    <table>
+      <tr><th>ID</th><th>Requirement</th></tr>
+      <tr><td class="reqid">FR-8.1</td><td>The system shall provide seven report types: Drilling Production, Machine Utilisation, Maintenance Summary, Job Card History, Chemical Usage, Asset Health, and Employee Activity.</td></tr>
+      <tr><td class="reqid">FR-8.2</td><td>Chemical Usage and Employee Activity reports shall be restricted to MANAGER and ADMIN roles.</td></tr>
+      <tr><td class="reqid">FR-8.3</td><td>Each generated report shall be rendered as both PDF and XLSX, stored in object storage, and archived as a Report record for 24 months, after which it is purged by an automated job.</td></tr>
+      <tr><td class="reqid">FR-8.4</td><td>The system shall support emailing a generated report to a specified recipient.</td></tr>
+      <tr><td class="reqid">FR-8.5</td><td>The system shall automatically generate all seven report types for the prior calendar month on the 1st of each month and notify managers when ready.</td></tr>
+    </table>
+
+    <h2 id="s9">§9 Cross-cutting requirements &amp; NFRs</h2>
+    <h3>§9.1 Role-based access control</h3>
+    <table>
+      <tr><th>ID</th><th>Requirement</th></tr>
+      <tr><td class="reqid">FR-9.1.1</td><td>The system shall enforce a single permission matrix mapping each of the 5 roles to a scope (self / site / all) per resource, applied identically across API, web, and mobile.</td></tr>
+      <tr><td class="reqid">FR-9.1.2</td><td>Every API route shall require authentication and pass an explicit permission check by default (deny-by-default).</td></tr>
+    </table>
+    <h3>§9.2 Offline synchronization</h3>
+    <table>
+      <tr><th>ID</th><th>Requirement</th></tr>
+      <tr><td class="reqid">FR-9.2.1</td><td>The mobile app shall queue writes locally when offline and flush them to the server automatically on reconnect and on a periodic interval.</td></tr>
+      <tr><td class="reqid">FR-9.2.2</td><td>The server shall process synced operations idempotently by client-generated operation ID; a replayed operation shall be reported as a duplicate, not reapplied.</td></tr>
+      <tr><td class="reqid">FR-9.2.3</td><td>A synced operation that would violate a uniqueness constraint already satisfied by another source shall be routed to a conflict queue for manual supervisor resolution rather than silently overwritten or dropped.</td></tr>
+    </table>
+    <h3>§9.3 Audit</h3>
+    <table>
+      <tr><th>ID</th><th>Requirement</th></tr>
+      <tr><td class="reqid">FR-9.3.1</td><td>Every create, update, delete, approve, complete, and resolve action shall write an audit log entry capturing actor, device, entity, action, and a diff of the change.</td></tr>
+    </table>
+    <h3>§9.4 Notifications</h3>
+    <table>
+      <tr><th>ID</th><th>Requirement</th></tr>
+      <tr><td class="reqid">FR-9.4.1</td><td>The system shall deliver notifications both in-app (persisted, markable read) and via mobile push, targetable by role and site.</td></tr>
+    </table>
+    <h3>§9.5 Non-functional requirements</h3>
+    <table>
+      <tr><th>ID</th><th>Requirement</th></tr>
+      <tr><td class="reqid">NFR-PERF-1</td><td>Under 200 concurrent virtual users, the API shall maintain a failed-request rate below 1%, with read endpoints (e.g. asset list, dashboard summary) at p95 latency under 3000ms and sync submissions at p95 under 5000ms (validated by the k6 smoke test at <code>infra/load/k6-smoke.js</code>).</td></tr>
+      <tr><td class="reqid">NFR-SEC-1</td><td>The API shall refuse to start in production with a missing or weak (&lt;32 char) JWT secret.</td></tr>
+      <tr><td class="reqid">NFR-SEC-2</td><td>All API responses shall be served behind security headers (Helmet) and a global request-rate limiter (default 120 req/60s).</td></tr>
+      <tr><td class="reqid">NFR-SEC-3</td><td>Passwords shall never be stored in plaintext; refresh tokens shall be stored hashed, never in plaintext.</td></tr>
+      <tr><td class="reqid">NFR-AVAIL-1</td><td>Scheduled jobs (maintenance reminders, weekly digest, month-end reports) shall run at fixed UTC times (06:00 daily, Monday 07:00, 1st of month 02:00 respectively) independent of user activity.</td></tr>
+      <tr><td class="reqid">NFR-USAB-1</td><td>All field-facing forms (daily reading, shift report, job card) shall be fully usable with no network connectivity.</td></tr>
+    </table>
+
+    <h2 id="s10">§10 Data requirements</h2>
+    <p>The canonical data model is the Prisma schema at <code>apps/api/prisma/schema.prisma</code> (22 models). See <a href="technical-details.html#data-model">Technical Details → Data model</a> for the full entity reference including fields and relations.</p>
+
+    <h2 id="s11">§11 External interface requirements</h2>
+    <table>
+      <tr><th>Interface</th><th>Requirement</th></tr>
+      <tr><td>Object storage</td><td>S3-compatible API (AWS S3 or MinIO) for attachments and generated report files, selectable via <code>STORAGE_DRIVER</code>, with local-disk fallback for development.</td></tr>
+      <tr><td>Push notifications</td><td>Firebase Cloud Messaging HTTP v1 API, authenticated via a Google service account.</td></tr>
+      <tr><td>Email</td><td>SMTP (via nodemailer) for report sharing; logs instead of sending if unconfigured.</td></tr>
+      <tr><td>API documentation</td><td>OpenAPI/Swagger UI served at <code>/api/docs</code> with Bearer-token auth.</td></tr>
+    </table>
+
+    <div class="footer-nav">
+      <a href="prd.html">← PRD</a>
+      <a href="wireframes.html">Next: Wireframes →</a>
+    </div>
+  </main>
+</div>
+</body>
+</html>

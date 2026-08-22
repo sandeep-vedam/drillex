@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Drillex Ops — Architecture</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="brand"><span class="dot"></span> Drillex Ops</div>
+    <p class="tagline">Documentation hub</p>
+    <nav>
+      <div class="group-label">Overview</div>
+      <a href="index.html"><span class="icon">&#8962;</span> Home</a>
+      <a href="presentation.html"><span class="icon">&#9673;</span> Presentation</a>
+      <div class="group-label">Product</div>
+      <a href="prd.html"><span class="icon">&#9998;</span> PRD</a>
+      <a href="srs.html"><span class="icon">&#9776;</span> SRS</a>
+      <a href="wireframes.html"><span class="icon">&#9635;</span> Wireframes</a>
+      <div class="group-label">Engineering</div>
+      <a href="architecture.html" class="active"><span class="icon">&#9881;</span> Architecture</a>
+      <a href="technical-details.html"><span class="icon">&#9000;</span> Technical Details</a>
+    </nav>
+  </aside>
+  <main class="content">
+    <p class="page-kicker">System Architecture</p>
+    <h1>Architecture</h1>
+    <p class="subtitle">Monorepo layout, request/data flow, auth &amp; RBAC design, offline sync, scheduled jobs, and deployment topology — as implemented.</p>
+
+    <div class="toc">
+      <div class="toc-title">On this page</div>
+      <ul>
+        <li><a href="#topology">System topology</a></li>
+        <li><a href="#monorepo">Monorepo layout</a></li>
+        <li><a href="#auth">Auth &amp; RBAC</a></li>
+        <li><a href="#sync">Offline sync</a></li>
+        <li><a href="#cron">Scheduled jobs</a></li>
+        <li><a href="#automation">Domain automation</a></li>
+        <li><a href="#infra">Deployment &amp; infra</a></li>
+      </ul>
+    </div>
+
+    <h2 id="topology" style="margin-top:8px;border-top:none;padding-top:0;">System topology</h2>
+    <div class="diagram">
+      <svg viewBox="0 0 940 380" xmlns="http://www.w3.org/2000/svg">
+        <style>
+          .box { fill: var(--bg-elevated); stroke: var(--border); }
+          .boxA { fill: var(--accent-soft); stroke: var(--accent); }
+          .lbl { fill: var(--text); font-size: 13px; font-weight: 700; }
+          .sub { fill: var(--text-dim); font-size: 10.5px; }
+          .flow { stroke: var(--text-faint); stroke-width: 1.4; fill: none; marker-end: url(#arrow2); }
+        </style>
+        <defs>
+          <marker id="arrow2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="var(--text-faint)"></path>
+          </marker>
+        </defs>
+
+        <rect class="box" x="20" y="20" width="150" height="60" rx="10"></rect>
+        <text class="lbl" x="40" y="46">Mobile app</text>
+        <text class="sub" x="40" y="64">React Native · offline outbox</text>
+
+        <rect class="box" x="20" y="110" width="150" height="60" rx="10"></rect>
+        <text class="lbl" x="40" y="136">Web console</text>
+        <text class="sub" x="40" y="154">Next.js 15 · role-gated</text>
+
+        <rect class="boxA" x="250" y="65" width="170" height="80" rx="10"></rect>
+        <text class="lbl" x="270" y="95" fill="var(--accent)">API</text>
+        <text class="sub" x="270" y="113">NestJS 10 · REST /api/v1</text>
+        <text class="sub" x="270" y="128">JWT + RBAC guards on every route</text>
+
+        <rect class="box" x="480" y="20" width="150" height="55" rx="10"></rect>
+        <text class="lbl" x="500" y="45">PostgreSQL</text>
+        <text class="sub" x="500" y="62">via Prisma ORM</text>
+
+        <rect class="box" x="480" y="90" width="150" height="55" rx="10"></rect>
+        <text class="lbl" x="500" y="115">Object storage</text>
+        <text class="sub" x="500" y="132">S3 / MinIO</text>
+
+        <rect class="box" x="480" y="160" width="150" height="55" rx="10"></rect>
+        <text class="lbl" x="500" y="185">SMTP</text>
+        <text class="sub" x="500" y="202">report email share</text>
+
+        <rect class="box" x="680" y="20" width="150" height="55" rx="10"></rect>
+        <text class="lbl" x="700" y="45">FCM push</text>
+        <text class="sub" x="700" y="62">HTTP v1, service account</text>
+
+        <rect class="box" x="680" y="90" width="150" height="55" rx="10"></rect>
+        <text class="lbl" x="700" y="115">Redis</text>
+        <text class="sub" x="700" y="132">provisioned, not yet used</text>
+
+        <rect class="box" x="250" y="220" width="170" height="70" rx="10"></rect>
+        <text class="lbl" x="270" y="248">@nestjs/schedule</text>
+        <text class="sub" x="270" y="266">cron: reminders, digest,</text>
+        <text class="sub" x="270" y="279">month-end reports, purge</text>
+
+        <rect class="box" x="20" y="310" width="600" height="52" rx="10"></rect>
+        <text class="lbl" x="40" y="332" font-size="12">@drillex/shared</text>
+        <text class="sub" x="40" y="348">Zod validation schemas + RBAC matrix — imported by API, web, and mobile alike</text>
+
+        <path class="flow" d="M170,50 C210,50 210,90 250,95"></path>
+        <path class="flow" d="M170,140 C210,140 210,110 250,105"></path>
+        <path class="flow" d="M420,90 C450,70 450,55 480,48"></path>
+        <path class="flow" d="M420,110 C450,115 450,117 480,117"></path>
+        <path class="flow" d="M420,120 C450,150 450,175 480,187"></path>
+        <path class="flow" d="M420,90 C640,60 640,55 680,48"></path>
+        <path class="flow" d="M420,110 C640,110 650,115 680,117"></path>
+        <path class="flow" d="M335,145 C335,180 335,200 335,220"></path>
+      </svg>
+    </div>
+    <p class="dim">Both the mobile app and web console talk only to the API over HTTPS/REST — neither has a direct database or storage connection. All three clients share the same validation rules and permission matrix from <code>packages/shared</code>, so a rule is written once and enforced identically everywhere.</p>
+
+    <h2 id="monorepo">Monorepo layout</h2>
+    <pre><code>drillex/
+├── apps/
+│   ├── api/           NestJS backend — REST API, Prisma, cron jobs
+│   ├── web/            Next.js 15 — supervisor/manager dashboard + admin console
+│   └── mobile/         React Native (bare CLI) — field app for operators/technicians
+├── packages/
+│   └── shared/          @drillex/shared — Zod schemas, enums, RBAC matrix, calc helpers
+├── infra/
+│   ├── docker-compose.yml   Postgres 16, Redis 7, MinIO (local dev dependencies)
+│   └── load/k6-smoke.js     k6 load test against SRS §9.5 NFR targets
+├── docs/
+│   ├── DEVELOPMENT_PLAN.md  original build plan + status log
+│   └── site/                 this documentation set
+└── .github/workflows/ci.yml  install → migrate → seed → typecheck → test → build
+</code></pre>
+    <p>Package manager: <strong>pnpm workspaces</strong> (<code>apps/*</code>, <code>packages/*</code>), task orchestration via <strong>Turborepo</strong>. Node ≥20 at the repo root; the mobile app requires Node ≥22.11.</p>
+    <div class="callout warn">
+      <strong>Plan vs. implementation</strong>
+      The original plan proposed Expo + WatermelonDB for mobile and additional <code>packages/ui</code> / <code>packages/config</code> workspaces. The shipped app uses bare React Native CLI with a custom AsyncStorage-backed outbox instead (documented as a deliberate 2026-08-21 decision — WatermelonDB remains the upgrade path if bidirectional offline editing is ever needed), and only <code>packages/shared</code> exists today.
+    </div>
+
+    <h2 id="auth">Authentication &amp; RBAC</h2>
+    <p>Every request passes through three global guards, in order: <code>ThrottlerGuard</code> (rate limiting) → <code>JwtAuthGuard</code> → <code>RbacGuard</code>. Routes are deny-by-default — a route must explicitly declare <code>@RequirePermission(...)</code> to be reachable by anything other than an unauthenticated health check.</p>
+    <div class="grid-2">
+      <div class="card">
+        <h3 style="margin-top:0;">Session lifecycle</h3>
+        <ul style="margin-bottom:0;">
+          <li>Login: employee ID + Argon2id password check, every attempt logged</li>
+          <li>2FA (TOTP) enforced for MANAGER/ADMIN before a session is granted</li>
+          <li>Access JWT: 15 min default; Refresh token: 30 days, hashed at rest, rotates on every use</li>
+          <li>Optional device pre-approval gate before login/refresh succeeds</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3 style="margin-top:0;">Permission matrix</h3>
+        <p style="margin-bottom:6px;">A single table in <code>packages/shared/src/rbac.ts</code> maps each of 5 roles to a <strong>scope</strong> per permission:</p>
+        <table style="margin:0;">
+          <tr><th>Scope</th><th>Meaning</th></tr>
+          <tr><td><code>self</code></td><td>only records the user owns</td></tr>
+          <tr><td><code>site</code></td><td>records within the user's site</td></tr>
+          <tr><td><code>all</code></td><td>cross-site (admin-level)</td></tr>
+        </table>
+      </div>
+    </div>
+    <p>Services translate the resolved scope into a Prisma <code>where</code> filter (e.g. an asset-scope helper), so access control is enforced at the query layer, not just the route layer.</p>
+
+    <h2 id="sync">Offline sync</h2>
+    <div class="diagram">
+      <svg viewBox="0 0 900 210" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <marker id="arrow3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="var(--text-faint)"></path>
+          </marker>
+        </defs>
+        <style>
+          .box{fill:var(--bg-elevated);stroke:var(--border);}
+          .lbl{fill:var(--text);font-size:12.5px;font-weight:700;}
+          .sub{fill:var(--text-dim);font-size:10px;}
+          .flow{stroke:var(--text-faint);stroke-width:1.4;fill:none;marker-end:url(#arrow3);}
+        </style>
+        <rect class="box" x="10" y="70" width="150" height="70" rx="10"></rect>
+        <text class="lbl" x="28" y="98">Form submit</text>
+        <text class="sub" x="28" y="115">reading / shift / job card</text>
+
+        <rect class="box" x="210" y="70" width="170" height="70" rx="10"></rect>
+        <text class="lbl" x="228" y="95">enqueue()</text>
+        <text class="sub" x="228" y="112">AsyncStorage FIFO queue</text>
+        <text class="sub" x="228" y="126">drillex.outbox.v1</text>
+
+        <rect class="box" x="430" y="10" width="170" height="60" rx="10"></rect>
+        <text class="lbl" x="448" y="35">On reconnect</text>
+        <text class="sub" x="448" y="52">NetInfo listener</text>
+
+        <rect class="box" x="430" y="140" width="170" height="60" rx="10"></rect>
+        <text class="lbl" x="448" y="165">Every 60s</text>
+        <text class="sub" x="448" y="182">interval flush</text>
+
+        <rect class="box" x="650" y="70" width="120" height="70" rx="10"></rect>
+        <text class="lbl" x="665" y="98">flush()</text>
+        <text class="sub" x="665" y="114">batch ≤50</text>
+        <text class="sub" x="665" y="127">POST /sync/push</text>
+
+        <rect class="box" x="800" y="30" width="90" height="45" rx="8"></rect>
+        <text class="sub" x="812" y="50" font-weight="700" fill="var(--accent-2)">applied</text>
+
+        <rect class="box" x="800" y="83" width="90" height="45" rx="8"></rect>
+        <text class="sub" x="800" y="103" font-weight="700">duplicate</text>
+
+        <rect class="box" x="800" y="136" width="90" height="45" rx="8"></rect>
+        <text class="sub" x="806" y="156" font-weight="700" fill="var(--danger)">conflict</text>
+
+        <path class="flow" d="M160,105 H210"></path>
+        <path class="flow" d="M380,90 C400,70 400,50 430,42"></path>
+        <path class="flow" d="M380,120 C400,140 400,155 430,163"></path>
+        <path class="flow" d="M600,40 C630,50 630,70 650,90"></path>
+        <path class="flow" d="M600,170 C630,150 630,120 650,115"></path>
+        <path class="flow" d="M770,90 C785,70 790,55 800,52"></path>
+        <path class="flow" d="M770,105 H800"></path>
+        <path class="flow" d="M770,120 C785,140 790,150 800,158"></path>
+      </svg>
+    </div>
+    <p>Each queued operation carries a client-generated UUID. The server treats replays as idempotent by that ID: an already-applied op returns <code>duplicate</code>; a validation/permission failure returns <code>rejected</code> with a reason (kept in the mobile Outbox screen for retry); a genuine data conflict (e.g. two submissions for the same asset+date) is written to the <code>SyncConflict</code> table rather than resolved automatically, and surfaced to supervisors on the web <strong>Sync Conflicts</strong> page for manual review.</p>
+
+    <h2 id="cron">Scheduled jobs</h2>
+    <table>
+      <tr><th>Job</th><th>Schedule (UTC)</th><th>Purpose</th></tr>
+      <tr><td>Maintenance reminders</td><td>Daily 06:00</td><td>Recompute schedule status, notify technicians/supervisors on due/overdue items (20h de-dupe window)</td></tr>
+      <tr><td>Maintenance weekly digest</td><td>Monday 07:00</td><td>Summary of all due/overdue schedules to all managers</td></tr>
+      <tr><td>Month-end reports</td><td>1st of month, 02:00</td><td>Generate all 7 report types for the prior month, notify managers</td></tr>
+      <tr><td>Report purge</td><td>Quarterly, 1st, 03:00</td><td>Delete archived reports older than 24 months</td></tr>
+    </table>
+    <p class="dim">All four run in-process via <code>@nestjs/schedule</code> — no external job queue is currently wired in, despite Redis being provisioned in local infra.</p>
+
+    <h2 id="automation">Domain automation</h2>
+    <ul>
+      <li><strong>Parts ↔ job cards:</strong> adding parts to a job card runs in a Prisma transaction that creates a stock movement and adjusts <code>qtyOnHand</code>; removing/editing reverses it; crossing below <code>minQty</code> triggers a low-stock notification.</li>
+      <li><strong>Asset status:</strong> any job card in OPEN/IN_PROGRESS/AWAITING_PARTS forces the asset to UNDER_MAINTENANCE; when the last one closes, the asset reverts to ACTIVE (unless DECOMMISSIONED).</li>
+      <li><strong>Job numbering:</strong> sequential per calendar year, computed transactionally to avoid collisions (<code>JC-2026-0001</code>, …).</li>
+    </ul>
+
+    <h2 id="infra">Deployment &amp; infra</h2>
+    <div class="grid-2">
+      <div class="card">
+        <h3 style="margin-top:0;">Local / CI</h3>
+        <ul style="margin-bottom:0;">
+          <li><code>infra/docker-compose.yml</code>: Postgres 16, Redis 7, MinIO</li>
+          <li>CI (<code>.github/workflows/ci.yml</code>): install → <code>prisma migrate deploy</code> → seed → typecheck → test → build (API + web only; mobile not built in CI)</li>
+          <li>k6 smoke test validates the §9.5 performance NFRs against a seeded dataset</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3 style="margin-top:0;">Production readiness</h3>
+        <ul style="margin-bottom:0;">
+          <li>API refuses to boot in production without strong JWT secrets</li>
+          <li>Recommended: <code>STORAGE_DRIVER=s3</code>, real SMTP/FCM credentials, <code>DEVICE_REGISTRATION_REQUIRED=true</code>, TLS termination at the load balancer, managed Postgres with backups</li>
+          <li><span class="badge warn">Gap</span> no Dockerfiles yet for <code>apps/api</code> / <code>apps/web</code> — only local dev infra is containerized today</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="footer-nav">
+      <a href="wireframes.html">← Wireframes</a>
+      <a href="technical-details.html">Next: Technical Details →</a>
+    </div>
+  </main>
+</div>
+</body>
+</html>
