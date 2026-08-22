@@ -22,13 +22,15 @@ function makeUser(overrides: Partial<Record<string, unknown>> = {}) {
   };
 }
 
-function makePrisma(user: ReturnType<typeof makeUser> | null) {
+// roles2fa mirrors the admin-configured SystemSetting row; defaults to [] (nobody requires 2FA), same as an unconfigured install.
+function makePrisma(user: ReturnType<typeof makeUser> | null, roles2fa: string[] = []) {
   return {
     user: { findUnique: vi.fn().mockResolvedValue(user), update: vi.fn().mockResolvedValue(user) },
     loginEvent: { create: vi.fn().mockResolvedValue({}) },
     device: { upsert: vi.fn().mockResolvedValue({ approved: true }) },
     refreshToken: { create: vi.fn().mockResolvedValue({}) },
     auditLog: { create: vi.fn().mockResolvedValue({}) },
+    systemSetting: { findUnique: vi.fn().mockResolvedValue({ key: 'roles_requiring_2fa', value: roles2fa }) },
   };
 }
 
@@ -77,39 +79,47 @@ describe('AuthService.login', () => {
     expect(r).toHaveProperty('refreshToken');
   });
 
-  it('returns requires2faSetup for a manager who has never enrolled, without issuing tokens', async () => {
+  it('by default (no SystemSetting configured), no role requires 2FA — even one that used to', async () => {
     const prisma = makePrisma(makeUser({ role: 'MANAGER', totpEnabled: false }));
+    prisma.systemSetting.findUnique.mockResolvedValue(null); // simulates an unconfigured install
+    const svc = new AuthService(prisma as never, makeJwt() as never);
+    const r = await svc.login({ employeeId: 'MGR001', password: PASSWORD, deviceId: 'd1' });
+    expect(r).toHaveProperty('accessToken', 'signed-jwt');
+  });
+
+  it('returns requires2faSetup for a role the admin has configured to require 2FA, if never enrolled', async () => {
+    const prisma = makePrisma(makeUser({ role: 'MANAGER', totpEnabled: false }), ['MANAGER']);
     const svc = new AuthService(prisma as never, makeJwt() as never);
     const r = await svc.login({ employeeId: 'MGR001', password: PASSWORD, deviceId: 'd1' });
     expect(r).toEqual({ requires2faSetup: true, userId: 'user-1' });
   });
 
-  it('rejects an enrolled manager login with no totp code supplied', async () => {
+  it('rejects an enrolled, configured-for-2FA role login with no totp code supplied', async () => {
     const secret = authenticator.generateSecret();
-    const prisma = makePrisma(makeUser({ role: 'MANAGER', totpEnabled: true, totpSecret: secret }));
+    const prisma = makePrisma(makeUser({ role: 'MANAGER', totpEnabled: true, totpSecret: secret }), ['MANAGER']);
     const svc = new AuthService(prisma as never, makeJwt() as never);
     await expect(svc.login({ employeeId: 'MGR001', password: PASSWORD, deviceId: 'd1' }))
       .rejects.toThrow('2FA code required');
   });
 
-  it('rejects an enrolled manager login with a wrong/expired totp code', async () => {
+  it('rejects an enrolled, configured-for-2FA role login with a wrong/expired totp code', async () => {
     const secret = authenticator.generateSecret();
-    const prisma = makePrisma(makeUser({ role: 'MANAGER', totpEnabled: true, totpSecret: secret }));
+    const prisma = makePrisma(makeUser({ role: 'MANAGER', totpEnabled: true, totpSecret: secret }), ['MANAGER']);
     const svc = new AuthService(prisma as never, makeJwt() as never);
     await expect(svc.login({ employeeId: 'MGR001', password: PASSWORD, deviceId: 'd1', totp: '000000' }))
       .rejects.toThrow('2FA code required');
   });
 
-  it('logs in an enrolled manager with the correct live totp code', async () => {
+  it('logs in an enrolled, configured-for-2FA role with the correct live totp code', async () => {
     const secret = authenticator.generateSecret();
-    const prisma = makePrisma(makeUser({ role: 'MANAGER', totpEnabled: true, totpSecret: secret }));
+    const prisma = makePrisma(makeUser({ role: 'MANAGER', totpEnabled: true, totpSecret: secret }), ['MANAGER']);
     const svc = new AuthService(prisma as never, makeJwt() as never);
     const r = await svc.login({ employeeId: 'MGR001', password: PASSWORD, deviceId: 'd1', totp: authenticator.generate(secret) });
     expect(r).toHaveProperty('accessToken', 'signed-jwt');
   });
 
-  it('logs in an admin with no totp code at all — ADMIN is not in ROLES_REQUIRING_2FA', async () => {
-    const prisma = makePrisma(makeUser({ role: 'ADMIN', employeeId: 'ADM001', totpEnabled: false }));
+  it('a role NOT in the configured 2FA set logs in with no totp code, even while other roles are gated', async () => {
+    const prisma = makePrisma(makeUser({ role: 'ADMIN', employeeId: 'ADM001', totpEnabled: false }), ['MANAGER']);
     const svc = new AuthService(prisma as never, makeJwt() as never);
     const r = await svc.login({ employeeId: 'ADM001', password: PASSWORD, deviceId: 'd1' });
     expect(r).toHaveProperty('accessToken', 'signed-jwt');

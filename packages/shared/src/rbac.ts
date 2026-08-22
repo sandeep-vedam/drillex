@@ -75,4 +75,5 @@ export function can(role: Role, permission: Permission): Scope | undefined {
   return RBAC[role]?.[permission];
 }
 
-export const ROLES_REQUIRING_2FA: Role[] = ['MANAGER'];
+/** Default when no admin-configured "roles_requiring_2fa" SystemSetting exists yet. See apps/api/src/settings. */
+export const ROLES_REQUIRING_2FA: Role[] = [];

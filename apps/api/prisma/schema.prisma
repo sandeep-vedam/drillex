@@ -8,6 +8,14 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+/// Admin-configurable app settings, e.g. key "roles_requiring_2fa" -> value ["MANAGER","ADMIN"].
+model SystemSetting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
+  updatedBy String?
+}
+
 enum Role {
   OPERATOR
   TECHNICIAN

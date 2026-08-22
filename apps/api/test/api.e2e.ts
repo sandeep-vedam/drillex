@@ -38,10 +38,18 @@ describe('auth & RBAC', () => {
     expect((await request(app.getHttpServer()).get('/api/v1/users').set(auth(t))).status).toBe(403);
     expect((await request(app.getHttpServer()).get('/api/v1/assets').set(auth(t))).status).toBe(200);
   });
-  it('requires 2FA for managers', async () => {
-    const r = await request(app.getHttpServer()).post('/api/v1/auth/login').send({ employeeId: 'MGR001', password: PW, deviceId: 'e2e' });
-    expect([200, 201, 401]).toContain(r.status); // enrolled → 401 without code; not enrolled → requires2faSetup
-    if (r.status < 400) expect(r.body.requires2faSetup).toBe(true);
+  it('2FA requirement is admin-configurable per role (SystemSetting), off by default', async () => {
+    await prisma.systemSetting.deleteMany({ where: { key: 'roles_requiring_2fa' } });
+    const off = await request(app.getHttpServer()).post('/api/v1/auth/login').send({ employeeId: 'MGR001', password: PW, deviceId: 'e2e' });
+    expect(off.status).toBeLessThan(300); // unconfigured -> no role requires 2FA
+    expect(off.body.requires2faSetup).toBeUndefined();
+
+    await prisma.systemSetting.upsert({ where: { key: 'roles_requiring_2fa' }, create: { key: 'roles_requiring_2fa', value: ['MANAGER'] }, update: { value: ['MANAGER'] } });
+    const on = await request(app.getHttpServer()).post('/api/v1/auth/login').send({ employeeId: 'MGR001', password: PW, deviceId: 'e2e' });
+    expect([200, 201, 401]).toContain(on.status); // enrolled → 401 without code; not enrolled → requires2faSetup
+    if (on.status < 400) expect(on.body.requires2faSetup).toBe(true);
+
+    await prisma.systemSetting.deleteMany({ where: { key: 'roles_requiring_2fa' } });
   });
 });
 

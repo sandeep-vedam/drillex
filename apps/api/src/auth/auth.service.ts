@@ -3,8 +3,9 @@ import { JwtService } from '@nestjs/jwt';
 import argon2 from 'argon2';
 import { createHash, randomBytes } from 'crypto';
 import { authenticator } from 'otplib';
-import { ROLES_REQUIRING_2FA, LoginInput } from '@drillex/shared';
+import { LoginInput } from '@drillex/shared';
 import { PrismaService } from '../prisma/prisma.service';
+import { getRoles2faRequired } from '../settings/settings.util';
 
 const sha = (s: string) => createHash('sha256').update(s).digest('hex');
 
@@ -18,7 +19,7 @@ export class AuthService {
     await this.prisma.loginEvent.create({ data: { userId: user?.id, employeeId: input.employeeId, deviceId: input.deviceId, success: ok, ip } });
     if (!ok || !user) throw new UnauthorizedException('Invalid credentials');
 
-    if (ROLES_REQUIRING_2FA.includes(user.role)) {
+    if ((await getRoles2faRequired(this.prisma)).includes(user.role)) {
       if (!user.totpEnabled) return { requires2faSetup: true, userId: user.id };
       if (!input.totp || !authenticator.check(input.totp, user.totpSecret!)) throw new UnauthorizedException('2FA code required');
     }

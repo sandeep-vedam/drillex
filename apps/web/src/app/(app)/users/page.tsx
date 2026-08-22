@@ -17,8 +17,14 @@ export default function UsersPage() {
   const [sites, setSites] = useState<{ id: string; name: string }[]>([]);
   const [error, setError] = useState<string | null>(null);
   const me = getUser();
+  const [roles2fa, setRoles2fa] = useState<string[]>(['MANAGER', 'ADMIN']); // best-guess default until/unless we can read the admin-configured setting
   const load = () => api<U[]>('/users').then(setUsers).catch((e) => setError(e.message));
-  useEffect(() => { load(); api<{ id: string; name: string }[]>('/sites').then((s) => { setSites(s); setForm((f) => ({ ...f, siteId: f.siteId || s[0]?.id || '' })); }).catch(() => {}); }, []);
+  useEffect(() => {
+    load();
+    api<{ id: string; name: string }[]>('/sites').then((s) => { setSites(s); setForm((f) => ({ ...f, siteId: f.siteId || s[0]?.id || '' })); }).catch(() => {});
+    if (me?.role === 'ADMIN') api<{ roles: string[] }>('/settings/2fa-roles').then((r) => setRoles2fa(r.roles)).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function reset(u: U) {
     if (!confirm(`Reset password for ${u.employeeId} (${u.name})? Their sessions will be signed out.`)) return;
@@ -56,7 +62,7 @@ export default function UsersPage() {
                 <td className="px-5 py-3 font-medium">{u.name}{u.mustChangePassword && <span className="ml-2 text-[11px] text-hazard">must change password</span>}</td>
                 <td className="px-5 py-3"><span className={`px-2 py-0.5 text-[11px] font-bold tracking-wider ${roleTone[u.role]}`}>{u.role}</span></td>
                 <td className="px-5 py-3 text-muted">{u.site?.name ?? '—'}</td>
-                <td className="px-5 py-3 text-[12px]">{['MANAGER', 'ADMIN'].includes(u.role) ? (u.totpEnabled ? <span className="text-ok font-semibold">Enabled</span> : <span className="text-hazard font-semibold">Pending enrolment</span>) : <span className="text-muted">n/a</span>}</td>
+                <td className="px-5 py-3 text-[12px]">{roles2fa.includes(u.role) ? (u.totpEnabled ? <span className="text-ok font-semibold">Enabled</span> : <span className="text-hazard font-semibold">Pending enrolment</span>) : <span className="text-muted">n/a</span>}</td>
                 <td className="px-5 py-3"><span className={`inline-flex items-center gap-1.5 text-[12px] font-semibold ${u.status === 'ACTIVE' ? 'text-ok' : 'text-crit'}`}><span className={`h-1.5 w-1.5 ${u.status === 'ACTIVE' ? 'bg-ok' : 'bg-crit'}`} />{u.status === 'ACTIVE' ? 'Active' : 'Disabled'}</span></td>
                 <td className="px-5 py-3 text-right whitespace-nowrap">
                   <button onClick={() => reset(u)} className="btn-ghost text-[12px]">Reset password</button>
