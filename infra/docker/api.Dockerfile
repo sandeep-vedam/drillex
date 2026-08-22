@@ -16,7 +16,8 @@ COPY apps/api apps/api
 RUN pnpm --filter @drillex/shared build \
  && pnpm --filter @drillex/api exec prisma generate \
  && pnpm --filter @drillex/api build \
- && pnpm deploy --filter @drillex/api --prod /out
+ && pnpm deploy --filter @drillex/api --prod /out \
+ && cd /out && node_modules/.bin/prisma generate
 
 FROM node:20-slim AS runner
 RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates && rm -rf /var/lib/apt/lists/*
