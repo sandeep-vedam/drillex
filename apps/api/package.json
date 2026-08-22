@@ -2,6 +2,7 @@
   "name": "@drillex/api",
   "version": "0.1.0",
   "private": true,
+  "files": ["dist", "prisma"],
   "scripts": {
     "build": "nest build",
     "dev": "nest start --watch",
