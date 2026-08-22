@@ -6,7 +6,7 @@ import { AuthService } from './auth.service';
 
 /**
  * Unit tests for the login/2FA/device-approval rules — isolated from Postgres via a mocked
- * PrismaService. Mirrors the flows exercised manually while debugging the ADM001 2FA rollout:
+ * PrismaService. Mirrors the flows exercised manually while debugging the MGR001 2FA rollout:
  * requires2faSetup on first login, code verification on subsequent ones, device approval gating.
  */
 
@@ -77,34 +77,41 @@ describe('AuthService.login', () => {
     expect(r).toHaveProperty('refreshToken');
   });
 
-  it('returns requires2faSetup for a manager/admin who has never enrolled, without issuing tokens', async () => {
-    const prisma = makePrisma(makeUser({ role: 'ADMIN', totpEnabled: false }));
+  it('returns requires2faSetup for a manager who has never enrolled, without issuing tokens', async () => {
+    const prisma = makePrisma(makeUser({ role: 'MANAGER', totpEnabled: false }));
     const svc = new AuthService(prisma as never, makeJwt() as never);
-    const r = await svc.login({ employeeId: 'ADM001', password: PASSWORD, deviceId: 'd1' });
+    const r = await svc.login({ employeeId: 'MGR001', password: PASSWORD, deviceId: 'd1' });
     expect(r).toEqual({ requires2faSetup: true, userId: 'user-1' });
   });
 
-  it('rejects an enrolled admin login with no totp code supplied', async () => {
+  it('rejects an enrolled manager login with no totp code supplied', async () => {
     const secret = authenticator.generateSecret();
-    const prisma = makePrisma(makeUser({ role: 'ADMIN', totpEnabled: true, totpSecret: secret }));
+    const prisma = makePrisma(makeUser({ role: 'MANAGER', totpEnabled: true, totpSecret: secret }));
     const svc = new AuthService(prisma as never, makeJwt() as never);
-    await expect(svc.login({ employeeId: 'ADM001', password: PASSWORD, deviceId: 'd1' }))
+    await expect(svc.login({ employeeId: 'MGR001', password: PASSWORD, deviceId: 'd1' }))
       .rejects.toThrow('2FA code required');
   });
 
-  it('rejects an enrolled admin login with a wrong/expired totp code', async () => {
+  it('rejects an enrolled manager login with a wrong/expired totp code', async () => {
     const secret = authenticator.generateSecret();
-    const prisma = makePrisma(makeUser({ role: 'ADMIN', totpEnabled: true, totpSecret: secret }));
+    const prisma = makePrisma(makeUser({ role: 'MANAGER', totpEnabled: true, totpSecret: secret }));
     const svc = new AuthService(prisma as never, makeJwt() as never);
-    await expect(svc.login({ employeeId: 'ADM001', password: PASSWORD, deviceId: 'd1', totp: '000000' }))
+    await expect(svc.login({ employeeId: 'MGR001', password: PASSWORD, deviceId: 'd1', totp: '000000' }))
       .rejects.toThrow('2FA code required');
   });
 
-  it('logs in an enrolled admin with the correct live totp code', async () => {
+  it('logs in an enrolled manager with the correct live totp code', async () => {
     const secret = authenticator.generateSecret();
-    const prisma = makePrisma(makeUser({ role: 'ADMIN', totpEnabled: true, totpSecret: secret }));
+    const prisma = makePrisma(makeUser({ role: 'MANAGER', totpEnabled: true, totpSecret: secret }));
     const svc = new AuthService(prisma as never, makeJwt() as never);
-    const r = await svc.login({ employeeId: 'ADM001', password: PASSWORD, deviceId: 'd1', totp: authenticator.generate(secret) });
+    const r = await svc.login({ employeeId: 'MGR001', password: PASSWORD, deviceId: 'd1', totp: authenticator.generate(secret) });
+    expect(r).toHaveProperty('accessToken', 'signed-jwt');
+  });
+
+  it('logs in an admin with no totp code at all — ADMIN is not in ROLES_REQUIRING_2FA', async () => {
+    const prisma = makePrisma(makeUser({ role: 'ADMIN', employeeId: 'ADM001', totpEnabled: false }));
+    const svc = new AuthService(prisma as never, makeJwt() as never);
+    const r = await svc.login({ employeeId: 'ADM001', password: PASSWORD, deviceId: 'd1' });
     expect(r).toHaveProperty('accessToken', 'signed-jwt');
   });
 
@@ -129,22 +136,22 @@ describe('AuthService.login', () => {
 
 describe('AuthService.setup2fa', () => {
   it('rejects a wrong password before touching totp state', async () => {
-    const prisma = makePrisma(makeUser({ role: 'ADMIN' }));
+    const prisma = makePrisma(makeUser({ role: 'MANAGER' }));
     const svc = new AuthService(prisma as never, makeJwt() as never);
-    await expect(svc.setup2fa('ADM001', 'wrong')).rejects.toBeInstanceOf(UnauthorizedException);
+    await expect(svc.setup2fa('MGR001', 'wrong')).rejects.toBeInstanceOf(UnauthorizedException);
     expect(prisma.user.update).not.toHaveBeenCalled();
   });
 
   it('rejects re-enrolling a user who already has 2FA enabled', async () => {
-    const prisma = makePrisma(makeUser({ role: 'ADMIN', totpEnabled: true, totpSecret: authenticator.generateSecret() }));
+    const prisma = makePrisma(makeUser({ role: 'MANAGER', totpEnabled: true, totpSecret: authenticator.generateSecret() }));
     const svc = new AuthService(prisma as never, makeJwt() as never);
-    await expect(svc.setup2fa('ADM001', PASSWORD)).rejects.toThrow('2FA already enabled');
+    await expect(svc.setup2fa('MGR001', PASSWORD)).rejects.toThrow('2FA already enabled');
   });
 
   it('generates and persists a fresh secret for a first-time enrolment', async () => {
-    const prisma = makePrisma(makeUser({ role: 'ADMIN', totpEnabled: false, totpSecret: null }));
+    const prisma = makePrisma(makeUser({ role: 'MANAGER', totpEnabled: false, totpSecret: null }));
     const svc = new AuthService(prisma as never, makeJwt() as never);
-    const r = await svc.setup2fa('ADM001', PASSWORD);
+    const r = await svc.setup2fa('MGR001', PASSWORD);
     expect(r.secret).toBeTruthy();
     expect(r.otpauth).toContain('otpauth://');
     expect(prisma.user.update).toHaveBeenCalledWith(expect.objectContaining({ data: { totpSecret: r.secret } }));
@@ -152,9 +159,9 @@ describe('AuthService.setup2fa', () => {
 
   it('reuses an existing unconfirmed secret instead of overwriting it (idempotent re-setup)', async () => {
     const existing = authenticator.generateSecret();
-    const prisma = makePrisma(makeUser({ role: 'ADMIN', totpEnabled: false, totpSecret: existing }));
+    const prisma = makePrisma(makeUser({ role: 'MANAGER', totpEnabled: false, totpSecret: existing }));
     const svc = new AuthService(prisma as never, makeJwt() as never);
-    const r = await svc.setup2fa('ADM001', PASSWORD);
+    const r = await svc.setup2fa('MGR001', PASSWORD);
     expect(r.secret).toBe(existing);
     expect(prisma.user.update).not.toHaveBeenCalled();
   });
@@ -163,23 +170,23 @@ describe('AuthService.setup2fa', () => {
 describe('AuthService.enable2fa', () => {
   it('rejects an invalid confirmation code and leaves totpEnabled false', async () => {
     const secret = authenticator.generateSecret();
-    const prisma = makePrisma(makeUser({ role: 'ADMIN', totpEnabled: false, totpSecret: secret }));
+    const prisma = makePrisma(makeUser({ role: 'MANAGER', totpEnabled: false, totpSecret: secret }));
     const svc = new AuthService(prisma as never, makeJwt() as never);
-    await expect(svc.enable2fa('ADM001', PASSWORD, '000000', 'd1')).rejects.toThrow('Invalid 2FA code');
+    await expect(svc.enable2fa('MGR001', PASSWORD, '000000', 'd1')).rejects.toThrow('Invalid 2FA code');
     expect(prisma.user.update).not.toHaveBeenCalled();
   });
 
   it('rejects confirmation when no secret was ever generated', async () => {
-    const prisma = makePrisma(makeUser({ role: 'ADMIN', totpEnabled: false, totpSecret: null }));
+    const prisma = makePrisma(makeUser({ role: 'MANAGER', totpEnabled: false, totpSecret: null }));
     const svc = new AuthService(prisma as never, makeJwt() as never);
-    await expect(svc.enable2fa('ADM001', PASSWORD, '123456', 'd1')).rejects.toThrow('Invalid 2FA code');
+    await expect(svc.enable2fa('MGR001', PASSWORD, '123456', 'd1')).rejects.toThrow('Invalid 2FA code');
   });
 
   it('enables 2FA, audit-logs it, and signs the user in on a correct code', async () => {
     const secret = authenticator.generateSecret();
-    const prisma = makePrisma(makeUser({ role: 'ADMIN', totpEnabled: false, totpSecret: secret }));
+    const prisma = makePrisma(makeUser({ role: 'MANAGER', totpEnabled: false, totpSecret: secret }));
     const svc = new AuthService(prisma as never, makeJwt() as never);
-    const r = await svc.enable2fa('ADM001', PASSWORD, authenticator.generate(secret), 'd1');
+    const r = await svc.enable2fa('MGR001', PASSWORD, authenticator.generate(secret), 'd1');
     expect(prisma.user.update).toHaveBeenCalledWith(expect.objectContaining({ data: { totpEnabled: true } }));
     expect(prisma.auditLog.create).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({ action: '2FA_ENABLED' }),

@@ -75,4 +75,4 @@ export function can(role: Role, permission: Permission): Scope | undefined {
   return RBAC[role]?.[permission];
 }
 
-export const ROLES_REQUIRING_2FA: Role[] = ['MANAGER', 'ADMIN'];
+export const ROLES_REQUIRING_2FA: Role[] = ['MANAGER'];
