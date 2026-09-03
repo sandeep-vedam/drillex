@@ -14,7 +14,7 @@ async function main() {
     for (const a of assets) {
       if (await prisma.dailyReading.findUnique({ where: { assetId_date: { assetId: a.id, date } } })) continue;
       const flag = Math.random() < 0.08;
-      await prisma.dailyReading.create({ data: { assetId: a.id, userId: op.id, date, hourMeter: 4000 + (31 - back) * rnd(6, 10), fuelStart: 100, fuelEnd: rnd(30, 70), fuelConsumed: 0, engineOil: 'OK', hydraulicOil: Math.random() < 0.1 ? 'LOW' : 'OK', coolant: 'OK', airFilter: 'OK', battery: 'OK', warningLights: flag, leaks: false, unusualNoises: false, preStartChecklistDone: true, conditionRating: flag ? 2 : rnd(3, 5) | 0, notes: '[demo]' } });
+      await prisma.dailyReading.create({ data: { assetId: a.id, userId: op.id, date, hourMeter: 4000 + (31 - back) * rnd(6, 10), fuelStart: 100, fuelEnd: rnd(30, 70), fuelConsumed: 0, engineOil: 'OK', hydraulicOil: Math.random() < 0.1 ? 'LOW' : 'OK', coolant: 'OK', airFilter: 'OK', battery: 'OK', warningLights: flag, leaks: false, unusualNoises: false, preStartChecklistDone: true, conditionRating: flag ? 2 : rnd(3, 5) | 0, tyrePressures: {}, notes: '[demo]' } });
       readings++;
       if (a.category === 'DRILLING' && Math.random() < 0.85) {
         const start = rnd(0, 50), end = start + rnd(90, 180);

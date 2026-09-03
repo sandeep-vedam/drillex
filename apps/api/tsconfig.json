@@ -5,5 +5,5 @@
     "experimentalDecorators": true, "sourceMap": true, "outDir": "./dist", "baseUrl": "./",
     "esModuleInterop": true, "skipLibCheck": true, "strict": true, "strictPropertyInitialization": false
   },
-  "include": ["src", "prisma/seed.ts"]
+  "include": ["src", "prisma/seed.ts", "prisma/demo.ts"]
 }
