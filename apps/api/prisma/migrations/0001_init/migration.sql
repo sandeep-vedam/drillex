@@ -1,533 +1,479 @@
--- CreateSchema
-CREATE SCHEMA IF NOT EXISTS "public";
+-- CreateTable
+CREATE TABLE `SystemSetting` (
+    `key` VARCHAR(191) NOT NULL,
+    `value` JSON NOT NULL,
+    `updatedAt` DATETIME(3) NOT NULL,
+    `updatedBy` VARCHAR(191) NULL,
 
--- CreateEnum
-CREATE TYPE "Role" AS ENUM ('OPERATOR', 'TECHNICIAN', 'SUPERVISOR', 'MANAGER', 'ADMIN');
-
--- CreateEnum
-CREATE TYPE "UserStatus" AS ENUM ('ACTIVE', 'DISABLED');
-
--- CreateEnum
-CREATE TYPE "AssetCategory" AS ENUM ('DRILLING', 'HAULAGE', 'COMPRESSOR', 'ANCILLARY', 'OTHER');
-
--- CreateEnum
-CREATE TYPE "AssetStatus" AS ENUM ('ACTIVE', 'UNDER_MAINTENANCE', 'IDLE', 'DECOMMISSIONED');
-
--- CreateEnum
-CREATE TYPE "Shift" AS ENUM ('DAY', 'NIGHT');
-
--- CreateEnum
-CREATE TYPE "SubmissionStatus" AS ENUM ('SUBMITTED', 'APPROVED', 'UNLOCKED');
-
--- CreateEnum
-CREATE TYPE "FluidLevel" AS ENUM ('OK', 'LOW', 'ADD', 'CHANGE_REQUIRED');
-
--- CreateEnum
-CREATE TYPE "AirFilterCondition" AS ENUM ('OK', 'BLOCKED', 'CHANGED');
-
--- CreateEnum
-CREATE TYPE "BatteryCondition" AS ENUM ('OK', 'WEAK', 'FLAT');
-
--- CreateEnum
-CREATE TYPE "ChemicalUnit" AS ENUM ('LITRES', 'KG', 'BAGS');
-
--- CreateEnum
-CREATE TYPE "ServiceType" AS ENUM ('HR_250', 'HR_500', 'HR_1000', 'ANNUAL', 'CONDITION_BASED', 'AD_HOC');
-
--- CreateEnum
-CREATE TYPE "ScheduleStatus" AS ENUM ('UPCOMING', 'DUE_NOW', 'OVERDUE', 'COMPLETED');
-
--- CreateEnum
-CREATE TYPE "JobType" AS ENUM ('SCHEDULED_SERVICE', 'BREAKDOWN_REPAIR', 'MODIFICATION', 'INSPECTION');
-
--- CreateEnum
-CREATE TYPE "JobStatus" AS ENUM ('OPEN', 'IN_PROGRESS', 'COMPLETED', 'AWAITING_PARTS');
-
--- CreateEnum
-CREATE TYPE "TestResult" AS ENUM ('PASSED', 'FAILED', 'PENDING');
-
--- CreateEnum
-CREATE TYPE "StockMovementType" AS ENUM ('IN', 'OUT', 'ADJUST');
-
--- CreateEnum
-CREATE TYPE "AttachmentKind" AS ENUM ('PHOTO', 'DOCUMENT', 'SIGNATURE');
+    PRIMARY KEY (`key`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- CreateTable
-CREATE TABLE "Site" (
-    "id" TEXT NOT NULL,
-    "name" TEXT NOT NULL,
-    "latitude" DOUBLE PRECISION,
-    "longitude" DOUBLE PRECISION,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
+CREATE TABLE `Site` (
+    `id` VARCHAR(191) NOT NULL,
+    `name` VARCHAR(191) NOT NULL,
+    `latitude` DOUBLE NULL,
+    `longitude` DOUBLE NULL,
+    `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    `updatedAt` DATETIME(3) NOT NULL,
 
-    CONSTRAINT "Site_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
-CREATE TABLE "User" (
-    "id" TEXT NOT NULL,
-    "employeeId" TEXT NOT NULL,
-    "name" TEXT NOT NULL,
-    "role" "Role" NOT NULL,
-    "status" "UserStatus" NOT NULL DEFAULT 'ACTIVE',
-    "passwordHash" TEXT NOT NULL,
-    "totpSecret" TEXT,
-    "totpEnabled" BOOLEAN NOT NULL DEFAULT false,
-    "siteId" TEXT,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
-
-    CONSTRAINT "User_pkey" PRIMARY KEY ("id")
-);
+    UNIQUE INDEX `Site_name_key`(`name`),
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- CreateTable
-CREATE TABLE "Device" (
-    "id" TEXT NOT NULL,
-    "userId" TEXT NOT NULL,
-    "deviceId" TEXT NOT NULL,
-    "platform" TEXT,
-    "pushToken" TEXT,
-    "approved" BOOLEAN NOT NULL DEFAULT true,
-    "lastSeen" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+CREATE TABLE `User` (
+    `id` VARCHAR(191) NOT NULL,
+    `employeeId` VARCHAR(191) NOT NULL,
+    `name` VARCHAR(191) NOT NULL,
+    `role` ENUM('OPERATOR', 'TECHNICIAN', 'SUPERVISOR', 'MANAGER', 'ADMIN') NOT NULL,
+    `status` ENUM('ACTIVE', 'DISABLED') NOT NULL DEFAULT 'ACTIVE',
+    `passwordHash` VARCHAR(191) NOT NULL,
+    `totpSecret` VARCHAR(191) NULL,
+    `totpEnabled` BOOLEAN NOT NULL DEFAULT false,
+    `mustChangePassword` BOOLEAN NOT NULL DEFAULT false,
+    `siteId` VARCHAR(191) NULL,
+    `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    `updatedAt` DATETIME(3) NOT NULL,
 
-    CONSTRAINT "Device_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
-CREATE TABLE "LoginEvent" (
-    "id" TEXT NOT NULL,
-    "userId" TEXT,
-    "employeeId" TEXT NOT NULL,
-    "deviceId" TEXT NOT NULL,
-    "success" BOOLEAN NOT NULL,
-    "ip" TEXT,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-    CONSTRAINT "LoginEvent_pkey" PRIMARY KEY ("id")
-);
+    UNIQUE INDEX `User_employeeId_key`(`employeeId`),
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- CreateTable
-CREATE TABLE "RefreshToken" (
-    "id" TEXT NOT NULL,
-    "userId" TEXT NOT NULL,
-    "tokenHash" TEXT NOT NULL,
-    "deviceId" TEXT NOT NULL,
-    "expiresAt" TIMESTAMP(3) NOT NULL,
-    "revokedAt" TIMESTAMP(3),
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+CREATE TABLE `Device` (
+    `id` VARCHAR(191) NOT NULL,
+    `userId` VARCHAR(191) NOT NULL,
+    `deviceId` VARCHAR(191) NOT NULL,
+    `platform` VARCHAR(191) NULL,
+    `pushToken` VARCHAR(191) NULL,
+    `approved` BOOLEAN NOT NULL DEFAULT true,
+    `lastSeen` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
-    CONSTRAINT "RefreshToken_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
-CREATE TABLE "Asset" (
-    "id" TEXT NOT NULL,
-    "assetNumber" TEXT NOT NULL,
-    "name" TEXT NOT NULL,
-    "category" "AssetCategory" NOT NULL,
-    "make" TEXT NOT NULL,
-    "model" TEXT NOT NULL,
-    "serialNumber" TEXT NOT NULL,
-    "yearOfManufacture" INTEGER NOT NULL,
-    "commissionedAt" TIMESTAMP(3) NOT NULL,
-    "siteId" TEXT NOT NULL,
-    "status" "AssetStatus" NOT NULL DEFAULT 'ACTIVE',
-    "notes" TEXT,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
-    "deletedAt" TIMESTAMP(3),
-
-    CONSTRAINT "Asset_pkey" PRIMARY KEY ("id")
-);
+    UNIQUE INDEX `Device_userId_deviceId_key`(`userId`, `deviceId`),
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- CreateTable
-CREATE TABLE "AssetOperator" (
-    "assetId" TEXT NOT NULL,
-    "userId" TEXT NOT NULL,
-    "validFrom" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "validTo" TIMESTAMP(3),
+CREATE TABLE `LoginEvent` (
+    `id` VARCHAR(191) NOT NULL,
+    `userId` VARCHAR(191) NULL,
+    `employeeId` VARCHAR(191) NOT NULL,
+    `deviceId` VARCHAR(191) NOT NULL,
+    `success` BOOLEAN NOT NULL,
+    `ip` VARCHAR(191) NULL,
+    `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
-    CONSTRAINT "AssetOperator_pkey" PRIMARY KEY ("assetId","userId")
-);
-
--- CreateTable
-CREATE TABLE "Chemical" (
-    "id" TEXT NOT NULL,
-    "name" TEXT NOT NULL,
-    "defaultUnit" "ChemicalUnit" NOT NULL,
-    "unitCost" DECIMAL(12,2),
-    "monthlyBudget" DECIMAL(12,2),
-
-    CONSTRAINT "Chemical_pkey" PRIMARY KEY ("id")
-);
+    INDEX `LoginEvent_employeeId_createdAt_idx`(`employeeId`, `createdAt`),
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- CreateTable
-CREATE TABLE "ShiftReport" (
-    "id" TEXT NOT NULL,
-    "assetId" TEXT NOT NULL,
-    "userId" TEXT NOT NULL,
-    "siteId" TEXT NOT NULL,
-    "date" DATE NOT NULL,
-    "shift" "Shift" NOT NULL,
-    "holeRef" TEXT NOT NULL,
-    "startDepth" DECIMAL(10,2) NOT NULL,
-    "endDepth" DECIMAL(10,2) NOT NULL,
-    "totalMeters" DECIMAL(10,2) NOT NULL,
-    "holesCompleted" INTEGER NOT NULL,
-    "holeDiameterMm" DECIMAL(8,2) NOT NULL,
-    "rockType" TEXT NOT NULL,
-    "penetrationRate" DECIMAL(8,2) NOT NULL,
-    "downtimeHours" DECIMAL(6,2) NOT NULL DEFAULT 0,
-    "downtimeReason" TEXT,
-    "status" "SubmissionStatus" NOT NULL DEFAULT 'SUBMITTED',
-    "signatureId" TEXT,
-    "submittedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "approvedById" TEXT,
-    "approvedAt" TIMESTAMP(3),
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
-    "deletedAt" TIMESTAMP(3),
+CREATE TABLE `RefreshToken` (
+    `id` VARCHAR(191) NOT NULL,
+    `userId` VARCHAR(191) NOT NULL,
+    `tokenHash` VARCHAR(191) NOT NULL,
+    `deviceId` VARCHAR(191) NOT NULL,
+    `expiresAt` DATETIME(3) NOT NULL,
+    `revokedAt` DATETIME(3) NULL,
+    `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
-    CONSTRAINT "ShiftReport_pkey" PRIMARY KEY ("id")
-);
+    UNIQUE INDEX `RefreshToken_tokenHash_key`(`tokenHash`),
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- CreateTable
-CREATE TABLE "ShiftReportChemical" (
-    "id" TEXT NOT NULL,
-    "shiftReportId" TEXT NOT NULL,
-    "chemicalId" TEXT NOT NULL,
-    "quantity" DECIMAL(10,2) NOT NULL,
-    "unit" "ChemicalUnit" NOT NULL,
-    "purpose" TEXT,
-    "stockOnHand" DECIMAL(10,2),
+CREATE TABLE `Asset` (
+    `id` VARCHAR(191) NOT NULL,
+    `assetNumber` VARCHAR(191) NOT NULL,
+    `name` VARCHAR(191) NOT NULL,
+    `category` ENUM('DRILLING', 'HAULAGE', 'COMPRESSOR', 'ANCILLARY', 'OTHER') NOT NULL,
+    `make` VARCHAR(191) NOT NULL,
+    `model` VARCHAR(191) NOT NULL,
+    `serialNumber` VARCHAR(191) NOT NULL,
+    `yearOfManufacture` INTEGER NOT NULL,
+    `commissionedAt` DATETIME(3) NOT NULL,
+    `siteId` VARCHAR(191) NOT NULL,
+    `status` ENUM('ACTIVE', 'UNDER_MAINTENANCE', 'IDLE', 'DECOMMISSIONED') NOT NULL DEFAULT 'ACTIVE',
+    `notes` TEXT NULL,
+    `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    `updatedAt` DATETIME(3) NOT NULL,
+    `deletedAt` DATETIME(3) NULL,
 
-    CONSTRAINT "ShiftReportChemical_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
-CREATE TABLE "DailyReading" (
-    "id" TEXT NOT NULL,
-    "assetId" TEXT NOT NULL,
-    "userId" TEXT NOT NULL,
-    "date" DATE NOT NULL,
-    "hourMeter" DECIMAL(10,1) NOT NULL,
-    "fuelStart" DECIMAL(8,2) NOT NULL,
-    "fuelEnd" DECIMAL(8,2) NOT NULL,
-    "fuelConsumed" DECIMAL(8,2) NOT NULL,
-    "engineOil" "FluidLevel" NOT NULL,
-    "hydraulicOil" "FluidLevel" NOT NULL,
-    "coolant" "FluidLevel" NOT NULL,
-    "airFilter" "AirFilterCondition" NOT NULL,
-    "tyrePressures" JSONB NOT NULL DEFAULT '{}',
-    "battery" "BatteryCondition" NOT NULL,
-    "warningLights" BOOLEAN NOT NULL,
-    "warningLightsNote" TEXT,
-    "unusualNoises" BOOLEAN NOT NULL,
-    "unusualNoisesNote" TEXT,
-    "leaks" BOOLEAN NOT NULL,
-    "leaksNote" TEXT,
-    "preStartChecklistDone" BOOLEAN NOT NULL,
-    "conditionRating" INTEGER NOT NULL,
-    "notes" TEXT,
-    "signatureId" TEXT,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
-    "deletedAt" TIMESTAMP(3),
-
-    CONSTRAINT "DailyReading_pkey" PRIMARY KEY ("id")
-);
+    UNIQUE INDEX `Asset_assetNumber_key`(`assetNumber`),
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- CreateTable
-CREATE TABLE "MaintenanceSchedule" (
-    "id" TEXT NOT NULL,
-    "assetId" TEXT NOT NULL,
-    "serviceType" "ServiceType" NOT NULL,
-    "description" TEXT NOT NULL,
-    "intervalHours" INTEGER,
-    "intervalDays" INTEGER,
-    "lastServiceAt" TIMESTAMP(3),
-    "lastServiceHours" DECIMAL(10,1),
-    "nextDueAt" TIMESTAMP(3),
-    "nextDueHours" DECIMAL(10,1),
-    "reminderLeadDays" INTEGER NOT NULL DEFAULT 3,
-    "status" "ScheduleStatus" NOT NULL DEFAULT 'UPCOMING',
-    "estDowntimeHours" DECIMAL(6,2),
-    "notes" TEXT,
-    "technicianIds" TEXT[],
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
-    "deletedAt" TIMESTAMP(3),
+CREATE TABLE `AssetOperator` (
+    `assetId` VARCHAR(191) NOT NULL,
+    `userId` VARCHAR(191) NOT NULL,
+    `validFrom` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    `validTo` DATETIME(3) NULL,
 
-    CONSTRAINT "MaintenanceSchedule_pkey" PRIMARY KEY ("id")
-);
+    PRIMARY KEY (`assetId`, `userId`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- CreateTable
-CREATE TABLE "MaintenanceSchedulePart" (
-    "id" TEXT NOT NULL,
-    "scheduleId" TEXT NOT NULL,
-    "partId" TEXT NOT NULL,
-    "quantity" INTEGER NOT NULL,
+CREATE TABLE `Chemical` (
+    `id` VARCHAR(191) NOT NULL,
+    `name` VARCHAR(191) NOT NULL,
+    `defaultUnit` ENUM('LITRES', 'KG', 'BAGS') NOT NULL,
+    `unitCost` DECIMAL(12, 2) NULL,
+    `monthlyBudget` DECIMAL(12, 2) NULL,
 
-    CONSTRAINT "MaintenanceSchedulePart_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
-CREATE TABLE "JobCard" (
-    "id" TEXT NOT NULL,
-    "jobNo" TEXT NOT NULL,
-    "assetId" TEXT NOT NULL,
-    "date" DATE NOT NULL,
-    "jobType" "JobType" NOT NULL,
-    "reportedFault" TEXT,
-    "workPerformed" TEXT NOT NULL,
-    "hourMeter" DECIMAL(10,1),
-    "labourHours" DECIMAL(6,2),
-    "technicianIds" TEXT[],
-    "toolsUsed" TEXT,
-    "conditionBefore" INTEGER,
-    "conditionAfter" INTEGER,
-    "testResult" "TestResult",
-    "nextAction" TEXT,
-    "status" "JobStatus" NOT NULL DEFAULT 'OPEN',
-    "techSignatureId" TEXT,
-    "approvedById" TEXT,
-    "approvedAt" TIMESTAMP(3),
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
-    "deletedAt" TIMESTAMP(3),
-
-    CONSTRAINT "JobCard_pkey" PRIMARY KEY ("id")
-);
+    UNIQUE INDEX `Chemical_name_key`(`name`),
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- CreateTable
-CREATE TABLE "Part" (
-    "id" TEXT NOT NULL,
-    "partNo" TEXT NOT NULL,
-    "name" TEXT NOT NULL,
-    "qtyOnHand" INTEGER NOT NULL DEFAULT 0,
-    "minQty" INTEGER NOT NULL DEFAULT 0,
-    "unitCost" DECIMAL(12,2),
+CREATE TABLE `ShiftReport` (
+    `id` VARCHAR(191) NOT NULL,
+    `assetId` VARCHAR(191) NOT NULL,
+    `userId` VARCHAR(191) NOT NULL,
+    `siteId` VARCHAR(191) NOT NULL,
+    `date` DATE NOT NULL,
+    `shift` ENUM('DAY', 'NIGHT') NOT NULL,
+    `holeRef` VARCHAR(191) NOT NULL,
+    `startDepth` DECIMAL(10, 2) NOT NULL,
+    `endDepth` DECIMAL(10, 2) NOT NULL,
+    `totalMeters` DECIMAL(10, 2) NOT NULL,
+    `holesCompleted` INTEGER NOT NULL,
+    `holeDiameterMm` DECIMAL(8, 2) NOT NULL,
+    `rockType` VARCHAR(191) NOT NULL,
+    `penetrationRate` DECIMAL(8, 2) NOT NULL,
+    `downtimeHours` DECIMAL(6, 2) NOT NULL DEFAULT 0,
+    `downtimeReason` TEXT NULL,
+    `status` ENUM('SUBMITTED', 'APPROVED', 'UNLOCKED') NOT NULL DEFAULT 'SUBMITTED',
+    `signatureId` VARCHAR(191) NULL,
+    `submittedAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    `approvedById` VARCHAR(191) NULL,
+    `approvedAt` DATETIME(3) NULL,
+    `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    `updatedAt` DATETIME(3) NOT NULL,
+    `deletedAt` DATETIME(3) NULL,
 
-    CONSTRAINT "Part_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
-CREATE TABLE "JobCardPart" (
-    "id" TEXT NOT NULL,
-    "jobCardId" TEXT NOT NULL,
-    "partId" TEXT NOT NULL,
-    "quantity" INTEGER NOT NULL,
-
-    CONSTRAINT "JobCardPart_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
-CREATE TABLE "PartStockMovement" (
-    "id" TEXT NOT NULL,
-    "partId" TEXT NOT NULL,
-    "type" "StockMovementType" NOT NULL,
-    "quantity" INTEGER NOT NULL,
-    "reference" TEXT,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-    CONSTRAINT "PartStockMovement_pkey" PRIMARY KEY ("id")
-);
+    INDEX `ShiftReport_siteId_date_idx`(`siteId`, `date`),
+    UNIQUE INDEX `ShiftReport_assetId_date_shift_key`(`assetId`, `date`, `shift`),
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- CreateTable
-CREATE TABLE "Attachment" (
-    "id" TEXT NOT NULL,
-    "ownerType" TEXT NOT NULL,
-    "ownerId" TEXT NOT NULL,
-    "kind" "AttachmentKind" NOT NULL,
-    "storageKey" TEXT NOT NULL,
-    "mimeType" TEXT,
-    "sha256" TEXT,
-    "createdBy" TEXT NOT NULL,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+CREATE TABLE `ShiftReportChemical` (
+    `id` VARCHAR(191) NOT NULL,
+    `shiftReportId` VARCHAR(191) NOT NULL,
+    `chemicalId` VARCHAR(191) NOT NULL,
+    `quantity` DECIMAL(10, 2) NOT NULL,
+    `unit` ENUM('LITRES', 'KG', 'BAGS') NOT NULL,
+    `purpose` TEXT NULL,
+    `stockOnHand` DECIMAL(10, 2) NULL,
 
-    CONSTRAINT "Attachment_pkey" PRIMARY KEY ("id")
-);
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- CreateTable
-CREATE TABLE "Notification" (
-    "id" TEXT NOT NULL,
-    "userId" TEXT NOT NULL,
-    "type" TEXT NOT NULL,
-    "title" TEXT NOT NULL,
-    "body" TEXT,
-    "payload" JSONB,
-    "readAt" TIMESTAMP(3),
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+CREATE TABLE `DailyReading` (
+    `id` VARCHAR(191) NOT NULL,
+    `assetId` VARCHAR(191) NOT NULL,
+    `userId` VARCHAR(191) NOT NULL,
+    `date` DATE NOT NULL,
+    `hourMeter` DECIMAL(10, 1) NOT NULL,
+    `fuelStart` DECIMAL(8, 2) NOT NULL,
+    `fuelEnd` DECIMAL(8, 2) NOT NULL,
+    `fuelConsumed` DECIMAL(8, 2) NOT NULL,
+    `engineOil` ENUM('OK', 'LOW', 'ADD', 'CHANGE_REQUIRED') NOT NULL,
+    `hydraulicOil` ENUM('OK', 'LOW', 'ADD', 'CHANGE_REQUIRED') NOT NULL,
+    `coolant` ENUM('OK', 'LOW', 'ADD', 'CHANGE_REQUIRED') NOT NULL,
+    `airFilter` ENUM('OK', 'BLOCKED', 'CHANGED') NOT NULL,
+    `tyrePressures` JSON NOT NULL,
+    `battery` ENUM('OK', 'WEAK', 'FLAT') NOT NULL,
+    `warningLights` BOOLEAN NOT NULL,
+    `warningLightsNote` TEXT NULL,
+    `unusualNoises` BOOLEAN NOT NULL,
+    `unusualNoisesNote` TEXT NULL,
+    `leaks` BOOLEAN NOT NULL,
+    `leaksNote` TEXT NULL,
+    `preStartChecklistDone` BOOLEAN NOT NULL,
+    `conditionRating` INTEGER NOT NULL,
+    `notes` TEXT NULL,
+    `signatureId` VARCHAR(191) NULL,
+    `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    `updatedAt` DATETIME(3) NOT NULL,
+    `deletedAt` DATETIME(3) NULL,
 
-    CONSTRAINT "Notification_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
-CREATE TABLE "Alert" (
-    "id" TEXT NOT NULL,
-    "assetId" TEXT NOT NULL,
-    "source" TEXT NOT NULL,
-    "severity" TEXT NOT NULL,
-    "message" TEXT NOT NULL,
-    "resolvedAt" TIMESTAMP(3),
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-    CONSTRAINT "Alert_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
-CREATE TABLE "Report" (
-    "id" TEXT NOT NULL,
-    "type" TEXT NOT NULL,
-    "periodStart" TIMESTAMP(3) NOT NULL,
-    "periodEnd" TIMESTAMP(3) NOT NULL,
-    "pdfKey" TEXT,
-    "xlsxKey" TEXT,
-    "generatedBy" TEXT,
-    "generatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-    CONSTRAINT "Report_pkey" PRIMARY KEY ("id")
-);
+    UNIQUE INDEX `DailyReading_assetId_date_key`(`assetId`, `date`),
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- CreateTable
-CREATE TABLE "AuditLog" (
-    "id" TEXT NOT NULL,
-    "actorId" TEXT,
-    "deviceId" TEXT,
-    "entity" TEXT NOT NULL,
-    "entityId" TEXT NOT NULL,
-    "action" TEXT NOT NULL,
-    "diff" JSONB,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+CREATE TABLE `MaintenanceSchedule` (
+    `id` VARCHAR(191) NOT NULL,
+    `assetId` VARCHAR(191) NOT NULL,
+    `serviceType` ENUM('HR_250', 'HR_500', 'HR_1000', 'ANNUAL', 'CONDITION_BASED', 'AD_HOC') NOT NULL,
+    `description` TEXT NOT NULL,
+    `intervalHours` INTEGER NULL,
+    `intervalDays` INTEGER NULL,
+    `lastServiceAt` DATETIME(3) NULL,
+    `lastServiceHours` DECIMAL(10, 1) NULL,
+    `nextDueAt` DATETIME(3) NULL,
+    `nextDueHours` DECIMAL(10, 1) NULL,
+    `reminderLeadDays` INTEGER NOT NULL DEFAULT 3,
+    `status` ENUM('UPCOMING', 'DUE_NOW', 'OVERDUE', 'COMPLETED') NOT NULL DEFAULT 'UPCOMING',
+    `estDowntimeHours` DECIMAL(6, 2) NULL,
+    `notes` TEXT NULL,
+    `technicianIds` JSON NOT NULL,
+    `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    `updatedAt` DATETIME(3) NOT NULL,
+    `deletedAt` DATETIME(3) NULL,
 
-    CONSTRAINT "AuditLog_pkey" PRIMARY KEY ("id")
-);
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- CreateTable
-CREATE TABLE "SyncConflict" (
-    "id" TEXT NOT NULL,
-    "entity" TEXT NOT NULL,
-    "entityId" TEXT NOT NULL,
-    "versions" JSONB NOT NULL,
-    "resolvedBy" TEXT,
-    "resolvedAt" TIMESTAMP(3),
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+CREATE TABLE `MaintenanceSchedulePart` (
+    `id` VARCHAR(191) NOT NULL,
+    `scheduleId` VARCHAR(191) NOT NULL,
+    `partId` VARCHAR(191) NOT NULL,
+    `quantity` INTEGER NOT NULL,
 
-    CONSTRAINT "SyncConflict_pkey" PRIMARY KEY ("id")
-);
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
--- CreateIndex
-CREATE UNIQUE INDEX "Site_name_key" ON "Site"("name");
+-- CreateTable
+CREATE TABLE `JobCard` (
+    `id` VARCHAR(191) NOT NULL,
+    `jobNo` VARCHAR(191) NOT NULL,
+    `assetId` VARCHAR(191) NOT NULL,
+    `date` DATE NOT NULL,
+    `jobType` ENUM('SCHEDULED_SERVICE', 'BREAKDOWN_REPAIR', 'MODIFICATION', 'INSPECTION') NOT NULL,
+    `reportedFault` TEXT NULL,
+    `workPerformed` TEXT NOT NULL,
+    `hourMeter` DECIMAL(10, 1) NULL,
+    `labourHours` DECIMAL(6, 2) NULL,
+    `technicianIds` JSON NOT NULL,
+    `toolsUsed` TEXT NULL,
+    `conditionBefore` INTEGER NULL,
+    `conditionAfter` INTEGER NULL,
+    `testResult` ENUM('PASSED', 'FAILED', 'PENDING') NULL,
+    `nextAction` TEXT NULL,
+    `status` ENUM('OPEN', 'IN_PROGRESS', 'COMPLETED', 'AWAITING_PARTS') NOT NULL DEFAULT 'OPEN',
+    `techSignatureId` VARCHAR(191) NULL,
+    `approvedById` VARCHAR(191) NULL,
+    `approvedAt` DATETIME(3) NULL,
+    `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    `updatedAt` DATETIME(3) NOT NULL,
+    `deletedAt` DATETIME(3) NULL,
 
--- CreateIndex
-CREATE UNIQUE INDEX "User_employeeId_key" ON "User"("employeeId");
+    UNIQUE INDEX `JobCard_jobNo_key`(`jobNo`),
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
--- CreateIndex
-CREATE UNIQUE INDEX "Device_userId_deviceId_key" ON "Device"("userId", "deviceId");
+-- CreateTable
+CREATE TABLE `Part` (
+    `id` VARCHAR(191) NOT NULL,
+    `partNo` VARCHAR(191) NOT NULL,
+    `name` VARCHAR(191) NOT NULL,
+    `qtyOnHand` INTEGER NOT NULL DEFAULT 0,
+    `minQty` INTEGER NOT NULL DEFAULT 0,
+    `unitCost` DECIMAL(12, 2) NULL,
 
--- CreateIndex
-CREATE INDEX "LoginEvent_employeeId_createdAt_idx" ON "LoginEvent"("employeeId", "createdAt");
+    UNIQUE INDEX `Part_partNo_key`(`partNo`),
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
--- CreateIndex
-CREATE UNIQUE INDEX "RefreshToken_tokenHash_key" ON "RefreshToken"("tokenHash");
+-- CreateTable
+CREATE TABLE `JobCardPart` (
+    `id` VARCHAR(191) NOT NULL,
+    `jobCardId` VARCHAR(191) NOT NULL,
+    `partId` VARCHAR(191) NOT NULL,
+    `quantity` INTEGER NOT NULL,
 
--- CreateIndex
-CREATE UNIQUE INDEX "Asset_assetNumber_key" ON "Asset"("assetNumber");
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
--- CreateIndex
-CREATE UNIQUE INDEX "Chemical_name_key" ON "Chemical"("name");
+-- CreateTable
+CREATE TABLE `PurchaseRequest` (
+    `id` VARCHAR(191) NOT NULL,
+    `partId` VARCHAR(191) NOT NULL,
+    `quantity` INTEGER NOT NULL,
+    `status` ENUM('OPEN', 'ORDERED', 'RECEIVED', 'CANCELLED') NOT NULL DEFAULT 'OPEN',
+    `requestedBy` VARCHAR(191) NOT NULL,
+    `notes` TEXT NULL,
+    `orderedAt` DATETIME(3) NULL,
+    `receivedAt` DATETIME(3) NULL,
+    `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    `updatedAt` DATETIME(3) NOT NULL,
 
--- CreateIndex
-CREATE INDEX "ShiftReport_siteId_date_idx" ON "ShiftReport"("siteId", "date");
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
--- CreateIndex
-CREATE UNIQUE INDEX "ShiftReport_assetId_date_shift_key" ON "ShiftReport"("assetId", "date", "shift");
+-- CreateTable
+CREATE TABLE `PartStockMovement` (
+    `id` VARCHAR(191) NOT NULL,
+    `partId` VARCHAR(191) NOT NULL,
+    `type` ENUM('IN', 'OUT', 'ADJUST') NOT NULL,
+    `quantity` INTEGER NOT NULL,
+    `reference` TEXT NULL,
+    `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
--- CreateIndex
-CREATE UNIQUE INDEX "DailyReading_assetId_date_key" ON "DailyReading"("assetId", "date");
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
--- CreateIndex
-CREATE UNIQUE INDEX "JobCard_jobNo_key" ON "JobCard"("jobNo");
+-- CreateTable
+CREATE TABLE `Attachment` (
+    `id` VARCHAR(191) NOT NULL,
+    `ownerType` VARCHAR(191) NOT NULL,
+    `ownerId` VARCHAR(191) NOT NULL,
+    `kind` ENUM('PHOTO', 'DOCUMENT', 'SIGNATURE') NOT NULL,
+    `storageKey` VARCHAR(191) NOT NULL,
+    `mimeType` VARCHAR(191) NULL,
+    `sha256` VARCHAR(191) NULL,
+    `createdBy` VARCHAR(191) NOT NULL,
+    `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
--- CreateIndex
-CREATE UNIQUE INDEX "Part_partNo_key" ON "Part"("partNo");
+    INDEX `Attachment_ownerType_ownerId_idx`(`ownerType`, `ownerId`),
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
--- CreateIndex
-CREATE INDEX "Attachment_ownerType_ownerId_idx" ON "Attachment"("ownerType", "ownerId");
+-- CreateTable
+CREATE TABLE `Notification` (
+    `id` VARCHAR(191) NOT NULL,
+    `userId` VARCHAR(191) NOT NULL,
+    `type` VARCHAR(191) NOT NULL,
+    `title` TEXT NOT NULL,
+    `body` TEXT NULL,
+    `payload` JSON NULL,
+    `readAt` DATETIME(3) NULL,
+    `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
--- CreateIndex
-CREATE INDEX "Notification_userId_readAt_idx" ON "Notification"("userId", "readAt");
+    INDEX `Notification_userId_readAt_idx`(`userId`, `readAt`),
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
--- CreateIndex
-CREATE INDEX "AuditLog_entity_entityId_idx" ON "AuditLog"("entity", "entityId");
+-- CreateTable
+CREATE TABLE `Alert` (
+    `id` VARCHAR(191) NOT NULL,
+    `assetId` VARCHAR(191) NOT NULL,
+    `source` VARCHAR(191) NOT NULL,
+    `severity` VARCHAR(191) NOT NULL,
+    `message` TEXT NOT NULL,
+    `resolvedAt` DATETIME(3) NULL,
+    `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `Report` (
+    `id` VARCHAR(191) NOT NULL,
+    `type` VARCHAR(191) NOT NULL,
+    `periodStart` DATETIME(3) NOT NULL,
+    `periodEnd` DATETIME(3) NOT NULL,
+    `pdfKey` VARCHAR(191) NULL,
+    `xlsxKey` VARCHAR(191) NULL,
+    `generatedBy` VARCHAR(191) NULL,
+    `generatedAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `AuditLog` (
+    `id` VARCHAR(191) NOT NULL,
+    `actorId` VARCHAR(191) NULL,
+    `deviceId` VARCHAR(191) NULL,
+    `entity` VARCHAR(191) NOT NULL,
+    `entityId` VARCHAR(191) NOT NULL,
+    `action` VARCHAR(191) NOT NULL,
+    `diff` JSON NULL,
+    `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+
+    INDEX `AuditLog_entity_entityId_idx`(`entity`, `entityId`),
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `SyncConflict` (
+    `id` VARCHAR(191) NOT NULL,
+    `entity` VARCHAR(191) NOT NULL,
+    `entityId` VARCHAR(191) NOT NULL,
+    `versions` JSON NOT NULL,
+    `resolvedBy` VARCHAR(191) NULL,
+    `resolvedAt` DATETIME(3) NULL,
+    `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- AddForeignKey
-ALTER TABLE "User" ADD CONSTRAINT "User_siteId_fkey" FOREIGN KEY ("siteId") REFERENCES "Site"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE `User` ADD CONSTRAINT `User_siteId_fkey` FOREIGN KEY (`siteId`) REFERENCES `Site`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "Device" ADD CONSTRAINT "Device_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE `Device` ADD CONSTRAINT `Device_userId_fkey` FOREIGN KEY (`userId`) REFERENCES `User`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "LoginEvent" ADD CONSTRAINT "LoginEvent_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE `LoginEvent` ADD CONSTRAINT `LoginEvent_userId_fkey` FOREIGN KEY (`userId`) REFERENCES `User`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "RefreshToken" ADD CONSTRAINT "RefreshToken_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE `RefreshToken` ADD CONSTRAINT `RefreshToken_userId_fkey` FOREIGN KEY (`userId`) REFERENCES `User`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "Asset" ADD CONSTRAINT "Asset_siteId_fkey" FOREIGN KEY ("siteId") REFERENCES "Site"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE `Asset` ADD CONSTRAINT `Asset_siteId_fkey` FOREIGN KEY (`siteId`) REFERENCES `Site`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "AssetOperator" ADD CONSTRAINT "AssetOperator_assetId_fkey" FOREIGN KEY ("assetId") REFERENCES "Asset"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE `AssetOperator` ADD CONSTRAINT `AssetOperator_assetId_fkey` FOREIGN KEY (`assetId`) REFERENCES `Asset`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "AssetOperator" ADD CONSTRAINT "AssetOperator_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE `AssetOperator` ADD CONSTRAINT `AssetOperator_userId_fkey` FOREIGN KEY (`userId`) REFERENCES `User`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "ShiftReport" ADD CONSTRAINT "ShiftReport_assetId_fkey" FOREIGN KEY ("assetId") REFERENCES "Asset"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE `ShiftReport` ADD CONSTRAINT `ShiftReport_assetId_fkey` FOREIGN KEY (`assetId`) REFERENCES `Asset`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "ShiftReport" ADD CONSTRAINT "ShiftReport_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE `ShiftReport` ADD CONSTRAINT `ShiftReport_userId_fkey` FOREIGN KEY (`userId`) REFERENCES `User`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "ShiftReport" ADD CONSTRAINT "ShiftReport_siteId_fkey" FOREIGN KEY ("siteId") REFERENCES "Site"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE `ShiftReport` ADD CONSTRAINT `ShiftReport_siteId_fkey` FOREIGN KEY (`siteId`) REFERENCES `Site`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "ShiftReportChemical" ADD CONSTRAINT "ShiftReportChemical_shiftReportId_fkey" FOREIGN KEY ("shiftReportId") REFERENCES "ShiftReport"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE `ShiftReportChemical` ADD CONSTRAINT `ShiftReportChemical_shiftReportId_fkey` FOREIGN KEY (`shiftReportId`) REFERENCES `ShiftReport`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "ShiftReportChemical" ADD CONSTRAINT "ShiftReportChemical_chemicalId_fkey" FOREIGN KEY ("chemicalId") REFERENCES "Chemical"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE `ShiftReportChemical` ADD CONSTRAINT `ShiftReportChemical_chemicalId_fkey` FOREIGN KEY (`chemicalId`) REFERENCES `Chemical`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "DailyReading" ADD CONSTRAINT "DailyReading_assetId_fkey" FOREIGN KEY ("assetId") REFERENCES "Asset"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE `DailyReading` ADD CONSTRAINT `DailyReading_assetId_fkey` FOREIGN KEY (`assetId`) REFERENCES `Asset`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "DailyReading" ADD CONSTRAINT "DailyReading_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE `DailyReading` ADD CONSTRAINT `DailyReading_userId_fkey` FOREIGN KEY (`userId`) REFERENCES `User`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "MaintenanceSchedule" ADD CONSTRAINT "MaintenanceSchedule_assetId_fkey" FOREIGN KEY ("assetId") REFERENCES "Asset"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE `MaintenanceSchedule` ADD CONSTRAINT `MaintenanceSchedule_assetId_fkey` FOREIGN KEY (`assetId`) REFERENCES `Asset`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "MaintenanceSchedulePart" ADD CONSTRAINT "MaintenanceSchedulePart_scheduleId_fkey" FOREIGN KEY ("scheduleId") REFERENCES "MaintenanceSchedule"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE `MaintenanceSchedulePart` ADD CONSTRAINT `MaintenanceSchedulePart_scheduleId_fkey` FOREIGN KEY (`scheduleId`) REFERENCES `MaintenanceSchedule`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "MaintenanceSchedulePart" ADD CONSTRAINT "MaintenanceSchedulePart_partId_fkey" FOREIGN KEY ("partId") REFERENCES "Part"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE `MaintenanceSchedulePart` ADD CONSTRAINT `MaintenanceSchedulePart_partId_fkey` FOREIGN KEY (`partId`) REFERENCES `Part`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "JobCard" ADD CONSTRAINT "JobCard_assetId_fkey" FOREIGN KEY ("assetId") REFERENCES "Asset"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE `JobCard` ADD CONSTRAINT `JobCard_assetId_fkey` FOREIGN KEY (`assetId`) REFERENCES `Asset`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "JobCardPart" ADD CONSTRAINT "JobCardPart_jobCardId_fkey" FOREIGN KEY ("jobCardId") REFERENCES "JobCard"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE `JobCardPart` ADD CONSTRAINT `JobCardPart_jobCardId_fkey` FOREIGN KEY (`jobCardId`) REFERENCES `JobCard`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "JobCardPart" ADD CONSTRAINT "JobCardPart_partId_fkey" FOREIGN KEY ("partId") REFERENCES "Part"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE `JobCardPart` ADD CONSTRAINT `JobCardPart_partId_fkey` FOREIGN KEY (`partId`) REFERENCES `Part`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "PartStockMovement" ADD CONSTRAINT "PartStockMovement_partId_fkey" FOREIGN KEY ("partId") REFERENCES "Part"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE `PurchaseRequest` ADD CONSTRAINT `PurchaseRequest_partId_fkey` FOREIGN KEY (`partId`) REFERENCES `Part`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "Notification" ADD CONSTRAINT "Notification_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE `PartStockMovement` ADD CONSTRAINT `PartStockMovement_partId_fkey` FOREIGN KEY (`partId`) REFERENCES `Part`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "Alert" ADD CONSTRAINT "Alert_assetId_fkey" FOREIGN KEY ("assetId") REFERENCES "Asset"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE `Notification` ADD CONSTRAINT `Notification_userId_fkey` FOREIGN KEY (`userId`) REFERENCES `User`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `Alert` ADD CONSTRAINT `Alert_assetId_fkey` FOREIGN KEY (`assetId`) REFERENCES `Asset`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 

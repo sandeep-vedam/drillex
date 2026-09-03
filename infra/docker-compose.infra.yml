@@ -1,19 +1,21 @@
-# Stateful infra only (Postgres, Redis, MinIO) — for when the API/web run as bare Node
+# Stateful infra only (MySQL, Redis, MinIO) — for when the API/web run as bare Node
 # processes via PM2 + nginx instead of in containers. Ports bind to 127.0.0.1 only;
 # the app processes run on the same host and reach these via localhost.
 #   docker compose -f infra/docker-compose.infra.yml --env-file infra/.env.prod-ip up -d
 services:
-  postgres:
-    image: postgres:16-alpine
+  mysql:
+    image: mysql:8.4
     restart: unless-stopped
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
     environment:
-      POSTGRES_USER: drillex
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: drillex
-    ports: ["127.0.0.1:5432:5432"]
-    volumes: [pgdata:/var/lib/postgresql/data]
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_USER: drillex
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_DATABASE: drillex
+    ports: ["127.0.0.1:3306:3306"]
+    volumes: [mysqldata:/var/lib/mysql]
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U drillex"]
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u drillex -p\"$$MYSQL_PASSWORD\" --silent"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -35,6 +37,6 @@ services:
     volumes: [miniodata:/data]
 
 volumes:
-  pgdata:
+  mysqldata:
   redisdata:
   miniodata:

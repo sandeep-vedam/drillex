@@ -6,7 +6,7 @@ import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
 
 /**
- * Integration tests against a real Postgres (DATABASE_URL) — run `prisma migrate deploy && db:seed` first (CI does).
+ * Integration tests against a real MySQL (DATABASE_URL) — run `prisma migrate deploy && db:seed` first (CI does).
  * Covers the SRS rules that matter most: auth + RBAC at API level, daily-reading alerts, shift-report validations, approval workflow, sync idempotency.
  */
 let app: INestApplication; let prisma: PrismaService;
@@ -105,7 +105,7 @@ describe('offline sync (SRS §9.2)', () => {
     expect((await request(app.getHttpServer()).post('/api/v1/sync/push').set(auth(t)).send(ops)).body.results[0].status).toBe('duplicate');
     const c = await request(app.getHttpServer()).post('/api/v1/sync/push').set(auth(t)).send({ ops: [{ opId: 'b', kind: 'daily_reading', payload: { ...payload, id: crypto.randomUUID() } }] });
     expect(c.body.results[0].status).toBe('conflict');
-    await prisma.syncConflict.deleteMany({ where: { entity: 'DailyReading', versions: { path: ['incoming', 'notes'], equals: '[e2e] sync' } } });
+    await prisma.syncConflict.deleteMany({ where: { entity: 'DailyReading', versions: { path: '$.incoming.notes', equals: '[e2e] sync' } } });
   });
 
   it('one malformed op envelope is rejected individually — it does not fail the whole batch', async () => {

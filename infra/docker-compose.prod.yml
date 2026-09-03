@@ -3,16 +3,18 @@
 #
 # Requires infra/.env.prod (copy from infra/.env.prod.example) with real secrets and your domains.
 services:
-  postgres:
-    image: postgres:16-alpine
+  mysql:
+    image: mysql:8.4
     restart: unless-stopped
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
     environment:
-      POSTGRES_USER: drillex
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: drillex
-    volumes: [pgdata:/var/lib/postgresql/data]
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_USER: drillex
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_DATABASE: drillex
+    volumes: [mysqldata:/var/lib/mysql]
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U drillex"]
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u drillex -p\"$$MYSQL_PASSWORD\" --silent"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -37,11 +39,11 @@ services:
       dockerfile: infra/docker/api.Dockerfile
     restart: unless-stopped
     depends_on:
-      postgres: { condition: service_healthy }
+      mysql: { condition: service_healthy }
       redis: { condition: service_started }
       minio: { condition: service_started }
     environment:
-      DATABASE_URL: postgresql://drillex:${POSTGRES_PASSWORD}@postgres:5432/drillex?schema=public
+      DATABASE_URL: mysql://drillex:${MYSQL_PASSWORD}@mysql:3306/drillex
       REDIS_URL: redis://redis:6379
       JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
@@ -90,7 +92,7 @@ services:
     depends_on: [api, web]
 
 volumes:
-  pgdata:
+  mysqldata:
   redisdata:
   miniodata:
   caddy_data:

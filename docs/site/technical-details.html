@@ -47,7 +47,7 @@
     <table>
       <tr><th>Concern</th><th>Choice</th></tr>
       <tr><td>Framework</td><td>NestJS 10 (<code>@nestjs/common</code>/<code>core</code>/<code>platform-express</code>)</td></tr>
-      <tr><td>ORM / DB</td><td>Prisma 6.2 → PostgreSQL</td></tr>
+      <tr><td>ORM / DB</td><td>Prisma 6.2 → MySQL</td></tr>
       <tr><td>Auth</td><td>Custom JWT (access + rotating refresh), Argon2 password hashing, otplib TOTP 2FA</td></tr>
       <tr><td>Validation</td><td>Zod (shared schemas from <code>@drillex/shared</code>)</td></tr>
       <tr><td>Rate limiting / security</td><td><code>@nestjs/throttler</code>, Helmet</td></tr>
@@ -57,7 +57,7 @@
       <tr><td>Push</td><td>google-auth-library against FCM HTTP v1</td></tr>
       <tr><td>Email</td><td>nodemailer (SMTP)</td></tr>
       <tr><td>API docs</td><td>@nestjs/swagger, served at <code>/api/docs</code></td></tr>
-      <tr><td>Testing</td><td>vitest + supertest (e2e-style, real Postgres)</td></tr>
+      <tr><td>Testing</td><td>vitest + supertest (e2e-style, real MySQL)</td></tr>
     </table>
 
     <h3>apps/web — @drillex/web</h3>
@@ -85,7 +85,7 @@
     <p>Pure TypeScript library (compiled via <code>tsc</code>), dependency-free aside from Zod. Provides: <code>enums.ts</code>, <code>schemas.ts</code> (Zod schemas for every domain input — logins, readings, shift reports, job cards, maintenance), <code>rbac.ts</code> (the permission matrix), <code>jobcards.ts</code> / <code>maintenance.ts</code> (business calculation helpers e.g. <code>nextCycle</code>, <code>scheduleStatus</code>), plus its own vitest unit tests.</p>
 
     <h2 id="data-model">Data model</h2>
-    <p>Source: <code>apps/api/prisma/schema.prisma</code> (PostgreSQL, 22 models). Three migrations applied to date: initial schema, forced-password-change flag, purchase requests.</p>
+    <p>Source: <code>apps/api/prisma/schema.prisma</code> (MySQL, 22 models). A single initial migration (the history was regenerated for MySQL).</p>
     <table>
       <tr><th>Model</th><th>Purpose / key fields</th><th>Key relations</th></tr>
       <tr><td><code>Site</code></td><td>name, coordinates</td><td>1–N Users, Assets, ShiftReports</td></tr>
@@ -159,7 +159,7 @@
     <h2 id="env">Environment variables (API)</h2>
     <table>
       <tr><th>Variable</th><th>Purpose</th></tr>
-      <tr><td><code>DATABASE_URL</code></td><td>PostgreSQL connection string</td></tr>
+      <tr><td><code>DATABASE_URL</code></td><td>MySQL connection string</td></tr>
       <tr><td><code>JWT_ACCESS_SECRET</code> / <code>JWT_REFRESH_SECRET</code></td><td>Token signing — must be ≥32 chars in production or boot fails</td></tr>
       <tr><td><code>JWT_ACCESS_TTL</code> / <code>JWT_REFRESH_TTL</code></td><td>Token lifetimes (default 15m / 30d)</td></tr>
       <tr><td><code>CORS_ORIGINS</code></td><td>Comma-separated allow-list; unset = allow all</td></tr>
@@ -177,7 +177,7 @@
       <div class="card">
         <h3 style="margin-top:0;">What's covered</h3>
         <ul style="margin-bottom:0;">
-          <li><code>apps/api/test/api.e2e.ts</code> — vitest + supertest against a live Postgres: auth/RBAC, daily readings + alerts, shift reports + approval, offline sync idempotency/conflicts</li>
+          <li><code>apps/api/test/api.e2e.ts</code> — vitest + supertest against a live MySQL: auth/RBAC, daily readings + alerts, shift reports + approval, offline sync idempotency/conflicts</li>
           <li><code>packages/shared/src/schemas.test.ts</code> — vitest unit tests for Zod schemas and calc helpers</li>
           <li><code>infra/load/k6-smoke.js</code> — 200 VU load test against the §9.5 NFR thresholds (run manually/CI-optional)</li>
         </ul>
@@ -191,7 +191,7 @@
         </ul>
       </div>
     </div>
-    <p><strong>CI pipeline</strong> (<code>.github/workflows/ci.yml</code>, Node 22 / pnpm 9.15.4, Postgres 16 service container):</p>
+    <p><strong>CI pipeline</strong> (<code>.github/workflows/ci.yml</code>, Node 22 / pnpm 9.15.4, MySQL 8 service container):</p>
     <pre><code>pnpm install --frozen-lockfile
 prisma generate &amp;&amp; prisma migrate deploy &amp;&amp; db:seed
 pnpm typecheck

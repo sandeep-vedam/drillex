@@ -6,13 +6,14 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { StorageService } from '../storage/storage.service';
 import { AuthUser } from '../auth/decorators';
 import { assertSufficientStock } from '../parts/parts.controller';
+import { assignedTo, technicianIds } from '../common/technician-ids';
 
 @Injectable()
 export class JobCardsService {
   constructor(private prisma: PrismaService, private notify: NotificationsService, private storage: StorageService) {}
   private assetScope(u: AuthUser) { return u.scope === 'site' ? { siteId: u.siteId ?? undefined } : {}; }
   private include = { asset: { select: { assetNumber: true, name: true, siteId: true, status: true } }, parts: { include: { part: { select: { partNo: true, name: true, unitCost: true } } } } };
-  private selfFilter(u: AuthUser) { return u.scope === 'self' ? { technicianIds: { has: u.id } } : {}; }
+  private selfFilter(u: AuthUser) { return u.scope === 'self' ? assignedTo(u.id) : {}; }
 
   async list(u: AuthUser, q: { status?: string; assetId?: string; from?: string; to?: string }) {
     return this.prisma.jobCard.findMany({ where: { deletedAt: null, asset: this.assetScope(u), ...this.selfFilter(u), ...(q.status ? { status: q.status as never } : {}), ...(q.assetId ? { assetId: q.assetId } : {}), ...(q.from || q.to ? { date: { ...(q.from ? { gte: new Date(q.from) } : {}), ...(q.to ? { lte: new Date(q.to) } : {}) } } : {}) }, include: this.include, orderBy: [{ date: 'desc' }, { createdAt: 'desc' }], take: 200 });
@@ -20,7 +21,7 @@ export class JobCardsService {
   async get(u: AuthUser, id: string) {
     const jc = await this.prisma.jobCard.findFirstOrThrow({ where: { id, deletedAt: null, asset: this.assetScope(u), ...this.selfFilter(u) }, include: this.include });
     const atts = await this.prisma.attachment.findMany({ where: { ownerType: 'JobCard', ownerId: id }, orderBy: { createdAt: 'asc' } });
-    const techs = await this.prisma.user.findMany({ where: { id: { in: jc.technicianIds } }, select: { id: true, employeeId: true, name: true } });
+    const techs = await this.prisma.user.findMany({ where: { id: { in: technicianIds(jc.technicianIds) } }, select: { id: true, employeeId: true, name: true } });
     return { ...jc, technicians: techs, attachments: await Promise.all(atts.map(async (a) => ({ id: a.id, kind: a.kind, url: await this.storage.urlFor(a.storageKey) }))) };
   }
 
@@ -86,7 +87,7 @@ export class JobCardsService {
       await tx.auditLog.create({ data: { actorId: u.id, deviceId: u.deviceId, entity: 'JobCard', entityId: id, action: 'APPROVE' } });
       return r;
     });
-    await this.prisma.notification.createMany({ data: jc.technicianIds.map((userId) => ({ userId, type: 'job_card_approved', title: `${jc.jobNo} approved`, body: `Approved by ${u.employeeId}.` })) });
+    await this.prisma.notification.createMany({ data: technicianIds(jc.technicianIds).map((userId) => ({ userId, type: 'job_card_approved', title: `${jc.jobNo} approved`, body: `Approved by ${u.employeeId}.` })) });
     return out;
   }
 

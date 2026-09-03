@@ -5,7 +5,7 @@ import { authenticator } from 'otplib';
 import { AuthService } from './auth.service';
 
 /**
- * Unit tests for the login/2FA/device-approval rules — isolated from Postgres via a mocked
+ * Unit tests for the login/2FA/device-approval rules — isolated from MySQL via a mocked
  * PrismaService. Mirrors the flows exercised manually while debugging the MGR001 2FA rollout:
  * requires2faSetup on first login, code verification on subsequent ones, device approval gating.
  */

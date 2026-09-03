@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Bare-metal deploy: Postgres/Redis/MinIO in Docker, API + web as PM2-managed Node
+# Bare-metal deploy: MySQL/Redis/MinIO in Docker, API + web as PM2-managed Node
 # processes, nginx reverse-proxying everything through port 80/443 only.
 #
 # One-time setup (as root/sudo on a fresh Ubuntu VPS):
@@ -26,7 +26,7 @@ source .env.prod-ip
 echo "==> Pulling latest code"
 git -C .. pull --ff-only
 
-echo "==> Starting/updating stateful infra (Postgres, Redis, MinIO)"
+echo "==> Starting/updating stateful infra (MySQL, Redis, MinIO)"
 docker compose -f docker-compose.infra.yml --env-file .env.prod-ip up -d
 
 echo "==> Installing deps and building"
@@ -47,7 +47,7 @@ cd ../..
 
 echo "==> Writing apps/api/.env"
 cat > apps/api/.env <<EOF
-DATABASE_URL=postgresql://drillex:${POSTGRES_PASSWORD}@127.0.0.1:5432/drillex?schema=public
+DATABASE_URL=mysql://drillex:${MYSQL_PASSWORD}@127.0.0.1:3306/drillex
 REDIS_URL=redis://127.0.0.1:6379
 JWT_ACCESS_SECRET=${JWT_ACCESS_SECRET}
 JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET}

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Deploy or redeploy the full stack (Postgres, Redis, MinIO, API, web, Caddy) on this VPS.
+# Deploy or redeploy the full stack (MySQL, Redis, MinIO, API, web, Caddy) on this VPS.
 # Run from infra/ after infra/.env.prod exists (see .env.prod.example): ./deploy.sh
 set -euo pipefail
 cd "$(dirname "$0")"

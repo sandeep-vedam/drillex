@@ -4,6 +4,7 @@ import { MaintenanceScheduleInput, nextCycle, scheduleStatus } from '@drillex/sh
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { AuthUser } from '../auth/decorators';
+import { assignedTo, technicianIds } from '../common/technician-ids';
 
 @Injectable()
 export class MaintenanceService {
@@ -21,7 +22,7 @@ export class MaintenanceService {
 
   async list(u: AuthUser, q: { assetId?: string; status?: string; mine?: string }) {
     const rows = await this.prisma.maintenanceSchedule.findMany({
-      where: { deletedAt: null, asset: this.assetScope(u), ...(q.assetId ? { assetId: q.assetId } : {}), ...(q.mine === '1' || u.scope === 'self' ? { technicianIds: { has: u.id } } : {}) },
+      where: { deletedAt: null, asset: this.assetScope(u), ...(q.assetId ? { assetId: q.assetId } : {}), ...(q.mine === '1' || u.scope === 'self' ? assignedTo(u.id) : {}) },
       include: this.include, orderBy: [{ nextDueAt: 'asc' }],
     });
     const hours = await this.currentHours([...new Set(rows.map((r) => r.assetId))]);
@@ -61,7 +62,7 @@ export class MaintenanceService {
   /** Technician marks the service done: records last service, rolls the cycle forward (or closes one-off), asset back to ACTIVE if nothing else is open. */
   async complete(u: AuthUser, id: string, b: { completedAt?: Date; hourMeter?: number; notes?: string }) {
     const s = await this.prisma.maintenanceSchedule.findFirstOrThrow({ where: { id, deletedAt: null }, include: { asset: true } });
-    if (u.scope === 'self' && !s.technicianIds.includes(u.id)) throw new ForbiddenException('You are not assigned to this service');
+    if (u.scope === 'self' && !technicianIds(s.technicianIds).includes(u.id)) throw new ForbiddenException('You are not assigned to this service');
     const completedAt = b.completedAt ?? new Date();
     const hm = b.hourMeter ?? (await this.currentHours([s.assetId])).get(s.assetId) ?? null;
     const recurring = !!(s.intervalHours || s.intervalDays);
@@ -93,10 +94,11 @@ export class MaintenanceService {
         const body = r.nextDueAt ? `Due ${r.nextDueAt.toISOString().slice(0, 10)}` : r.nextDueHours ? `Due at ${Number(r.nextDueHours)} h` : '';
         // de-dupe: one reminder per schedule per day
         const since = new Date(now.getTime() - 20 * 3600e3);
-        const already = await this.prisma.notification.count({ where: { type: 'maintenance_due', payload: { path: ['scheduleId'], equals: r.id }, createdAt: { gte: since } } });
+        const already = await this.prisma.notification.count({ where: { type: 'maintenance_due', payload: { path: '$.scheduleId', equals: r.id }, createdAt: { gte: since } } });
         if (!already) {
           await this.notify.notifyRoles(r.asset.siteId, ['SUPERVISOR'], { type: 'maintenance_due', title, body, payload: { scheduleId: r.id } });
-          if (r.technicianIds.length) await this.prisma.notification.createMany({ data: r.technicianIds.map((userId) => ({ userId, type: 'maintenance_due', title, body, payload: { scheduleId: r.id } as never })) });
+          const techIds = technicianIds(r.technicianIds);
+          if (techIds.length) await this.prisma.notification.createMany({ data: techIds.map((userId) => ({ userId, type: 'maintenance_due', title, body, payload: { scheduleId: r.id } as never })) });
           reminded++;
         }
         if (st === 'OVERDUE') overdue++;

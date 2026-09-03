@@ -4,7 +4,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "mysql"
   url      = env("DATABASE_URL")
 }
 
@@ -202,7 +202,7 @@ model Asset {
   site              Site          @relation(fields: [siteId], references: [id])
   siteId            String
   status            AssetStatus   @default(ACTIVE)
-  notes             String?
+  notes             String? @db.Text
   operators         AssetOperator[]
   shiftReports      ShiftReport[]
   dailyReadings     DailyReading[]
@@ -252,7 +252,7 @@ model ShiftReport {
   rockType         String
   penetrationRate  Decimal          @db.Decimal(8, 2)
   downtimeHours    Decimal          @default(0) @db.Decimal(6, 2)
-  downtimeReason   String?
+  downtimeReason   String? @db.Text
   status           SubmissionStatus @default(SUBMITTED)
   signatureId      String?
   submittedAt      DateTime         @default(now())
@@ -274,7 +274,7 @@ model ShiftReportChemical {
   chemicalId    String
   quantity      Decimal      @db.Decimal(10, 2)
   unit          ChemicalUnit
-  purpose       String?
+  purpose       String? @db.Text
   stockOnHand   Decimal?     @db.Decimal(10, 2)
 }
 
@@ -293,17 +293,17 @@ model DailyReading {
   hydraulicOil         FluidLevel
   coolant              FluidLevel
   airFilter            AirFilterCondition
-  tyrePressures        Json               @default("{}")
+  tyrePressures        Json               // MySQL cannot default a JSON column; always written explicitly
   battery              BatteryCondition
   warningLights        Boolean
-  warningLightsNote    String?
+  warningLightsNote    String? @db.Text
   unusualNoises        Boolean
-  unusualNoisesNote    String?
+  unusualNoisesNote    String? @db.Text
   leaks                Boolean
-  leaksNote            String?
+  leaksNote            String? @db.Text
   preStartChecklistDone Boolean
   conditionRating      Int
-  notes                String?
+  notes                String? @db.Text
   signatureId          String?
   createdAt            DateTime           @default(now())
   updatedAt            DateTime           @updatedAt
@@ -316,7 +316,7 @@ model MaintenanceSchedule {
   asset            Asset          @relation(fields: [assetId], references: [id])
   assetId          String
   serviceType      ServiceType
-  description      String
+  description      String @db.Text
   intervalHours    Int?
   intervalDays     Int?
   lastServiceAt    DateTime?
@@ -326,8 +326,8 @@ model MaintenanceSchedule {
   reminderLeadDays Int            @default(3)
   status           ScheduleStatus @default(UPCOMING)
   estDowntimeHours Decimal?       @db.Decimal(6, 2)
-  notes            String?
-  technicianIds    String[]
+  notes            String? @db.Text
+  technicianIds    Json           // string[] of User.id (MySQL has no scalar lists)
   parts            MaintenanceSchedulePart[]
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
@@ -350,16 +350,16 @@ model JobCard {
   assetId         String
   date            DateTime    @db.Date
   jobType         JobType
-  reportedFault   String?
-  workPerformed   String
+  reportedFault   String? @db.Text
+  workPerformed   String @db.Text
   hourMeter       Decimal?    @db.Decimal(10, 1)
   labourHours     Decimal?    @db.Decimal(6, 2)
-  technicianIds   String[]
-  toolsUsed       String?
+  technicianIds   Json        // string[] of User.id (MySQL has no scalar lists)
+  toolsUsed       String? @db.Text
   conditionBefore Int?
   conditionAfter  Int?
   testResult      TestResult?
-  nextAction      String?
+  nextAction      String? @db.Text
   status          JobStatus   @default(OPEN)
   techSignatureId String?
   approvedById    String?
@@ -399,7 +399,7 @@ model PurchaseRequest {
   quantity    Int
   status      PurchaseRequestStatus @default(OPEN)
   requestedBy String
-  notes       String?
+  notes       String? @db.Text
   orderedAt   DateTime?
   receivedAt  DateTime?
   createdAt   DateTime              @default(now())
@@ -412,7 +412,7 @@ model PartStockMovement {
   partId    String
   type      StockMovementType
   quantity  Int
-  reference String?
+  reference String? @db.Text
   createdAt DateTime          @default(now())
 }
 
@@ -434,8 +434,8 @@ model Notification {
   user      User     @relation(fields: [userId], references: [id])
   userId    String
   type      String
-  title     String
-  body      String?
+  title     String @db.Text
+  body      String? @db.Text
   payload   Json?
   readAt    DateTime?
   createdAt DateTime @default(now())
@@ -448,7 +448,7 @@ model Alert {
   assetId    String
   source     String
   severity   String
-  message    String
+  message    String @db.Text
   resolvedAt DateTime?
   createdAt  DateTime  @default(now())
 }

@@ -6,14 +6,14 @@ Plan & budget: [docs/DEVELOPMENT_PLAN.md](docs/DEVELOPMENT_PLAN.md).
 ## Layout
 - `apps/mobile` — React Native CLI app: login, 15-min idle lock + biometrics, daily readings, shift reports, job cards, maintenance, notifications, reports — **offline-first** (outbox sync, signatures, photos)
 - `apps/web` — Next.js: dashboard, asset register, shift production approval, daily readings review, maintenance, job cards, parts inventory, reports, notifications; admin: users, devices, sync conflicts
-- `apps/api` — NestJS + Prisma + PostgreSQL: RBAC at API level, JWT + TOTP 2FA, offline `/sync/push`, attachments (S3/local), cron jobs (maintenance reminders, weekly digest, month-end reports), push (FCM v1), email (SMTP)
+- `apps/api` — NestJS + Prisma + MySQL: RBAC at API level, JWT + TOTP 2FA, offline `/sync/push`, attachments (S3/local), cron jobs (maintenance reminders, weekly digest, month-end reports), push (FCM v1), email (SMTP)
 - `packages/shared` — Zod schemas, enums, RBAC matrix and business rules shared by all three
-- `infra/` — docker-compose (Postgres, Redis, MinIO) and k6 load test
+- `infra/` — docker-compose (MySQL, Redis, MinIO) and k6 load test
 
 ## Local development
 ```bash
 corepack enable && pnpm install
-pnpm infra:up                       # or use a local Postgres 16 (brew services start postgresql@16)
+pnpm infra:up                       # or use a local MySQL 8 (brew services start mysql)
 cp apps/api/.env.example apps/api/.env && cp apps/web/.env.example apps/web/.env.local
 pnpm --filter @drillex/api prisma migrate deploy
 pnpm db:seed                        # ADM001 / MGR001 / SUP001 / TEC001 / OPR001 — password Password123
@@ -44,7 +44,7 @@ CI (`.github/workflows/ci.yml`) runs install → migrate → seed → typecheck 
 Two options — pick one per server. Works on any Linux VPS (Lightsail, Hostinger KVM, DigitalOcean, Hetzner, EC2, …).
 
 ### Option A — bare Node + PM2 + nginx (recommended)
-Only Postgres/Redis/MinIO run in Docker (bound to `127.0.0.1`); the API and web app run as plain Node processes under PM2, with nginx reverse-proxying everything through port 80/443 only — `/api/` → the API, everything else → the web app. No other ports need to be public.
+Only MySQL/Redis/MinIO run in Docker (bound to `127.0.0.1`); the API and web app run as plain Node processes under PM2, with nginx reverse-proxying everything through port 80/443 only — `/api/` → the API, everything else → the web app. No other ports need to be public.
 ```bash
 # One-time, as root on a fresh Ubuntu VPS:
 curl -fsSL https://get.docker.com | sh && systemctl enable --now docker
@@ -63,7 +63,7 @@ ln -sf /etc/nginx/sites-available/drillex /etc/nginx/sites-enabled/drillex
 Open Lightsail/VPS firewall ports 22, 80, 443 only. If you later get a domain, add TLS via `certbot --nginx`.
 
 ### Option B — Docker Compose + Caddy (auto-HTTPS for a domain)
-Everything (Postgres, Redis, MinIO, API, web, Caddy) runs in containers; Caddy auto-issues Let's Encrypt certs for whatever domains you point at it.
+Everything (MySQL, Redis, MinIO, API, web, Caddy) runs in containers; Caddy auto-issues Let's Encrypt certs for whatever domains you point at it.
 ```bash
 # On a fresh Ubuntu/Debian VPS, as root:
 curl -fsSL https://raw.githubusercontent.com/sandeep-vedam/drillex/master/infra/setup-vps.sh | bash
@@ -78,5 +78,5 @@ cp .env.prod.example .env.prod && nano .env.prod   # fill in your domains + gene
 - `NODE_ENV=production`, 32+ char `JWT_ACCESS_SECRET`/`JWT_REFRESH_SECRET` (server refuses weak secrets), `CORS_ORIGINS`
 - `STORAGE_DRIVER=s3` + bucket creds (MinIO/R2/S3); `SMTP_*` for report email; `FCM_*` for push
 - `DEVICE_REGISTRATION_REQUIRED=true` to enforce approved devices (Admin → Devices)
-- Managed Postgres with backups; TLS termination (TLS 1.3) at the load balancer; run `prisma migrate deploy` on release
+- Managed MySQL with backups; TLS termination (TLS 1.3) at the load balancer; run `prisma migrate deploy` on release
 - Monthly reports run on the 1st at 02:00 UTC; maintenance reminders daily 06:00; weekly digest Monday 07:00

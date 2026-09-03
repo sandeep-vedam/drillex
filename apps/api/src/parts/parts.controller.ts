@@ -22,7 +22,7 @@ export async function assertSufficientStock(tx: Prisma.TransactionClient, partId
 export class PartsController {
   constructor(private prisma: PrismaService, private notify: NotificationsService) {}
   @Get() @RequirePermission('parts:read') list(@Query('q') q?: string) {
-    return this.prisma.part.findMany({ where: q ? { OR: [{ partNo: { contains: q, mode: 'insensitive' } }, { name: { contains: q, mode: 'insensitive' } }] } : {}, orderBy: { partNo: 'asc' } });
+    return this.prisma.part.findMany({ where: q ? { OR: [{ partNo: { contains: q } }, { name: { contains: q } }] } : {}, orderBy: { partNo: 'asc' } });
   }
   @Post() @RequirePermission('parts:write') create(@CurrentUser() u: AuthUser, @Body(new ZodPipe(PartSchema)) b: z.infer<typeof PartSchema>) { return this.prisma.part.create({ data: b }); }
   /** Stock movement (receipt, issue, stock-take adjustment). Low-stock alert when below minimum (SRS §7.3). */

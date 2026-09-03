@@ -6,13 +6,15 @@ jobs:
   build:
     runs-on: ubuntu-latest
     services:
-      postgres:
-        image: postgres:16-alpine
-        env: { POSTGRES_USER: drillex, POSTGRES_PASSWORD: drillex, POSTGRES_DB: drillex }
-        ports: ['5432:5432']
-        options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
+      mysql:
+        image: mysql:8.4
+        env: { MYSQL_ROOT_PASSWORD: drillex, MYSQL_USER: drillex, MYSQL_PASSWORD: drillex, MYSQL_DATABASE: drillex }
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -u drillex -pdrillex --silent"
+          --health-interval=10s --health-timeout=5s --health-retries=10
     env:
-      DATABASE_URL: postgresql://drillex:drillex@localhost:5432/drillex?schema=public
+      DATABASE_URL: mysql://drillex:drillex@127.0.0.1:3306/drillex
       JWT_ACCESS_SECRET: ci
       JWT_REFRESH_SECRET: ci
     steps:
@@ -25,7 +27,7 @@ jobs:
       - run: pnpm --filter @drillex/api prisma generate
       - run: pnpm --filter @drillex/api prisma migrate deploy
       - run: pnpm --filter @drillex/api db:seed
-        env: { DATABASE_URL: "postgresql://drillex:drillex@localhost:5432/drillex?schema=public" }
+        env: { DATABASE_URL: "mysql://drillex:drillex@127.0.0.1:3306/drillex" }
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm --filter @drillex/api --filter @drillex/web build

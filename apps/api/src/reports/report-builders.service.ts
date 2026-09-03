@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { ReportDoc, ReportType, REPORT_META } from './report-types';
+import { technicianIds } from '../common/technician-ids';
 
 const n = (v: unknown) => (v == null ? 0 : Number(v));
 const r1 = (v: number) => Math.round(v * 10) / 10;
@@ -78,7 +79,7 @@ export class ReportBuildersService {
           this.prisma.auditLog.groupBy({ by: ['actorId'], where: { action: { in: ['APPROVE'] }, createdAt: range }, _count: true }),
         ]);
         const cnt = (arr: { _count: number }[], pred: (x: never) => boolean) => (arr as never[]).filter(pred).reduce((s, x) => s + (x as { _count: number })._count, 0);
-        const rows = users.map((u) => [u.employeeId, u.name, u.role, cnt(logins, (l: { employeeId: string; success: boolean }) => l.employeeId === u.employeeId && l.success), cnt(logins, (l: { employeeId: string; success: boolean }) => l.employeeId === u.employeeId && !l.success), cnt(readings, (r: { userId: string }) => r.userId === u.id), cnt(shifts, (r: { userId: string }) => r.userId === u.id), jobs.filter((j) => j.technicianIds.includes(u.id)).length, cnt(approvals, (a: { actorId: string | null }) => a.actorId === u.id)]);
+        const rows = users.map((u) => [u.employeeId, u.name, u.role, cnt(logins, (l: { employeeId: string; success: boolean }) => l.employeeId === u.employeeId && l.success), cnt(logins, (l: { employeeId: string; success: boolean }) => l.employeeId === u.employeeId && !l.success), cnt(readings, (r: { userId: string }) => r.userId === u.id), cnt(shifts, (r: { userId: string }) => r.userId === u.id), jobs.filter((j) => technicianIds(j.technicianIds).includes(u.id)).length, cnt(approvals, (a: { actorId: string | null }) => a.actorId === u.id)]);
         const ops = users.filter((u) => u.role === 'OPERATOR');
         const days = Math.max(1, Math.round((to.getTime() - from.getTime()) / 864e5) + 1);
         const incomplete = ops.map((u) => { const r = cnt(readings, (x: { userId: string }) => x.userId === u.id); return [u.employeeId, u.name, r, days, Math.max(0, days - r)]; }).filter((x) => n(x[4]) > 0);

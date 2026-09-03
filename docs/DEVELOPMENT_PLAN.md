@@ -10,7 +10,7 @@ Source: *DrillexOps App Requirements Blueprint v1.0 (May 2026)*. This plan turns
 |---|---|---|
 | **Mobile app** (Android primary, iOS, Android tablets) | Operators, drillers, technicians, supervisors | React Native (Expo SDK 52+, TypeScript), offline-first |
 | **Web app** (single site, role-filtered) | Managers, admins, supervisors | Next.js 15 (App Router), TypeScript, Tailwind + shadcn/ui |
-| **Backend API** | Both clients | NestJS (TypeScript), PostgreSQL 16, Prisma, Redis, BullMQ, S3-compatible object storage |
+| **Backend API** | Both clients | NestJS (TypeScript), MySQL 8, Prisma, Redis, BullMQ, S3-compatible object storage |
 | **Shared packages** | All TS code | Zod schemas, TS types, RBAC permission matrix, calc helpers |
 
 Yes — a separate **admin portal** is required (SRS 9.1 "Admin web dashboard", 10.1 User Management / Asset Register / Reports), and a **backend** is required (RBAC at API level, offline sync, scheduled reports, push notifications, audit trail). The admin portal and manager dashboard are one Next.js site with role-gated sections, not two sites.
@@ -19,10 +19,10 @@ Yes — a separate **admin portal** is required (SRS 9.1 "Admin web dashboard", 
 - **Expo + RN** — one codebase for phone/tablet/iOS; EAS Build/Update for OTA fixes; `expo-local-authentication` (biometrics), `expo-camera`, `expo-location`, `expo-notifications`, `expo-secure-store`.
 - **Local DB: WatermelonDB** (SQLite) — built for offline-first RN with sync protocol; SQLCipher-encrypted at rest (AES-256 requirement).
 - **NestJS** — modular, decorator-based guards make RBAC at API level explicit; first-class BullMQ integration for jobs (monthly reports, digests, reminders).
-- **PostgreSQL + Prisma** — relational data (assets ↔ schedules ↔ job cards ↔ parts); Prisma shares types with `packages/shared`. Append-only `audit_log` table.
+- **MySQL + Prisma** — relational data (assets ↔ schedules ↔ job cards ↔ parts); Prisma shares types with `packages/shared`. Append-only `audit_log` table.
 - **Next.js** — same TS/Zod schemas as mobile; server components for report pages; export PDFs via headless Chromium (Playwright) on the API, Excel via `exceljs`.
 - **Auth: self-hosted** (employee ID + password, Argon2id, JWT access 15 min + refresh rotation, TOTP 2FA for Manager/Admin). No shared logins; device ID captured on every login.
-- **Infra** — Docker images; deploy API + web to a single cloud (Fly.io/Render/AWS ECS — decide in Phase 0), managed Postgres, Redis, S3/R2 for photos & report files. GitHub Actions CI, EAS for mobile builds.
+- **Infra** — Docker images; deploy API + web to a single cloud (Fly.io/Render/AWS ECS — decide in Phase 0), managed MySQL, Redis, S3/R2 for photos & report files. GitHub Actions CI, EAS for mobile builds.
 
 ---
 
@@ -38,7 +38,7 @@ flowchart LR
     A[NestJS API<br/>REST + RBAC guards]
     Q[BullMQ workers<br/>reports · digests · reminders · alerts]
     R[(Redis)]
-    P[(PostgreSQL)]
+    P[(MySQL)]
     S[(Object storage<br/>photos · PDFs · XLSX)]
   end
   F[FCM / APNs push]
@@ -142,7 +142,7 @@ All syncable tables carry `id (uuid)`, `created_at`, `updated_at`, `deleted_at`,
 
 **Notifications** — Expo push tokens per device; types: maintenance_due, overdue_submission, approval_required, machine_alert, report_ready, low_stock. Daily digest email (supervisor/manager), weekly maintenance digest (manager).
 
-**Reports** — builders read from Postgres views/materialised summaries; render HTML → PDF (Playwright) and XLSX (exceljs); stored in object storage; emailable from the app.
+**Reports** — builders read from MySQL views/materialised summaries; render HTML → PDF (Playwright) and XLSX (exceljs); stored in object storage; emailable from the app.
 
 ---
 
@@ -244,7 +244,7 @@ A lean variant (1 RN dev + 1 full-stack + lead, ~9 months) would land around **$
 |---|---|
 | Apple Developer Program | $99 / year |
 | Google Play developer account | $25 once |
-| Cloud hosting (API + web, managed Postgres, Redis, object storage, staging + prod) | $400 – 900 / month |
+| Cloud hosting (API + web, managed MySQL, Redis, object storage, staging + prod) | $400 – 900 / month |
 | Expo EAS (builds + OTA updates) | $0 – 99 / month (Production plan ≈ $99) |
 | Transactional email (SES / Postmark) | $20 – 50 / month |
 | Push (FCM / APNs) | free |

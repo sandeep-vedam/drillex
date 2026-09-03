@@ -1,12 +1,14 @@
 services:
-  postgres:
-    image: postgres:16-alpine
+  mysql:
+    image: mysql:8.4
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
     environment:
-      POSTGRES_USER: drillex
-      POSTGRES_PASSWORD: drillex
-      POSTGRES_DB: drillex
-    ports: ["5432:5432"]
-    volumes: [pgdata:/var/lib/postgresql/data]
+      MYSQL_ROOT_PASSWORD: drillex
+      MYSQL_USER: drillex
+      MYSQL_PASSWORD: drillex
+      MYSQL_DATABASE: drillex
+    ports: ["3306:3306"]
+    volumes: [mysqldata:/var/lib/mysql]
   redis:
     image: redis:7-alpine
     ports: ["6379:6379"]
@@ -19,5 +21,5 @@ services:
     ports: ["9000:9000", "9001:9001"]
     volumes: [miniodata:/data]
 volumes:
-  pgdata:
+  mysqldata:
   miniodata:

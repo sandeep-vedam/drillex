@@ -4,6 +4,7 @@ import { can } from '@drillex/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
 import { AuthUser } from '../auth/decorators';
+import { technicianIds } from '../common/technician-ids';
 
 export type AttachmentInput = { id?: string; ownerType: string; ownerId: string; kind: 'PHOTO' | 'DOCUMENT' | 'SIGNATURE'; contentType: string; base64: string };
 const MAX_BYTES = 8 * 1024 * 1024;
@@ -39,7 +40,7 @@ export class AttachmentsService {
     } else if (ownerType === 'JobCard') {
       const row = await this.prisma.jobCard.findUnique({ where: { id: ownerId }, include: { asset: { select: { siteId: true } } } });
       if (!row) throw new NotFoundException('JobCard not found');
-      siteId = row.asset.siteId; isSelf = row.technicianIds.includes(u.id);
+      siteId = row.asset.siteId; isSelf = technicianIds(row.technicianIds).includes(u.id);
     } else if (ownerType === 'Asset') {
       const row = await this.prisma.asset.findUnique({ where: { id: ownerId }, select: { siteId: true, operators: { where: { userId: u.id, validTo: null }, select: { userId: true } } } });
       if (!row) throw new NotFoundException('Asset not found');

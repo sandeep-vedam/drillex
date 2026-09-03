@@ -72,7 +72,7 @@
         <text class="sub" x="270" y="128">JWT + RBAC guards on every route</text>
 
         <rect class="box" x="480" y="20" width="150" height="55" rx="10"></rect>
-        <text class="lbl" x="500" y="45">PostgreSQL</text>
+        <text class="lbl" x="500" y="45">MySQL</text>
         <text class="sub" x="500" y="62">via Prisma ORM</text>
 
         <rect class="box" x="480" y="90" width="150" height="55" rx="10"></rect>
@@ -121,7 +121,7 @@
 ├── packages/
 │   └── shared/          @drillex/shared — Zod schemas, enums, RBAC matrix, calc helpers
 ├── infra/
-│   ├── docker-compose.yml   Postgres 16, Redis 7, MinIO (local dev dependencies)
+│   ├── docker-compose.yml   MySQL 8, Redis 7, MinIO (local dev dependencies)
 │   └── load/k6-smoke.js     k6 load test against SRS §9.5 NFR targets
 ├── docs/
 │   ├── DEVELOPMENT_PLAN.md  original build plan + status log
@@ -238,7 +238,7 @@
       <div class="card">
         <h3 style="margin-top:0;">Local / CI</h3>
         <ul style="margin-bottom:0;">
-          <li><code>infra/docker-compose.yml</code>: Postgres 16, Redis 7, MinIO</li>
+          <li><code>infra/docker-compose.yml</code>: MySQL 8, Redis 7, MinIO</li>
           <li>CI (<code>.github/workflows/ci.yml</code>): install → <code>prisma migrate deploy</code> → seed → typecheck → test → build (API + web only; mobile not built in CI)</li>
           <li>k6 smoke test validates the §9.5 performance NFRs against a seeded dataset</li>
         </ul>
@@ -247,7 +247,7 @@
         <h3 style="margin-top:0;">Production readiness</h3>
         <ul style="margin-bottom:0;">
           <li>API refuses to boot in production without strong JWT secrets</li>
-          <li>Recommended: <code>STORAGE_DRIVER=s3</code>, real SMTP/FCM credentials, <code>DEVICE_REGISTRATION_REQUIRED=true</code>, TLS termination at the load balancer, managed Postgres with backups</li>
+          <li>Recommended: <code>STORAGE_DRIVER=s3</code>, real SMTP/FCM credentials, <code>DEVICE_REGISTRATION_REQUIRED=true</code>, TLS termination at the load balancer, managed MySQL with backups</li>
           <li><span class="badge warn">Gap</span> no Dockerfiles yet for <code>apps/api</code> / <code>apps/web</code> — only local dev infra is containerized today</li>
         </ul>
       </div>
