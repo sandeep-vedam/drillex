@@ -88,6 +88,22 @@ pm2 status                              # drillex-api and drillex-web both onlin
 
 Then open `http://<SERVER_IP>` in a browser and sign in as ADM001.
 
+## If you cannot run the migration on the server
+
+Some hosts give you a MySQL database and phpMyAdmin, but no way to run Node
+tooling against it. For that case the repo ships a ready-made dump:
+
+    infra/drillex-mysql.sql
+
+Import it into an **empty** database — `mysql -u <user> -p <db> < infra/drillex-mysql.sql`,
+or phpMyAdmin -> your database -> Import. It creates all 26 tables and the five
+starter users, and it contains no session-variable or SUPER-privilege
+statements, so it imports as an ordinary restricted database user.
+
+It also marks `0001_init` as applied in `_prisma_migrations`, so `deploy.sh`
+later sees an up-to-date database instead of trying to recreate every table.
+Skip step 4 (seeding) if you import this file — the users are already in it.
+
 ## Redeploying
 
 ```bash
