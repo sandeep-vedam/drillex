@@ -44,6 +44,8 @@ CI (`.github/workflows/ci.yml`) runs install → migrate → seed → typecheck 
 
 ## Deploy to a VPS
 
+Full step-by-step runbook for a brand-new server: [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
+
 One path: API and web run as PM2-managed Node processes behind nginx, with MySQL
 installed natively on the same host. No Docker. Works on any Linux VPS (Hostinger
 KVM, DigitalOcean, Hetzner, EC2, Lightsail, …).
