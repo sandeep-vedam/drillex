@@ -124,13 +124,13 @@
 
     <h2 id="status">6. Release status</h2>
     <p>Per <code>docs/DEVELOPMENT_PLAN.md</code> §13 (as of 2026-08-21), all ten planned phases are implemented: foundation/auth incl. 2FA, asset register, daily readings + alerts, shift production + approval/unlock, offline outbox sync, maintenance schedules + reminders, job cards + parts + asset-status automation, parts inventory + purchase requests + push + notification centres, the 7-report suite with PDF/XLSX/email/month-end cron, and release hardening (device registration, integration tests in CI, k6 load test, production config guards, Android release signing, demo data, README runbook).</p>
-    <p>Known gaps carried forward: mobile push requires a manual post-clone step to add Firebase config files and the <code>@react-native-firebase/messaging</code> dependency (server-side FCM sending is fully implemented); no production Dockerfiles exist yet for the API or web app; the web app has no automated test suite.</p>
+    <p>Known gaps carried forward: mobile push requires a manual post-clone step to add Firebase config files and the <code>@react-native-firebase/messaging</code> dependency (server-side FCM sending is fully implemented); deployment is container-free (PM2 + nginx + native MySQL) rather than Docker-based; the web app has no automated test suite.</p>
 
     <h2 id="risks">7. Risks &amp; open questions</h2>
     <ul>
       <li><strong>Connectivity risk:</strong> field sites may have long offline windows — the outbox is FIFO and caps batches at 50-200 ops per flush; very long offline periods should be validated against real-world queue sizes.</li>
       <li><strong>Conflict resolution UX:</strong> sync conflicts currently require manual supervisor review; if conflict volume grows, this queue needs monitoring.</li>
-      <li><strong>Redis is provisioned but unused</strong> by the current API (cron runs in-process) — decide whether to formally drop it from infra or adopt it for a job queue as the plan originally intended.</li>
+      <li><strong>Redis has been dropped from infra</strong> — nothing in the API referenced it (cron runs in-process via <code>@nestjs/schedule</code>). Re-introduce it only if a real job queue is needed.</li>
       <li><strong>Containerized deployment</strong> for API/web is not yet defined in-repo; needed before a production rollout beyond the documented manual runbook.</li>
     </ul>
 

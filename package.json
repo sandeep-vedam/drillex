@@ -13,8 +13,6 @@
     "typecheck": "turbo run typecheck",
     "db:migrate": "pnpm --filter @drillex/api prisma migrate dev",
     "db:seed": "pnpm --filter @drillex/api db:seed",
-    "infra:up": "docker compose -f infra/docker-compose.yml up -d",
-    "infra:down": "docker compose -f infra/docker-compose.yml down",
     "db:demo": "pnpm --filter @drillex/api db:demo"
   },
   "devDependencies": {

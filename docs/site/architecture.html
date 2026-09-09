@@ -121,7 +121,7 @@
 ├── packages/
 │   └── shared/          @drillex/shared — Zod schemas, enums, RBAC matrix, calc helpers
 ├── infra/
-│   ├── docker-compose.yml   MySQL 8, Redis 7, MinIO (local dev dependencies)
+│   ├── setup-vps.sh         One-time VPS provisioning (Node 20, MySQL 8, nginx)
 │   └── load/k6-smoke.js     k6 load test against SRS §9.5 NFR targets
 ├── docs/
 │   ├── DEVELOPMENT_PLAN.md  original build plan + status log
@@ -224,7 +224,7 @@
       <tr><td>Month-end reports</td><td>1st of month, 02:00</td><td>Generate all 7 report types for the prior month, notify managers</td></tr>
       <tr><td>Report purge</td><td>Quarterly, 1st, 03:00</td><td>Delete archived reports older than 24 months</td></tr>
     </table>
-    <p class="dim">All four run in-process via <code>@nestjs/schedule</code> — no external job queue is currently wired in, despite Redis being provisioned in local infra.</p>
+    <p class="dim">All four run in-process via <code>@nestjs/schedule</code> — no external job queue is wired in, and Redis has been dropped from infra accordingly.</p>
 
     <h2 id="automation">Domain automation</h2>
     <ul>
@@ -238,7 +238,7 @@
       <div class="card">
         <h3 style="margin-top:0;">Local / CI</h3>
         <ul style="margin-bottom:0;">
-          <li><code>infra/docker-compose.yml</code>: MySQL 8, Redis 7, MinIO</li>
+          <li><code>infra/setup-vps.sh</code> + <code>infra/deploy.sh</code>: Node 20, MySQL 8, nginx, PM2 — no containers</li>
           <li>CI (<code>.github/workflows/ci.yml</code>): install → <code>prisma migrate deploy</code> → seed → typecheck → test → build (API + web only; mobile not built in CI)</li>
           <li>k6 smoke test validates the §9.5 performance NFRs against a seeded dataset</li>
         </ul>
@@ -248,7 +248,7 @@
         <ul style="margin-bottom:0;">
           <li>API refuses to boot in production without strong JWT secrets</li>
           <li>Recommended: <code>STORAGE_DRIVER=s3</code>, real SMTP/FCM credentials, <code>DEVICE_REGISTRATION_REQUIRED=true</code>, TLS termination at the load balancer, managed MySQL with backups</li>
-          <li><span class="badge warn">Gap</span> no Dockerfiles yet for <code>apps/api</code> / <code>apps/web</code> — only local dev infra is containerized today</li>
+          <li>Deployment is container-free by design: PM2 runs both Node processes, nginx terminates HTTP, MySQL runs natively</li>
         </ul>
       </div>
     </div>

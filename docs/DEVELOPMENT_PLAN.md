@@ -10,7 +10,7 @@ Source: *DrillexOps App Requirements Blueprint v1.0 (May 2026)*. This plan turns
 |---|---|---|
 | **Mobile app** (Android primary, iOS, Android tablets) | Operators, drillers, technicians, supervisors | React Native (Expo SDK 52+, TypeScript), offline-first |
 | **Web app** (single site, role-filtered) | Managers, admins, supervisors | Next.js 15 (App Router), TypeScript, Tailwind + shadcn/ui |
-| **Backend API** | Both clients | NestJS (TypeScript), MySQL 8, Prisma, Redis, BullMQ, S3-compatible object storage |
+| **Backend API** | Both clients | NestJS (TypeScript), MySQL 8, Prisma, in-process cron, S3-compatible object storage or local disk |
 | **Shared packages** | All TS code | Zod schemas, TS types, RBAC permission matrix, calc helpers |
 
 Yes — a separate **admin portal** is required (SRS 9.1 "Admin web dashboard", 10.1 User Management / Asset Register / Reports), and a **backend** is required (RBAC at API level, offline sync, scheduled reports, push notifications, audit trail). The admin portal and manager dashboard are one Next.js site with role-gated sections, not two sites.
@@ -22,7 +22,7 @@ Yes — a separate **admin portal** is required (SRS 9.1 "Admin web dashboard", 
 - **MySQL + Prisma** — relational data (assets ↔ schedules ↔ job cards ↔ parts); Prisma shares types with `packages/shared`. Append-only `audit_log` table.
 - **Next.js** — same TS/Zod schemas as mobile; server components for report pages; export PDFs via headless Chromium (Playwright) on the API, Excel via `exceljs`.
 - **Auth: self-hosted** (employee ID + password, Argon2id, JWT access 15 min + refresh rotation, TOTP 2FA for Manager/Admin). No shared logins; device ID captured on every login.
-- **Infra** — Docker images; deploy API + web to a single cloud (Fly.io/Render/AWS ECS — decide in Phase 0), managed MySQL, Redis, S3/R2 for photos & report files. GitHub Actions CI, EAS for mobile builds.
+- **Infra** — API + web run as PM2-managed Node processes behind nginx on a single Linux VPS, with MySQL 8 installed natively on the same host. Attachments on local disk or S3/R2. GitHub Actions CI, EAS for mobile builds.
 
 ---
 
@@ -75,7 +75,7 @@ drillex/
 │  ├─ shared/          # Zod schemas, types, enums, RBAC matrix, calc helpers
 │  ├─ ui/              # (optional) shared web components
 │  └─ config/          # eslint, tsconfig, prettier presets
-├─ infra/              # docker-compose (pg, redis, minio), deploy manifests
+├─ infra/              # VPS setup + deploy scripts (PM2, nginx), k6 load test
 ├─ docs/               # this plan, ADRs, API docs
 └─ turbo.json, pnpm-workspace.yaml
 ```
@@ -150,7 +150,7 @@ All syncable tables carry `id (uuid)`, `created_at`, `updated_at`, `deleted_at`,
 
 | Phase | Weeks | Scope | Exit criteria |
 |---|---|---|---|
-| **0 — Foundation** | 1–2 | Monorepo, CI, docker-compose, Prisma schema v1, auth (login/JWT/2FA), RBAC matrix, design system (mobile + web), EAS setup | Both apps log in against the API; seed data; pipeline green |
+| **0 — Foundation** | 1–2 | Monorepo, CI, local MySQL, Prisma schema v1, auth (login/JWT/2FA), RBAC matrix, design system (mobile + web), EAS setup | Both apps log in against the API; seed data; pipeline green |
 | **1 — Core** | 3–8 | Asset Register (web CRUD, mobile view), Daily Readings (mobile form + sync + alerts, web review dashboard), Shift Production (form, chemicals, signature, approval/unlock), offline sync v1, audit log, notification centre | Pilot site can run a full day offline and sync; supervisors approve on web |
 | **2 — Maintenance** | 9–16 | Maintenance schedules + reminders, Job Cards (mobile/web), Parts Inventory + low-stock, status automation, push notifications, technician flows | A breakdown → job card → parts → approval loop works end-to-end |
 | **3 — Reporting** | 17–20 | 7 report builders, month-end job, PDF/XLSX export, email share, custom ranges, manager dashboard analytics, 24-month archive | Month-end reports auto-generated and downloadable |
@@ -203,7 +203,7 @@ Each phase ends with a UAT on a real site with the stakeholder group and a go/no
 2. Bootstrap monorepo (`pnpm`, Turborepo, Expo app, Next app, Nest app, Prisma).
 3. Write Prisma schema v1 from §4 and the RBAC matrix from §6.
 4. Produce low-fi screens for Daily Readings & Shift Production (the two highest-volume forms).
-5. Set up CI + docker-compose and a staging environment.
+5. Set up CI + a local MySQL and a staging environment.
 
 ---
 
@@ -244,7 +244,7 @@ A lean variant (1 RN dev + 1 full-stack + lead, ~9 months) would land around **$
 |---|---|
 | Apple Developer Program | $99 / year |
 | Google Play developer account | $25 once |
-| Cloud hosting (API + web, managed MySQL, Redis, object storage, staging + prod) | $400 – 900 / month |
+| VPS hosting (API + web + MySQL on one box, staging + prod) | $20 – 80 / month |
 | Expo EAS (builds + OTA updates) | $0 – 99 / month (Production plan ≈ $99) |
 | Transactional email (SES / Postmark) | $20 – 50 / month |
 | Push (FCM / APNs) | free |

@@ -8,12 +8,15 @@ Plan & budget: [docs/DEVELOPMENT_PLAN.md](docs/DEVELOPMENT_PLAN.md).
 - `apps/web` — Next.js: dashboard, asset register, shift production approval, daily readings review, maintenance, job cards, parts inventory, reports, notifications; admin: users, devices, sync conflicts
 - `apps/api` — NestJS + Prisma + MySQL: RBAC at API level, JWT + TOTP 2FA, offline `/sync/push`, attachments (S3/local), cron jobs (maintenance reminders, weekly digest, month-end reports), push (FCM v1), email (SMTP)
 - `packages/shared` — Zod schemas, enums, RBAC matrix and business rules shared by all three
-- `infra/` — docker-compose (MySQL, Redis, MinIO) and k6 load test
+- `infra/` — VPS setup & deploy scripts (Node + PM2 + nginx + MySQL, no Docker) and k6 load test
 
 ## Local development
 ```bash
 corepack enable && pnpm install
-pnpm infra:up                       # or use a local MySQL 8 (brew services start mysql)
+brew services start mysql           # local MySQL 8 (Linux: sudo systemctl start mysql)
+mysql -u root -e "CREATE DATABASE IF NOT EXISTS drillex CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+                  CREATE USER IF NOT EXISTS 'drillex'@'localhost' IDENTIFIED BY 'drillex';
+                  GRANT ALL PRIVILEGES ON drillex.* TO 'drillex'@'localhost'; FLUSH PRIVILEGES;"
 cp apps/api/.env.example apps/api/.env && cp apps/web/.env.example apps/web/.env.local
 pnpm --filter @drillex/api prisma migrate deploy
 pnpm db:seed                        # ADM001 / MGR001 / SUP001 / TEC001 / OPR001 — password Password123
@@ -41,42 +44,37 @@ CI (`.github/workflows/ci.yml`) runs install → migrate → seed → typecheck 
 
 ## Deploy to a VPS
 
-Two options — pick one per server. Works on any Linux VPS (Lightsail, Hostinger KVM, DigitalOcean, Hetzner, EC2, …).
+One path: API and web run as PM2-managed Node processes behind nginx, with MySQL
+installed natively on the same host. No Docker. Works on any Linux VPS (Hostinger
+KVM, DigitalOcean, Hetzner, EC2, Lightsail, …).
 
-### Option A — bare Node + PM2 + nginx (recommended)
-Only MySQL/Redis/MinIO run in Docker (bound to `127.0.0.1`); the API and web app run as plain Node processes under PM2, with nginx reverse-proxying everything through port 80/443 only — `/api/` → the API, everything else → the web app. No other ports need to be public.
+nginx is the only thing listening publicly — `/api/` proxies to the API on 4000,
+everything else to the web app on 3000. MySQL stays bound to localhost.
+
 ```bash
-# One-time, as root on a fresh Ubuntu VPS:
-curl -fsSL https://get.docker.com | sh && systemctl enable --now docker
-curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && apt-get install -y nodejs nginx
-corepack enable && corepack prepare pnpm@9.15.4 --activate && npm install -g pm2
-git clone https://github.com/sandeep-vedam/drillex.git /opt/drillex
-cd /opt/drillex/infra
-cp .env.prod-ip.example .env.prod-ip && nano .env.prod-ip   # fill in SERVER_IP + generated secrets
-ln -sf /opt/drillex/infra/nginx-drillex.conf /etc/nginx/sites-available/drillex
-rm -f /etc/nginx/sites-enabled/default
-ln -sf /etc/nginx/sites-available/drillex /etc/nginx/sites-enabled/drillex
-
-# Then, and on every redeploy:
-./deploy-baremetal.sh
-```
-Open Lightsail/VPS firewall ports 22, 80, 443 only. If you later get a domain, add TLS via `certbot --nginx`.
-
-### Option B — Docker Compose + Caddy (auto-HTTPS for a domain)
-Everything (MySQL, Redis, MinIO, API, web, Caddy) runs in containers; Caddy auto-issues Let's Encrypt certs for whatever domains you point at it.
-```bash
-# On a fresh Ubuntu/Debian VPS, as root:
+# One-time, as root on a fresh Ubuntu/Debian VPS. Installs Node 20, MySQL 8,
+# nginx, pnpm and PM2, creates the database, and prints a generated DB password:
 curl -fsSL https://raw.githubusercontent.com/sandeep-vedam/drillex/master/infra/setup-vps.sh | bash
-# Point DNS A records for api.yourdomain.com and app.yourdomain.com at the VPS IP, then:
+
 cd /opt/drillex/infra
-cp .env.prod.example .env.prod && nano .env.prod   # fill in your domains + generated secrets
+cp .env.prod.example .env.prod && nano .env.prod   # SERVER_IP, the DB password, generated secrets
 ./deploy.sh
+
+# Seed the first users once:
+cd /opt/drillex/apps/api && node --import tsx prisma/seed.ts
 ```
-`deploy.sh` builds and starts everything including Caddy. Re-run `./deploy.sh` after `git push` to redeploy. See `infra/docker-compose.prod.yml`. (For a no-domain, plain-HTTP variant of this same containerized approach, see `infra/docker-compose.prod-ip.yml`.)
+Re-run `./deploy.sh` after every `git push` to redeploy — it pulls, builds,
+migrates, and reloads PM2 and nginx.
+
+Open only ports 22, 80 and 443 on the provider firewall (`setup-vps.sh` configures
+ufw the same way). Once you have a domain pointed at the server, add TLS with
+`apt-get install -y certbot python3-certbot-nginx && certbot --nginx`, then set
+`PUBLIC_ORIGIN=https://your.domain` in `.env.prod` and redeploy so the web build
+and CORS use the new origin.
 
 ## Production checklist
 - `NODE_ENV=production`, 32+ char `JWT_ACCESS_SECRET`/`JWT_REFRESH_SECRET` (server refuses weak secrets), `CORS_ORIGINS`
-- `STORAGE_DRIVER=s3` + bucket creds (MinIO/R2/S3); `SMTP_*` for report email; `FCM_*` for push
+- `STORAGE_DRIVER=local` writes attachments to `UPLOAD_DIR` — back that directory up with the database, or set `s3` + bucket creds (R2/S3); `SMTP_*` for report email; `FCM_*` for push
 - `DEVICE_REGISTRATION_REQUIRED=true` to enforce approved devices (Admin → Devices)
-- Managed MySQL with backups; TLS termination (TLS 1.3) at the load balancer; run `prisma migrate deploy` on release
+- Regular `mysqldump` backups; TLS via certbot (or at a load balancer); `deploy.sh` runs `prisma migrate deploy` on every release
 - Monthly reports run on the 1st at 02:00 UTC; maintenance reminders daily 06:00; weekly digest Monday 07:00
