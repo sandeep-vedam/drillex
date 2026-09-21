@@ -36,6 +36,10 @@ export const AssetSchema = z.object({
   notes: z.string().optional(),
 });
 
+/** Category is omitted on purpose: the asset number is derived from it and is immutable (SRS 3.1). */
+export const AssetUpdateSchema = AssetSchema.omit({ category: true }).partial();
+export type AssetUpdateInput = z.infer<typeof AssetUpdateSchema>;
+
 export const ChemicalEntrySchema = z.object({
   chemicalId: z.string().uuid(),
   quantity: z.number().nonnegative(),

@@ -122,6 +122,69 @@ describe('offline sync (SRS §9.2)', () => {
   });
 });
 
+describe('asset register management', () => {
+  const site = () => prisma.site.findFirstOrThrow();
+  const user = (employeeId: string) => prisma.user.findUniqueOrThrow({ where: { employeeId } });
+  async function newAsset(token: string, operatorIds: string[]) {
+    const s = await site();
+    const r = await request(app.getHttpServer()).post('/api/v1/assets').set(auth(token))
+      .send({ name: '[e2e] register target', category: 'ANCILLARY', make: 'Atlas', model: 'T1', serialNumber: `E2E-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, yearOfManufacture: 2020, commissionedAt: day(400), siteId: s.id, operatorIds });
+    expect(r.status).toBe(201);
+    return r.body.id as string;
+  }
+  async function scrub(id: string) {
+    await prisma.jobCard.deleteMany({ where: { assetId: id } });
+    await prisma.assetOperator.deleteMany({ where: { assetId: id } });
+    await prisma.auditLog.deleteMany({ where: { entity: 'Asset', entityId: id } });
+    await prisma.asset.delete({ where: { id } });
+  }
+
+  it('edits an asset, keeps the number/category immutable, and closes the old operator window instead of dropping it', async () => {
+    const admin = await login('ADM001');
+    const opr = await user('OPR001'); const tec = await user('TEC001');
+    const id = await newAsset(admin, [opr.id]);
+    const before = await prisma.asset.findUniqueOrThrow({ where: { id } });
+
+    const edited = await request(app.getHttpServer()).patch(`/api/v1/assets/${id}`).set(auth(admin)).send({ name: '[e2e] renamed', make: 'Sandvik', operatorIds: [tec.id], category: 'DRILLING' });
+    expect(edited.status).toBe(200);
+    expect(edited.body).toMatchObject({ name: '[e2e] renamed', make: 'Sandvik', assetNumber: before.assetNumber, category: 'ANCILLARY' }); // category is stripped, number never changes
+    expect(edited.body.operators.map((o: { userId: string }) => o.userId)).toEqual([tec.id]); // only the open window is returned
+    expect(await prisma.assetOperator.findUniqueOrThrow({ where: { assetId_userId: { assetId: id, userId: opr.id } } })).toMatchObject({ validTo: expect.any(Date) }); // history kept, not deleted
+
+    await scrub(id);
+  });
+
+  it('blocks status changes and delete while a job card is open — except decommissioning', async () => {
+    const admin = await login('ADM001'); const techToken = await login('TEC001');
+    const tec = await user('TEC001');
+    const id = await newAsset(admin, [tec.id]);
+    const patch = (body: object) => request(app.getHttpServer()).patch(`/api/v1/assets/${id}`).set(auth(admin)).send(body);
+
+    const jc = await request(app.getHttpServer()).post('/api/v1/job-cards').set(auth(techToken))
+      .send({ assetId: id, date: day(0), jobType: 'BREAKDOWN_REPAIR', workPerformed: '[e2e] holds the asset open', technicianIds: [tec.id] });
+    expect(jc.status).toBe(201);
+    expect(await prisma.asset.findUniqueOrThrow({ where: { id } })).toMatchObject({ status: 'UNDER_MAINTENANCE' });
+
+    expect((await patch({ status: 'ACTIVE' })).status).toBe(400);
+    expect((await patch({ status: 'IDLE' })).status).toBe(400);
+    expect((await patch({ status: 'UNDER_MAINTENANCE' })).status).toBe(400); // owned by the job-card flow, never set by hand
+    expect((await request(app.getHttpServer()).delete(`/api/v1/assets/${id}`).set(auth(admin))).status).toBe(400);
+    expect((await patch({ status: 'DECOMMISSIONED' })).status).toBe(200); // the one status the job-card flow leaves alone
+
+    const closed = await request(app.getHttpServer()).patch(`/api/v1/job-cards/${jc.body.id}`).set(auth(techToken)).send({ status: 'COMPLETED' });
+    expect(closed.status).toBe(200);
+    const deleted = await request(app.getHttpServer()).delete(`/api/v1/assets/${id}`).set(auth(admin));
+    expect(deleted.status).toBe(200);
+
+    const listed = await request(app.getHttpServer()).get('/api/v1/assets').set(auth(admin));
+    expect(listed.body.some((a: { id: string }) => a.id === id)).toBe(false); // gone from the register
+    expect(await prisma.jobCard.count({ where: { assetId: id } })).toBe(1); // its history is not
+    expect(await prisma.assetOperator.count({ where: { assetId: id, validTo: null } })).toBe(0);
+
+    await scrub(id);
+  });
+});
+
 describe('negative-scenario hardening', () => {
   it('rejects a parts stock movement that would take qtyOnHand below zero', async () => {
     const t = await login('TEC001'); // TECHNICIAN has parts:write; SUPERVISOR does not

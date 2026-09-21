@@ -4,31 +4,43 @@ import { api } from '@/lib/api';
 import { I } from './Icons';
 
 type Opt = { id: string; name: string; employeeId?: string };
+export type EditableAsset = { id: string; assetNumber: string; name: string; category: string; make: string; model: string; serialNumber: string; yearOfManufacture: number; commissionedAt: string; siteId?: string; notes?: string | null; operators?: { userId: string }[] };
 const CATS = ['DRILLING', 'HAULAGE', 'COMPRESSOR', 'ANCILLARY', 'OTHER'];
 const PREFIX: Record<string, string> = { DRILLING: 'DRL', HAULAGE: 'HAU', COMPRESSOR: 'CMP', ANCILLARY: 'ANC', OTHER: 'EQP' };
+const blank = () => ({ name: '', category: 'DRILLING', make: '', model: '', serialNumber: '', yearOfManufacture: new Date().getFullYear(), commissionedAt: new Date().toISOString().slice(0, 10), siteId: '', operatorIds: [] as string[], notes: '' });
 
-export function AssetDrawer({ open, onClose, onCreated }: { open: boolean; onClose: () => void; onCreated: () => void }) {
+export function AssetDrawer({ open, onClose, onSaved, asset }: { open: boolean; onClose: () => void; onSaved: () => void; asset?: EditableAsset | null }) {
   const [sites, setSites] = useState<Opt[]>([]);
   const [ops, setOps] = useState<Opt[]>([]);
-  const [f, setF] = useState({ name: '', category: 'DRILLING', make: '', model: '', serialNumber: '', yearOfManufacture: new Date().getFullYear(), commissionedAt: new Date().toISOString().slice(0, 10), siteId: '', operatorIds: [] as string[], notes: '' });
+  const [f, setF] = useState(blank);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   useEffect(() => { if (!open) return; api<Opt[]>('/sites').then((s) => { setSites(s); setF((x) => ({ ...x, siteId: x.siteId || s[0]?.id || '' })); }).catch(() => {}); api<Opt[]>('/users/lookup?role=OPERATOR').then(setOps).catch(() => {}); }, [open]);
+  // Prefill runs before the lookups resolve, and the /sites handler above keeps a siteId that is already set.
+  useEffect(() => {
+    if (!open) return;
+    setError(null);
+    setF(asset ? { name: asset.name, category: asset.category, make: asset.make, model: asset.model, serialNumber: asset.serialNumber, yearOfManufacture: asset.yearOfManufacture, commissionedAt: asset.commissionedAt.slice(0, 10), siteId: asset.siteId ?? '', operatorIds: (asset.operators ?? []).map((o) => o.userId), notes: asset.notes ?? '' } : blank());
+  }, [open, asset]);
   const set = (k: string, v: unknown) => setF((x) => ({ ...x, [k]: v }));
   async function submit(e: React.FormEvent) {
     e.preventDefault(); setBusy(true); setError(null);
-    try { await api('/assets', { method: 'POST', body: JSON.stringify({ ...f, yearOfManufacture: Number(f.yearOfManufacture), notes: f.notes || undefined }) }); onCreated(); onClose(); }
-    catch (err) { setError((err as Error).message); } finally { setBusy(false); }
+    const body = { name: f.name, make: f.make, model: f.model, serialNumber: f.serialNumber, yearOfManufacture: Number(f.yearOfManufacture), commissionedAt: f.commissionedAt, siteId: f.siteId, operatorIds: f.operatorIds, notes: f.notes || undefined };
+    try {
+      if (asset) await api(`/assets/${asset.id}`, { method: 'PATCH', body: JSON.stringify(body) });
+      else await api('/assets', { method: 'POST', body: JSON.stringify({ ...body, category: f.category }) });
+      onSaved(); onClose();
+    } catch (err) { setError((err as Error).message); } finally { setBusy(false); }
   }
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-20 flex justify-end bg-navy-900/40 backdrop-blur-[2px]" onClick={onClose}>
       <form onSubmit={submit} onClick={(e) => e.stopPropagation()} className="h-full w-full max-w-[520px] bg-surface shadow-card flex flex-col">
-        <header className="px-6 py-5 border-b border-line flex items-start justify-between"><div><div className="eyebrow">Asset register</div><h2 className="font-display font-semibold text-[26px] text-navy-800">Register new asset</h2><p className="text-[13px] text-muted">Number will be assigned as <span className="font-mono text-ink">{PREFIX[f.category]}-###</span> and can never change.</p></div><button type="button" onClick={onClose} className="btn-ghost" aria-label="Close">✕</button></header>
+        <header className="px-6 py-5 border-b border-line flex items-start justify-between"><div><div className="eyebrow">Asset register</div><h2 className="font-display font-semibold text-[26px] text-navy-800">{asset ? `Edit ${asset.assetNumber}` : 'Register new asset'}</h2><p className="text-[13px] text-muted">{asset ? <>Asset number and category can never change.</> : <>Number will be assigned as <span className="font-mono text-ink">{PREFIX[f.category]}-###</span> and can never change.</>}</p></div><button type="button" onClick={onClose} className="btn-ghost" aria-label="Close">✕</button></header>
         <div className="p-6 flex flex-col gap-4 overflow-y-auto flex-1">
           <L label="Asset name"><input className="input" required value={f.name} onChange={(e) => set('name', e.target.value)} placeholder="Drill Rig #3" /></L>
           <div className="grid grid-cols-2 gap-4">
-            <L label="Category"><select className="input" value={f.category} onChange={(e) => set('category', e.target.value)}>{CATS.map((c) => <option key={c} value={c}>{c[0] + c.slice(1).toLowerCase()}</option>)}</select></L>
+            <L label="Category"><select className="input disabled:text-muted" disabled={!!asset} value={f.category} onChange={(e) => set('category', e.target.value)}>{CATS.map((c) => <option key={c} value={c}>{c[0] + c.slice(1).toLowerCase()}</option>)}</select></L>
             <L label="Site"><select className="input" required value={f.siteId} onChange={(e) => set('siteId', e.target.value)}>{sites.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select></L>
             <L label="Make"><input className="input" required value={f.make} onChange={(e) => set('make', e.target.value)} placeholder="Sandvik" /></L>
             <L label="Model"><input className="input" required value={f.model} onChange={(e) => set('model', e.target.value)} placeholder="DP1500i" /></L>
@@ -47,7 +59,7 @@ export function AssetDrawer({ open, onClose, onCreated }: { open: boolean; onClo
           <L label="Notes"><textarea className="input min-h-[80px]" value={f.notes} onChange={(e) => set('notes', e.target.value)} /></L>
           {error && <p role="alert" className="text-[13px] text-crit border-l-2 border-crit pl-3">{error}</p>}
         </div>
-        <footer className="px-6 py-4 border-t border-line flex justify-end gap-2"><button type="button" onClick={onClose} className="btn-ghost">Cancel</button><button disabled={busy || !f.operatorIds.length} className="btn-primary h-10"><I.Plus /> {busy ? 'Saving…' : 'Register asset'}</button></footer>
+        <footer className="px-6 py-4 border-t border-line flex justify-end gap-2"><button type="button" onClick={onClose} className="btn-ghost">Cancel</button><button disabled={busy || !f.operatorIds.length} className="btn-primary h-10"><I.Plus /> {busy ? 'Saving…' : asset ? 'Save changes' : 'Register asset'}</button></footer>
       </form>
     </div>
   );
