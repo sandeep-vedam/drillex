@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { I } from './Icons';
+import { PhotoPicker, uploadPhotos, type PendingPhoto } from './PhotoPicker';
 
 type Opt = { id: string; name: string; employeeId?: string };
 export type EditableAsset = { id: string; assetNumber: string; name: string; category: string; make: string; model: string; serialNumber: string; yearOfManufacture: number; commissionedAt: string; siteId?: string; notes?: string | null; operators?: { userId: string }[] };
@@ -13,13 +14,14 @@ export function AssetDrawer({ open, onClose, onSaved, asset }: { open: boolean; 
   const [sites, setSites] = useState<Opt[]>([]);
   const [ops, setOps] = useState<Opt[]>([]);
   const [f, setF] = useState(blank);
+  const [photos, setPhotos] = useState<PendingPhoto[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   useEffect(() => { if (!open) return; api<Opt[]>('/sites').then((s) => { setSites(s); setF((x) => ({ ...x, siteId: x.siteId || s[0]?.id || '' })); }).catch(() => {}); api<Opt[]>('/users/lookup?role=OPERATOR').then(setOps).catch(() => {}); }, [open]);
   // Prefill runs before the lookups resolve, and the /sites handler above keeps a siteId that is already set.
   useEffect(() => {
     if (!open) return;
-    setError(null);
+    setError(null); setPhotos([]);
     setF(asset ? { name: asset.name, category: asset.category, make: asset.make, model: asset.model, serialNumber: asset.serialNumber, yearOfManufacture: asset.yearOfManufacture, commissionedAt: asset.commissionedAt.slice(0, 10), siteId: asset.siteId ?? '', operatorIds: (asset.operators ?? []).map((o) => o.userId), notes: asset.notes ?? '' } : blank());
   }, [open, asset]);
   const set = (k: string, v: unknown) => setF((x) => ({ ...x, [k]: v }));
@@ -27,8 +29,14 @@ export function AssetDrawer({ open, onClose, onSaved, asset }: { open: boolean; 
     e.preventDefault(); setBusy(true); setError(null);
     const body = { name: f.name, make: f.make, model: f.model, serialNumber: f.serialNumber, yearOfManufacture: Number(f.yearOfManufacture), commissionedAt: f.commissionedAt, siteId: f.siteId, operatorIds: f.operatorIds, notes: f.notes || undefined };
     try {
-      if (asset) await api(`/assets/${asset.id}`, { method: 'PATCH', body: JSON.stringify(body) });
-      else await api('/assets', { method: 'POST', body: JSON.stringify({ ...body, category: f.category }) });
+      const saved = asset
+        ? await api<{ id: string }>(`/assets/${asset.id}`, { method: 'PATCH', body: JSON.stringify(body) })
+        : await api<{ id: string }>('/assets', { method: 'POST', body: JSON.stringify({ ...body, category: f.category }) });
+      // An attachment needs an owner id, so photos can only go up once the asset itself exists.
+      if (photos.length) {
+        try { await uploadPhotos(saved.id, photos); }
+        catch (err) { onSaved(); setError(`Asset saved, but a photo did not upload: ${(err as Error).message}`); return; }
+      }
       onSaved(); onClose();
     } catch (err) { setError((err as Error).message); } finally { setBusy(false); }
   }
@@ -57,6 +65,9 @@ export function AssetDrawer({ open, onClose, onSaved, asset }: { open: boolean; 
             </div>
           </L>
           <L label="Notes"><textarea className="input min-h-[80px]" value={f.notes} onChange={(e) => set('notes', e.target.value)} /></L>
+          <L label="Photos" hint={asset ? 'Added to the ones already on this asset' : 'Uploaded once the asset has been created'}>
+            <PhotoPicker photos={photos} onChange={setPhotos} disabled={busy} />
+          </L>
           {error && <p role="alert" className="text-[13px] text-crit border-l-2 border-crit pl-3">{error}</p>}
         </div>
         <footer className="px-6 py-4 border-t border-line flex justify-end gap-2"><button type="button" onClick={onClose} className="btn-ghost">Cancel</button><button disabled={busy || !f.operatorIds.length} className="btn-primary h-10"><I.Plus /> {busy ? 'Saving…' : asset ? 'Save changes' : 'Register asset'}</button></footer>

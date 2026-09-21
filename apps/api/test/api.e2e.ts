@@ -159,6 +159,29 @@ describe('asset register management', () => {
     await scrub(id);
   });
 
+  it('takes photos against an asset and serves them back, gated by asset:write', async () => {
+    const admin = await login('ADM001'); const opr = await user('OPR001');
+    const id = await newAsset(admin, [opr.id]);
+    const png = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+    const body = { ownerType: 'Asset', ownerId: id, kind: 'PHOTO', contentType: 'image/png', base64: png };
+
+    const up = await request(app.getHttpServer()).post('/api/v1/attachments').set(auth(admin)).send(body);
+    expect(up.status).toBe(201);
+    expect(up.body.url).toContain(id);
+
+    const listed = await request(app.getHttpServer()).get(`/api/v1/attachments?ownerType=Asset&ownerId=${id}`).set(auth(admin));
+    expect(listed.status).toBe(200);
+    expect(listed.body).toHaveLength(1);
+    expect(listed.body[0]).toMatchObject({ kind: 'PHOTO', mimeType: 'image/png' });
+
+    const tec = await login('TEC001'); // TECHNICIAN has no asset:write, so it cannot attach to an asset
+    expect((await request(app.getHttpServer()).post('/api/v1/attachments').set(auth(tec)).send(body)).status).toBe(403);
+    expect((await request(app.getHttpServer()).post('/api/v1/attachments').set(auth(admin)).send({ ...body, contentType: 'image/gif' })).status).toBe(400);
+
+    await prisma.attachment.deleteMany({ where: { ownerType: 'Asset', ownerId: id } });
+    await scrub(id);
+  });
+
   it('blocks status changes and delete while a job card is open — except decommissioning', async () => {
     const admin = await login('ADM001'); const techToken = await login('TEC001');
     const tec = await user('TEC001');

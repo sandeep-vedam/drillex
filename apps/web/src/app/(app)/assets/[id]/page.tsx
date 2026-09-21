@@ -7,6 +7,7 @@ import { StatusChip } from '@/components/StatusChip';
 import { I } from '@/components/Icons';
 import { api, getUser } from '@/lib/api';
 import { AssetDrawer } from '@/components/AssetDrawer';
+import { PhotoPicker, uploadPhotos, type AssetPhoto, type PendingPhoto } from '@/components/PhotoPicker';
 
 type Asset = { id: string; assetNumber: string; name: string; category: string; status: string; make: string; model: string; serialNumber: string; yearOfManufacture: number; commissionedAt: string; siteId?: string; notes?: string | null; operators: { userId: string }[] };
 type JobCard = { id: string; jobNo: string; date: string; jobType: string; status: string; approvedAt?: string; workPerformed: string; hourMeter?: string; parts?: { id: string }[] };
@@ -29,6 +30,8 @@ export default function AssetDetailPage() {
   const [readings, setReadings] = useState<Reading[]>([]);
   const [scheds, setScheds] = useState<Sched[]>([]);
   const [shifts, setShifts] = useState<Shift[]>([]);
+  const [photos, setPhotos] = useState<AssetPhoto[]>([]);
+  const [pending, setPending] = useState<PendingPhoto[]>([]);
   const [tab, setTab] = useState('jobs');
   const [loadError, setLoadError] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -39,13 +42,14 @@ export default function AssetDetailPage() {
   // History lists tolerate a 403 so a role that can see the register but not one of the modules still gets the rest of the page.
   const load = useCallback(async () => {
     try { setAsset(await api<Asset>(`/assets/${id}`)); } catch (e) { setLoadError((e as Error).message); return; }
-    const [jc, dr, ms, sr] = await Promise.all([
+    const [jc, dr, ms, sr, ph] = await Promise.all([
       api<JobCard[]>(`/job-cards?assetId=${id}`).catch(() => [] as JobCard[]),
       api<Reading[]>(`/daily-readings?assetId=${id}`).catch(() => [] as Reading[]),
       api<Sched[]>(`/maintenance/schedules?assetId=${id}`).catch(() => [] as Sched[]),
       api<Shift[]>(`/shift-reports?assetId=${id}`).catch(() => [] as Shift[]),
+      api<AssetPhoto[]>(`/attachments?ownerType=Asset&ownerId=${id}`).catch(() => [] as AssetPhoto[]),
     ]);
-    setJobCards(jc); setReadings(dr); setScheds(ms); setShifts(sr);
+    setJobCards(jc); setReadings(dr); setScheds(ms); setShifts(sr); setPhotos(ph);
   }, [id]);
   useEffect(() => { load(); }, [load]);
 
@@ -66,7 +70,7 @@ export default function AssetDetailPage() {
   if (!asset) return <Shell title="Asset"><div className="card p-8 text-center text-muted">Loading…</div></Shell>;
 
   const nextService = scheds.filter((s) => s.status !== 'COMPLETED' && s.nextDueAt).sort((a, b) => (a.nextDueAt! < b.nextDueAt! ? -1 : 1))[0];
-  const TABS: [string, string, number][] = [['jobs', 'Job cards', jobCards.length], ['readings', 'Daily readings', readings.length], ['maintenance', 'Maintenance', scheds.length], ['shifts', 'Shift production', shifts.length]];
+  const TABS: [string, string, number][] = [['jobs', 'Job cards', jobCards.length], ['readings', 'Daily readings', readings.length], ['maintenance', 'Maintenance', scheds.length], ['shifts', 'Shift production', shifts.length], ['photos', 'Photos', photos.length]];
 
   return (
     <Shell title={`${asset.assetNumber} · ${asset.name}`} actions={<Link href="/assets" className="btn-ghost text-[13px]">← Register</Link>}>
@@ -139,6 +143,26 @@ export default function AssetDetailPage() {
                 <span key="m" className="tnum font-medium">{r.totalMeters}</span>, <span key="u" className="font-mono text-[12px] text-muted">{r.user?.employeeId}</span>,
                 <StatusChip key="s" status={r.status} />,
               ])} empty="No shift reports for this asset." total={shifts.length} />
+            )}
+            {tab === 'photos' && (
+              <div className="p-5 flex flex-col gap-4">
+                {photos.length > 0 ? (
+                  <div className="flex flex-wrap gap-3">
+                    {photos.map((p) => (
+                      <a key={p.id} href={p.url} target="_blank" rel="noreferrer" title={`Added ${fmtDate(p.createdAt)}`}>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={p.url} alt="Asset photo" className="h-28 w-28 object-cover border border-line hover:border-navy-600" />
+                      </a>
+                    ))}
+                  </div>
+                ) : <p className="text-[14px] text-muted">No photos on this asset yet.</p>}
+                {canWrite && (
+                  <div className="border-t border-line pt-4 flex flex-col gap-3">
+                    <PhotoPicker photos={pending} onChange={setPending} disabled={busy} />
+                    {pending.length > 0 && <button disabled={busy} onClick={() => act(async () => { await uploadPhotos(id, pending); setPending([]); })} className="btn-primary h-9 text-[13px] self-start">{busy ? 'Uploading…' : `Upload ${pending.length} photo${pending.length > 1 ? 's' : ''}`}</button>}
+                  </div>
+                )}
+              </div>
             )}
           </div>
         </section>
