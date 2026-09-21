@@ -151,6 +151,11 @@ describe('asset register management', () => {
     expect(edited.body.operators.map((o: { userId: string }) => o.userId)).toEqual([tec.id]); // only the open window is returned
     expect(await prisma.assetOperator.findUniqueOrThrow({ where: { assetId_userId: { assetId: id, userId: opr.id } } })).toMatchObject({ validTo: expect.any(Date) }); // history kept, not deleted
 
+    const one = await request(app.getHttpServer()).get(`/api/v1/assets/${id}`).set(auth(admin)); // the detail page reads a single asset
+    expect(one.status).toBe(200);
+    expect(one.body).toMatchObject({ id, name: '[e2e] renamed', assetNumber: before.assetNumber });
+    expect((await request(app.getHttpServer()).get(`/api/v1/assets/${crypto.randomUUID()}`).set(auth(admin))).status).toBe(404);
+
     await scrub(id);
   });
 

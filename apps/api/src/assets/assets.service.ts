@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { z } from 'zod';
 import { AssetPrefix, AssetSchema, AssetUpdateSchema, OPEN_JOB_STATUSES } from '@drillex/shared';
 import { PrismaService } from '../prisma/prisma.service';
@@ -22,6 +22,13 @@ export class AssetsService {
 
   list(u: AuthUser) {
     return this.prisma.asset.findMany({ where: { ...this.scopeWhere(u), deletedAt: null }, include: this.include, orderBy: { assetNumber: 'asc' } });
+  }
+
+  /** Out-of-scope assets 404 rather than 403 so the register does not leak which assets exist elsewhere. */
+  async get(u: AuthUser, id: string) {
+    const asset = await this.prisma.asset.findFirst({ where: { id, deletedAt: null, ...this.scopeWhere(u) }, include: this.include });
+    if (!asset) throw new NotFoundException('Asset not found');
+    return asset;
   }
 
   /** Asset numbers are immutable and never reused (SRS 3.1): take max sequence per prefix, +1. */
