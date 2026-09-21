@@ -96,7 +96,7 @@ describe('shift reports (SRS §4) + approval', () => {
 describe('offline sync (SRS §9.2)', () => {
   it('replays are idempotent and same-day duplicates become conflicts', async () => {
     const t = await login('OPR001');
-    const asset = await prisma.asset.findFirstOrThrow({ where: { assetNumber: 'DRL-002' } });
+    const asset = await prisma.asset.findFirstOrThrow({ where: { assetNumber: 'DRL-001' } });
     const date = day(402); const id = crypto.randomUUID();
     await prisma.dailyReading.deleteMany({ where: { assetId: asset.id, date: new Date(date) } });
     const payload = { id, assetId: asset.id, date, hourMeter: 1, fuelStart: 2, fuelEnd: 1, engineOil: 'OK', hydraulicOil: 'OK', coolant: 'OK', airFilter: 'OK', battery: 'OK', preStartChecklistDone: true, warningLights: false, unusualNoises: false, leaks: false, conditionRating: 5, notes: '[e2e] sync' };
@@ -110,7 +110,7 @@ describe('offline sync (SRS §9.2)', () => {
 
   it('one malformed op envelope is rejected individually — it does not fail the whole batch', async () => {
     const t = await login('OPR001');
-    const asset = await prisma.asset.findFirstOrThrow({ where: { assetNumber: 'DRL-002' } });
+    const asset = await prisma.asset.findFirstOrThrow({ where: { assetNumber: 'DRL-001' } });
     const date = day(403);
     await prisma.dailyReading.deleteMany({ where: { assetId: asset.id, date: new Date(date) } });
     const good = { id: crypto.randomUUID(), assetId: asset.id, date, hourMeter: 1, fuelStart: 2, fuelEnd: 1, engineOil: 'OK', hydraulicOil: 'OK', coolant: 'OK', airFilter: 'OK', battery: 'OK', preStartChecklistDone: true, warningLights: false, unusualNoises: false, leaks: false, conditionRating: 5, notes: '[e2e] batch' };
@@ -135,7 +135,7 @@ describe('negative-scenario hardening', () => {
     const t = await login('TEC001');
     const asset = await prisma.asset.findFirstOrThrow({ where: { assetNumber: 'DRL-001' } });
     const part = await prisma.part.findUniqueOrThrow({ where: { partNo: 'BLT-ALT-07' } }); // seeded qtyOnHand: 2
-    const r = await request(app.getHttpServer()).post('/api/v1/job-cards').set(auth(t)).send({ assetId: asset.id, date: day(0), jobType: 'CORRECTIVE', workPerformed: '[e2e] insufficient stock test', parts: [{ partId: part.id, quantity: part.qtyOnHand + 50 }] });
+    const r = await request(app.getHttpServer()).post('/api/v1/job-cards').set(auth(t)).send({ assetId: asset.id, date: day(0), jobType: 'BREAKDOWN_REPAIR', workPerformed: '[e2e] insufficient stock test', parts: [{ partId: part.id, quantity: part.qtyOnHand + 50 }] });
     expect(r.status).toBe(400);
     expect(await prisma.part.findUniqueOrThrow({ where: { id: part.id } })).toMatchObject({ qtyOnHand: part.qtyOnHand });
   });
