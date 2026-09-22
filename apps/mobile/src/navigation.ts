@@ -4,6 +4,7 @@ export type RootStackParamList = {
   Outbox: undefined;
   Notifications: undefined;
   Reports: undefined;
+  History: undefined;
   Maintenance: undefined;
   JobCards: undefined;
   JobCardNew: { assetId?: string };

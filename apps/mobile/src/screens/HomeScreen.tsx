@@ -35,6 +35,7 @@ export default function HomeScreen({ navigation }: Props) {
   const tasks = [
     ...(isTech ? [{ key: 'maint', title: 'Maintenance services', sub: 'View assigned services · mark completed', tone: colors.hazard, onPress: () => navigation.navigate('Maintenance') }, { key: 'jc', title: 'Job cards', sub: 'Record work done on a machine', tone: colors.navy700, onPress: () => navigation.navigate('JobCards') }] : []),
     ...(canReports ? [{ key: 'reports', title: 'Reports', sub: 'Monthly & custom reports · PDF / Excel', tone: colors.ok, onPress: () => navigation.navigate('Reports') }] : []),
+    { key: 'history', title: 'My submissions', sub: 'Machine readings & drilled production already sent', tone: colors.navy800, onPress: () => navigation.navigate('History') },
     { key: 'reading', title: 'Daily machine readings', sub: summary ? (summary.readingsToday ? 'Submitted today' : 'Due today — not yet submitted') : '—', tone: summary?.readingsToday ? colors.ok : colors.hazard },
     { key: 'shift', title: 'Shift production report', sub: 'Submit at end of shift', tone: colors.navy700 },
   ];

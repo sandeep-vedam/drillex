@@ -25,7 +25,39 @@ export async function clearSession() { await Keychain.resetGenericPassword({ ser
 
 export async function getDeviceId() { return DeviceInfo.getUniqueId(); }
 
-export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
+/** Thrown once the refresh token itself is rejected — the only case where the user has to sign in again. */
+export class SessionExpiredError extends Error {
+  constructor() { super('Session expired — please sign in again.'); this.name = 'SessionExpiredError'; }
+}
+let onSessionExpired: (() => void) | null = null;
+export function setSessionExpiredHandler(fn: (() => void) | null) { onSessionExpired = fn; }
+
+/**
+ * Access tokens last 15 minutes, so anything long-lived — the outbox above all — has to refresh or it starts
+ * 401ing and never recovers. Refresh tokens are rotated server-side, so concurrent 401s share one in-flight
+ * refresh instead of each spending the token and invalidating the others.
+ */
+type RefreshResult = 'refreshed' | 'invalid' | 'unreachable';
+let refreshing: Promise<RefreshResult> | null = null;
+async function refreshSession(): Promise<RefreshResult> {
+  if (!refreshing) {
+    refreshing = (async (): Promise<RefreshResult> => {
+      const session = await loadSession();
+      if (!session?.refreshToken) return 'invalid';
+      let res: Response;
+      try {
+        res = await fetch(`${API_URL}/auth/refresh`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ refreshToken: session.refreshToken }) });
+      } catch {
+        return 'unreachable'; // offline or server down: keep the session, the caller retries later
+      }
+      if (!res.ok) return 'invalid';
+      try { await saveSession((await res.json()) as Session); return 'refreshed'; } catch { return 'unreachable'; }
+    })();
+  }
+  try { return await refreshing; } finally { refreshing = null; }
+}
+
+export async function api<T>(path: string, init: RequestInit = {}, isRetry = false): Promise<T> {
   const session = await loadSession();
   const res = await fetch(`${API_URL}${path}`, {
     ...init,
@@ -35,6 +67,12 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
       ...((init.headers as Record<string, string>) ?? {}),
     },
   });
+  if (res.status === 401 && !isRetry && !path.startsWith('/auth/')) {
+    const outcome = await refreshSession();
+    if (outcome === 'refreshed') return api<T>(path, init, true); // the access token had merely expired
+    if (outcome === 'invalid') { await clearSession(); onSessionExpired?.(); throw new SessionExpiredError(); }
+    // 'unreachable' falls through: queued work stays queued and is retried, the session is left intact
+  }
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
     throw new Error(body?.message ?? res.statusText);

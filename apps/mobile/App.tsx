@@ -14,9 +14,10 @@ import JobCardsScreen from './src/screens/JobCardsScreen';
 import JobCardNewScreen from './src/screens/JobCardNewScreen';
 import NotificationsScreen from './src/screens/NotificationsScreen';
 import ReportsScreen from './src/screens/ReportsScreen';
+import HistoryScreen from './src/screens/HistoryScreen';
 import { SyncBadge } from './src/ui/SyncBadge';
 import { startSyncLoop } from './src/sync/outbox';
-import { loadSession } from './src/lib/api';
+import { loadSession, setSessionExpiredHandler } from './src/lib/api';
 import type { RootStackParamList } from './src/navigation';
 import { IdleLockProvider, useIdleLock } from './src/security/IdleLock';
 
@@ -36,6 +37,7 @@ function Root({ initial }: { initial: 'Login' | 'Home' }) {
           <Stack.Screen name="Outbox" component={OutboxScreen} options={{ title: 'Sync queue' }} />
           <Stack.Screen name="Notifications" component={NotificationsScreen} options={{ title: 'Notifications' }} />
           <Stack.Screen name="Reports" component={ReportsScreen} options={{ title: 'Reports' }} />
+          <Stack.Screen name="History" component={HistoryScreen} options={{ title: 'My submissions' }} />
           <Stack.Screen name="Maintenance" component={MaintenanceScreen} options={{ title: 'Maintenance' }} />
           <Stack.Screen name="JobCards" component={JobCardsScreen} options={{ title: 'Job cards' }} />
           <Stack.Screen name="JobCardNew" component={JobCardNewScreen} options={{ title: 'New job card' }} />
@@ -54,7 +56,13 @@ function Root({ initial }: { initial: 'Login' | 'Home' }) {
 
 export default function App() {
   const [initial, setInitial] = useState<'Login' | 'Home' | null>(null);
-  useEffect(() => { loadSession().then((s) => setInitial(s ? 'Home' : 'Login')).catch(() => setInitial('Login')); return startSyncLoop(); }, []);
+  useEffect(() => {
+    loadSession().then((s) => setInitial(s ? 'Home' : 'Login')).catch(() => setInitial('Login'));
+    // A rejected refresh token is the one auth failure the user has to act on — send them back to Login.
+    setSessionExpiredHandler(() => { if (navRef.isReady()) navRef.reset({ index: 0, routes: [{ name: 'Login' }] }); });
+    const stopSync = startSyncLoop();
+    return () => { setSessionExpiredHandler(null); stopSync(); };
+  }, []);
   if (!initial) return <View style={{ flex: 1, justifyContent: 'center' }}><ActivityIndicator /></View>;
   return (
     <SafeAreaProvider>
