@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, KeyboardAvoidingView, ScrollView } from 'react-native';
 import { api, clearSession, getDeviceId, loadSession, saveSession, Session } from '../lib/api';
 import { Button, Field, Mark } from '../ui';
 import { colors } from '../ui/theme';
@@ -29,7 +29,8 @@ export default function LockScreen({ onUnlock, onSignedOut }: { onUnlock: () => 
   async function signOut() { await clearSession(); onSignedOut(); }
 
   return (
-    <View style={s.wrap}>
+    <KeyboardAvoidingView behavior="padding" style={{ flex: 1, backgroundColor: colors.canvas }}>
+      <ScrollView contentContainerStyle={s.wrap} keyboardShouldPersistTaps="handled">
       <Mark size={44} />
       <Text style={s.h1}>Session locked</Text>
       <Text style={s.sub}>Locked after 15 minutes of inactivity. Signed in as <Text style={{ fontFamily: 'Menlo', color: colors.ink }}>{who}</Text>.</Text>
@@ -40,11 +41,12 @@ export default function LockScreen({ onUnlock, onSignedOut }: { onUnlock: () => 
         <Button title={busy ? 'Unlocking…' : 'Unlock with password'} onPress={withPassword} disabled={busy || !password} variant={bio ? 'ghost' : 'primary'} />
         <Button title="Sign out" onPress={signOut} variant="ghost" />
       </View>
-    </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 const s = StyleSheet.create({
-  wrap: { flex: 1, backgroundColor: colors.canvas, padding: 24, justifyContent: 'center', alignItems: 'flex-start' },
+  wrap: { flexGrow: 1, padding: 24, justifyContent: 'center', alignItems: 'flex-start' },
   h1: { fontSize: 30, fontWeight: '800', color: colors.navy800, marginTop: 16 },
   sub: { color: colors.muted, fontSize: 14, marginTop: 4 },
   err: { color: colors.crit },

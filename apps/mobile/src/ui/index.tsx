@@ -1,4 +1,4 @@
-import React, { type ReactNode } from 'react';
+import React, { useState, type ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View, type TextInputProps, type ViewStyle } from 'react-native';
 import { colors, font } from './theme';
 
@@ -12,11 +12,37 @@ export function Mark({ size = 36 }: { size?: number }) {
     </View>
   );
 }
-export function Field({ label, hint, ...rest }: TextInputProps & { label: string; hint?: string }) {
+export function Field({ label, hint, secureTextEntry, style, ...rest }: TextInputProps & { label: string; hint?: string }) {
+  const [shown, setShown] = useState(false);
+  const secure = !!secureTextEntry;
   return (
     <View style={{ gap: 6 }}>
       <Text style={s.label}>{label}{hint ? <Text style={{ color: colors.muted, fontWeight: '400' }}>  {hint}</Text> : null}</Text>
-      <TextInput placeholderTextColor="#9AA6B3" style={s.input} {...rest} />
+      <View>
+        <TextInput placeholderTextColor="#9AA6B3" secureTextEntry={secure && !shown} {...rest} style={[s.input, secure && { paddingRight: 52 }, style]} />
+        {secure && (
+          <Pressable
+            onPress={() => setShown((v) => !v)}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel={shown ? 'Hide password' : 'Show password'}
+            style={s.eyeBtn}
+          >
+            <Eye off={!shown} />
+          </Pressable>
+        )}
+      </View>
+    </View>
+  );
+}
+
+/** Drawn from plain views — the app has no SVG or icon-font dependency. */
+function Eye({ off }: { off: boolean }) {
+  return (
+    <View style={{ width: 22, height: 16, alignItems: 'center', justifyContent: 'center' }}>
+      <View style={s.eyeLens} />
+      <View style={s.eyePupil} />
+      {off && <View style={s.eyeSlash} />}
     </View>
   );
 }
@@ -60,6 +86,10 @@ export function Stat({ label, value, tone = colors.navy700 }: { label: string; v
 const s = StyleSheet.create({
   eyebrow: { fontSize: 11, fontWeight: '700', letterSpacing: 1.6, textTransform: 'uppercase', color: colors.muted },
   label: { fontSize: 13, fontWeight: '600', color: colors.ink },
+  eyeBtn: { position: 'absolute', right: 0, top: 0, bottom: 0, width: 48, alignItems: 'center', justifyContent: 'center' },
+  eyeLens: { width: 21, height: 13, borderWidth: 1.6, borderColor: colors.muted, borderRadius: 9 },
+  eyePupil: { position: 'absolute', width: 6.5, height: 6.5, borderRadius: 3.25, backgroundColor: colors.muted },
+  eyeSlash: { position: 'absolute', width: 24, height: 1.6, backgroundColor: colors.muted, transform: [{ rotate: '-45deg' }] },
   input: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line, paddingHorizontal: 14, paddingVertical: 13, fontSize: 16, color: colors.ink },
   btn: { backgroundColor: colors.navy800, paddingVertical: 15, alignItems: 'center' },
   btnGhost: { backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.line },

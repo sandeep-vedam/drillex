@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Text, StyleSheet, KeyboardAvoidingView, Platform, View, ScrollView } from 'react-native';
+import React, { useRef, useState } from 'react';
+import { Text, StyleSheet, KeyboardAvoidingView, View, ScrollView } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { api, getDeviceId, saveSession, Session } from '../lib/api';
 import type { RootStackParamList } from '../navigation';
@@ -13,6 +13,10 @@ export default function LoginScreen({ navigation }: Props) {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const scroller = useRef<React.ComponentRef<typeof ScrollView>>(null);
+  // Android is edge-to-edge (gradle.properties), so the window no longer resizes for the keyboard and the
+  // sheet would sit behind it; padding lifts it and this scrolls the focused field fully into view.
+  const revealForm = () => setTimeout(() => scroller.current?.scrollToEnd({ animated: true }), 150);
 
   async function submit() {
     setBusy(true); setError(null);
@@ -31,8 +35,8 @@ export default function LoginScreen({ navigation }: Props) {
   }
 
   return (
-    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, backgroundColor: colors.navy900 }}>
-      <ScrollView contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled">
+    <KeyboardAvoidingView behavior="padding" style={{ flex: 1, backgroundColor: colors.navy900 }}>
+      <ScrollView ref={scroller} contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
         <View style={s.hero}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
             <Mark size={34} />
@@ -49,8 +53,8 @@ export default function LoginScreen({ navigation }: Props) {
           <Text style={s.h2}>Welcome back</Text>
           <Text style={s.sub}>Use your Employee ID and personal password.</Text>
           <View style={{ gap: 14, marginTop: 18 }}>
-            <Field label="Employee ID" placeholder="OPR001" autoCapitalize="characters" autoCorrect={false} value={employeeId} onChangeText={setEmployeeId} textContentType="username" />
-            <Field label="Password" placeholder="••••••••" secureTextEntry value={password} onChangeText={setPassword} textContentType="password" onSubmitEditing={submit} />
+            <Field onFocus={revealForm} label="Employee ID" placeholder="OPR001" autoCapitalize="characters" autoCorrect={false} value={employeeId} onChangeText={setEmployeeId} textContentType="username" />
+            <Field onFocus={revealForm} label="Password" placeholder="••••••••" secureTextEntry value={password} onChangeText={setPassword} textContentType="password" onSubmitEditing={submit} />
             {error && <Text style={s.err}>{error}</Text>}
             <Button title={busy ? 'Signing in…' : 'Sign in'} onPress={submit} disabled={busy} />
             <Text style={s.help}>Forgot your password? Ask your supervisor or administrator to reset it.</Text>
