@@ -39,23 +39,31 @@ export function setSessionExpiredHandler(fn: (() => void) | null) { onSessionExp
  */
 type RefreshResult = 'refreshed' | 'invalid' | 'unreachable';
 let refreshing: Promise<RefreshResult> | null = null;
-async function refreshSession(): Promise<RefreshResult> {
+async function refreshSession(usedAccessToken?: string): Promise<RefreshResult> {
+  const current = await loadSession();
+  // A request that was already in flight when someone else refreshed comes back 401 holding a stale token;
+  // the stored one is already new, so retry with it rather than rotating a second time.
+  if (usedAccessToken && current && current.accessToken !== usedAccessToken) return 'refreshed';
   if (!refreshing) {
+    // The guard is cleared when the request settles, not by each awaiter, or a late 401 starts a second
+    // rotation — and two overlapping rotations revoke each other, which signs the user out.
     refreshing = (async (): Promise<RefreshResult> => {
-      const session = await loadSession();
-      if (!session?.refreshToken) return 'invalid';
+      if (!current?.refreshToken) return 'invalid';
       let res: Response;
       try {
-        res = await fetch(`${API_URL}/auth/refresh`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ refreshToken: session.refreshToken }) });
+        res = await fetch(`${API_URL}/auth/refresh`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ refreshToken: current.refreshToken }) });
       } catch {
         return 'unreachable'; // offline or server down: keep the session, the caller retries later
       }
       if (!res.ok) return 'invalid';
       try { await saveSession((await res.json()) as Session); return 'refreshed'; } catch { return 'unreachable'; }
-    })();
+    })().finally(() => { refreshing = null; });
   }
-  try { return await refreshing; } finally { refreshing = null; }
+  return refreshing;
 }
+
+/** Endpoints that mint tokens from credentials: a 401 from these is a real rejection, not an expired access token. */
+const ISSUES_TOKENS = ['/auth/login', '/auth/refresh', '/auth/2fa'];
 
 export async function api<T>(path: string, init: RequestInit = {}, isRetry = false): Promise<T> {
   const session = await loadSession();
@@ -67,8 +75,8 @@ export async function api<T>(path: string, init: RequestInit = {}, isRetry = fal
       ...((init.headers as Record<string, string>) ?? {}),
     },
   });
-  if (res.status === 401 && !isRetry && !path.startsWith('/auth/')) {
-    const outcome = await refreshSession();
+  if (res.status === 401 && !isRetry && !ISSUES_TOKENS.some((p) => path.startsWith(p))) {
+    const outcome = await refreshSession(session?.accessToken);
     if (outcome === 'refreshed') return api<T>(path, init, true); // the access token had merely expired
     if (outcome === 'invalid') { await clearSession(); onSessionExpired?.(); throw new SessionExpiredError(); }
     // 'unreachable' falls through: queued work stays queued and is retried, the session is left intact

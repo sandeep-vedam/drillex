@@ -1,13 +1,10 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, FlatList, StyleSheet, Pressable, RefreshControl } from 'react-native';
-import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { api } from '../lib/api';
 import { cached } from '../sync/cache';
-import type { RootStackParamList } from '../navigation';
 import { Card, Eyebrow, StatusChip } from '../ui';
 import { colors } from '../ui/theme';
 
-type Props = NativeStackScreenProps<RootStackParamList, 'History'>;
 type Asset = { assetNumber: string; name: string };
 type Reading = { id: string; date: string; hourMeter: string; fuelConsumed: string; conditionRating: number; warningLights: boolean; leaks: boolean; unusualNoises: boolean; asset: Asset; user: { employeeId: string } };
 type Shift = { id: string; date: string; shift: string; holeRef: string; totalMeters: string; holesCompleted: number; status: string; asset: Asset; user: { employeeId: string } };
@@ -15,7 +12,7 @@ type Shift = { id: string; date: string; shift: string; holeRef: string; totalMe
 const fmtDate = (d: string) => new Date(d).toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' });
 const TABS = [['readings', 'Machine readings'], ['shifts', 'Drilled production']] as const;
 
-export default function HistoryScreen({}: Props) {
+export default function HistoryScreen() {
   const [tab, setTab] = useState<'readings' | 'shifts'>('readings');
   const [readings, setReadings] = useState<Reading[]>([]);
   const [shifts, setShifts] = useState<Shift[]>([]);
@@ -23,15 +20,17 @@ export default function HistoryScreen({}: Props) {
   const [refreshing, setRefreshing] = useState(false);
 
   // The API scopes both lists to the machines this operator is assigned to, so no filtering is needed here.
+  // Settled rather than all: a role allowed to read one list but not the other still gets the half it can see.
   const load = useCallback(async () => {
-    try {
-      const [r, s] = await Promise.all([
-        cached('history.readings', () => api<Reading[]>('/daily-readings')),
-        cached('history.shifts', () => api<Shift[]>('/shift-reports')),
-      ]);
-      setReadings(r.data); setShifts(s.data);
-      setNote(r.fromCache || s.fromCache ? 'Offline — showing the last synced history.' : null);
-    } catch (e) { setNote((e as Error).message); }
+    const [r, sh] = await Promise.allSettled([
+      cached('history.readings', () => api<Reading[]>('/daily-readings')),
+      cached('history.shifts', () => api<Shift[]>('/shift-reports')),
+    ]);
+    if (r.status === 'fulfilled') setReadings(r.value.data);
+    if (sh.status === 'fulfilled') setShifts(sh.value.data);
+    const stale = (r.status === 'fulfilled' && r.value.fromCache) || (sh.status === 'fulfilled' && sh.value.fromCache);
+    if (r.status === 'rejected' && sh.status === 'rejected') setNote((r.reason as Error).message);
+    else setNote(stale ? 'Offline — showing the last synced history.' : null);
   }, []);
   useEffect(() => { load(); }, [load]);
 
