@@ -38,9 +38,10 @@ export default function JobCardNewScreen({ route, navigation }: Props) {
     if (f.status === 'COMPLETED' && !signature) { setError('Sign the job card before marking it completed.'); return; }
     setBusy(true);
     try {
+      // Queue the record before its attachments: an attachment cannot be stored until its owner exists.
+      await enqueue('job_card', payload, `${asset?.assetNumber} · job card (${f.jobType.toLowerCase().replace('_', ' ')})`);
       if (signature && sigId) await enqueue('attachment', { id: sigId, ownerType: 'JobCard', ownerId: id, kind: 'SIGNATURE', contentType: 'image/png', base64: signature.replace(/^data:image\/png;base64,/, '') }, `${asset?.assetNumber} · job card signature`);
       for (const p of [...before, ...after]) await enqueue('attachment', { id: uuid(), ownerType: 'JobCard', ownerId: id, kind: 'PHOTO', contentType: p.type, base64: p.base64 }, `${asset?.assetNumber} · job card photo`);
-      await enqueue('job_card', payload, `${asset?.assetNumber} · job card (${f.jobType.toLowerCase().replace('_', ' ')})`);
       Alert.alert('Job card saved', 'Saved on this device and will sync automatically. The machine is marked Under Maintenance while the job is open.', [{ text: 'OK', onPress: () => navigation.goBack() }]);
     } catch (e) { setError((e as Error).message); } finally { setBusy(false); }
   }

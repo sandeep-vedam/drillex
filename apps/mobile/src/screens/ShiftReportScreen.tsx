@@ -49,8 +49,9 @@ export default function ShiftReportScreen({ route, navigation }: Props) {
     if (!signature) { setError('Please sign the report.'); return; }
     setBusy(true);
     try {
-      await enqueue('attachment', { id: sigId, ownerType: 'ShiftReport', ownerId: reportId, kind: 'SIGNATURE', contentType: 'image/png', base64: signature.replace(/^data:image\/png;base64,/, '') }, `${assetNumber} · signature`);
+      // Queue the record before its attachments: an attachment cannot be stored until its owner exists.
       await enqueue('shift_report', payload, `${assetNumber} · ${f.shift.toLowerCase()} shift ${payload.date}`);
+      await enqueue('attachment', { id: sigId, ownerType: 'ShiftReport', ownerId: reportId, kind: 'SIGNATURE', contentType: 'image/png', base64: signature.replace(/^data:image\/png;base64,/, '') }, `${assetNumber} · signature`);
       Alert.alert('Shift report saved', `${total ?? 0} m recorded. It will sync and your supervisor will be asked to approve it.`, [{ text: 'OK', onPress: () => navigation.goBack() }]);
     } catch (e) { setError((e as Error).message); } finally { setBusy(false); }
   }

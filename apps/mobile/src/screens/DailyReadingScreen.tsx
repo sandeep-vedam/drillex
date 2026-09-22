@@ -53,9 +53,10 @@ export default function DailyReadingScreen({ route, navigation }: Props) {
     setBusy(true);
     try {
       // Attachments first, then the record — all idempotent by client UUID; synced in order when online.
+      // Queue the record before its attachments: an attachment cannot be stored until its owner exists.
+      await enqueue('daily_reading', payload, `${assetNumber} · daily reading ${payload.date}`);
       await enqueue('attachment', { id: sigId, ownerType: 'DailyReading', ownerId: readingId, kind: 'SIGNATURE', contentType: 'image/png', base64: signature.replace(/^data:image\/png;base64,/, '') }, `${assetNumber} · signature`);
       for (const p of photos) await enqueue('attachment', { id: uuid(), ownerType: 'DailyReading', ownerId: readingId, kind: 'PHOTO', contentType: p.type, base64: p.base64 }, `${assetNumber} · photo`);
-      await enqueue('daily_reading', payload, `${assetNumber} · daily reading ${payload.date}`);
       Alert.alert('Reading saved', alerts.length ? `Supervisor and maintenance will be alerted (${alerts.length} flag${alerts.length > 1 ? 's' : ''}). It will sync automatically.` : 'Saved on this device and will sync automatically.', [{ text: 'OK', onPress: () => navigation.goBack() }]);
     } catch (e) { setError((e as Error).message); } finally { setBusy(false); }
   }
