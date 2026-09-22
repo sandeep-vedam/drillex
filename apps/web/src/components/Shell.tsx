@@ -5,24 +5,27 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { Wordmark } from './Brand';
 import { I } from './Icons';
 import { api, getUser, signOut, type SessionUser } from '@/lib/api';
+import { can, type Permission, type Role } from '@drillex/shared';
 
+// SRS FR-9.1.1: one permission matrix applied identically across API, web and mobile. Each entry names the
+// permission its page needs, so the menu can never offer less (or more) than the API will actually allow.
 const NAV = [
-  { href: '/dashboard', label: 'Dashboard', icon: I.Dashboard, roles: ['*'] },
-  { href: '/assets', label: 'Asset register', icon: I.Asset, roles: ['ADMIN', 'MANAGER', 'SUPERVISOR'] },
-  { href: '/shift-reports', label: 'Shift production', icon: I.Drill, roles: ['SUPERVISOR', 'MANAGER'] },
-  { href: '/readings', label: 'Daily readings', icon: I.Gauge, roles: ['SUPERVISOR', 'MANAGER'] },
-  { href: '/maintenance', label: 'Maintenance', icon: I.Wrench, roles: ['TECHNICIAN', 'SUPERVISOR', 'MANAGER'] },
-  { href: '/job-cards', label: 'Job cards', icon: I.Card, roles: ['TECHNICIAN', 'SUPERVISOR', 'MANAGER'] },
-  { href: '/parts', label: 'Parts inventory', icon: I.Box, roles: ['TECHNICIAN', 'MANAGER', 'ADMIN'] },
-  { href: '/reports', label: 'Reports', icon: I.Report, roles: ['SUPERVISOR', 'MANAGER', 'TECHNICIAN', 'ADMIN'] },
-];
+  { href: '/dashboard', label: 'Dashboard', icon: I.Dashboard, perm: null },
+  { href: '/assets', label: 'Asset register', icon: I.Asset, perm: 'asset:read' },
+  { href: '/shift-reports', label: 'Shift production', icon: I.Drill, perm: 'shift_report:read' },
+  { href: '/readings', label: 'Daily readings', icon: I.Gauge, perm: 'daily_reading:read' },
+  { href: '/maintenance', label: 'Maintenance', icon: I.Wrench, perm: 'maintenance:read' },
+  { href: '/job-cards', label: 'Job cards', icon: I.Card, perm: 'job_card:read' },
+  { href: '/parts', label: 'Parts inventory', icon: I.Box, perm: 'parts:read' },
+  { href: '/reports', label: 'Reports', icon: I.Report, perm: 'report:read' },
+] as const;
 const ADMIN = [
-  { href: '/sync-conflicts', label: 'Sync conflicts', icon: I.Sync, roles: ['SUPERVISOR', 'MANAGER'] },
-  { href: '/users', label: 'User management', icon: I.Users, roles: ['ADMIN'] },
-  { href: '/devices', label: 'Devices', icon: I.Settings, roles: ['ADMIN'] },
-  { href: '/settings', label: 'Settings', icon: I.Settings, roles: ['*'] },
-];
-const visible = (role: string | undefined) => (n: { roles: string[] }) => n.roles.includes('*') || (role ? n.roles.includes(role) : false);
+  { href: '/sync-conflicts', label: 'Sync conflicts', icon: I.Sync, perm: 'shift_report:approve' },
+  { href: '/users', label: 'User management', icon: I.Users, perm: 'user:manage' },
+  { href: '/devices', label: 'Devices', icon: I.Settings, perm: 'user:manage' },
+  { href: '/settings', label: 'Settings', icon: I.Settings, perm: null },
+] as const;
+const visible = (role: string | undefined) => (n: { perm: Permission | null }) => n.perm === null || (!!role && !!can(role as Role, n.perm));
 
 export function Shell({ children, title, actions }: { children: ReactNode; title: string; actions?: ReactNode }) {
   const path = usePathname();

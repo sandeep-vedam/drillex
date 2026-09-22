@@ -6,6 +6,7 @@ import { cached } from '../sync/cache';
 import type { RootStackParamList } from '../navigation';
 import { Card, Eyebrow, Stat, StatusChip } from '../ui';
 import { colors } from '../ui/theme';
+import { can, type Role } from '@drillex/shared';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
 type Asset = { id: string; assetNumber: string; name: string; status: string; make: string; model: string; siteId: string; category: string };
@@ -30,16 +31,18 @@ export default function HomeScreen({ navigation }: Props) {
   async function signOut() { await clearSession(); navigation.replace('Login'); }
 
   const greeting = new Date().getHours() < 12 ? 'Good morning' : new Date().getHours() < 17 ? 'Good afternoon' : 'Good evening';
-  const isTech = who?.role === 'TECHNICIAN' || who?.role === 'SUPERVISOR';
-  // Technicians hold neither daily_reading:read nor shift_report:read, so the history lists would 403 for them.
-  const canHistory = who ? who.role !== 'TECHNICIAN' : false;
-  const canReports = who?.role === 'SUPERVISOR' || who?.role === 'MANAGER' || who?.role === 'TECHNICIAN';
+  // SRS FR-9.1.1: the same permission matrix the API enforces decides what this screen offers, so the app
+  // never shows a task the server would then refuse.
+  const role = who?.role as Role | undefined;
+  const allow = (p: Parameters<typeof can>[1]) => !!role && !!can(role, p);
   const tasks = [
-    ...(isTech ? [{ key: 'maint', title: 'Maintenance services', sub: 'View assigned services · mark completed', tone: colors.hazard, onPress: () => navigation.navigate('Maintenance') }, { key: 'jc', title: 'Job cards', sub: 'Record work done on a machine', tone: colors.navy700, onPress: () => navigation.navigate('JobCards') }] : []),
-    ...(canReports ? [{ key: 'reports', title: 'Reports', sub: 'Monthly & custom reports · PDF / Excel', tone: colors.ok, onPress: () => navigation.navigate('Reports') }] : []),
-    ...(canHistory ? [{ key: 'history', title: 'My submissions', sub: 'Machine readings & drilled production already sent', tone: colors.navy800, onPress: () => navigation.navigate('History') }] : []),
-    { key: 'reading', title: 'Daily machine readings', sub: summary ? (summary.readingsToday ? 'Submitted today' : 'Due today — not yet submitted') : '—', tone: summary?.readingsToday ? colors.ok : colors.hazard },
-    { key: 'shift', title: 'Shift production report', sub: 'Submit at end of shift', tone: colors.navy700 },
+    ...(allow('maintenance:read') ? [{ key: 'maint', title: 'Maintenance services', sub: 'View assigned services · mark completed', tone: colors.hazard, onPress: () => navigation.navigate('Maintenance') }] : []),
+    ...(allow('job_card:read') ? [{ key: 'jc', title: 'Job cards', sub: 'Record work done on a machine', tone: colors.navy700, onPress: () => navigation.navigate('JobCards') }] : []),
+    ...(allow('parts:read') ? [{ key: 'parts', title: 'Parts store', sub: 'Search stock levels before a job', tone: colors.steel, onPress: () => navigation.navigate('Parts') }] : []),
+    ...(allow('report:read') ? [{ key: 'reports', title: 'Reports', sub: 'Monthly & custom reports · PDF / Excel', tone: colors.ok, onPress: () => navigation.navigate('Reports') }] : []),
+    ...(allow('daily_reading:read') || allow('shift_report:read') ? [{ key: 'history', title: 'My submissions', sub: 'Machine readings & drilled production already sent', tone: colors.navy800, onPress: () => navigation.navigate('History') }] : []),
+    ...(allow('daily_reading:create') ? [{ key: 'reading', title: 'Daily machine readings', sub: summary ? (summary.readingsToday ? 'Submitted today' : 'Due today — not yet submitted') : '—', tone: summary?.readingsToday ? colors.ok : colors.hazard }] : []),
+    ...(allow('shift_report:create') ? [{ key: 'shift', title: 'Shift production report', sub: 'Submit at end of shift', tone: colors.navy700 }] : []),
   ];
 
   return (
@@ -83,10 +86,12 @@ export default function HomeScreen({ navigation }: Props) {
           </View>
           <Text style={s.name}>{item.name}</Text>
           <Text style={s.meta}>{item.make} {item.model}</Text>
-          <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
-            <Pressable style={s.action} onPress={() => navigation.navigate('DailyReading', { assetId: item.id, assetNumber: item.assetNumber, assetName: item.name })}><Text style={s.actionText}>Daily reading</Text></Pressable>
-            {item.category === 'DRILLING' && <Pressable style={[s.action, { backgroundColor: colors.hazard }]} onPress={() => navigation.navigate('ShiftReport', { assetId: item.id, assetNumber: item.assetNumber, assetName: item.name, siteId: item.siteId })}><Text style={s.actionText}>Shift report</Text></Pressable>}
-          </View>
+          {(allow('daily_reading:create') || allow('shift_report:create')) && (
+            <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
+              {allow('daily_reading:create') && <Pressable style={s.action} onPress={() => navigation.navigate('DailyReading', { assetId: item.id, assetNumber: item.assetNumber, assetName: item.name })}><Text style={s.actionText}>Daily reading</Text></Pressable>}
+              {allow('shift_report:create') && item.category === 'DRILLING' && <Pressable style={[s.action, { backgroundColor: colors.hazard }]} onPress={() => navigation.navigate('ShiftReport', { assetId: item.id, assetNumber: item.assetNumber, assetName: item.name, siteId: item.siteId })}><Text style={s.actionText}>Shift report</Text></Pressable>}
+            </View>
+          )}
         </Card>
       )}
     />
