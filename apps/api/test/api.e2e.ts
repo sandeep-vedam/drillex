@@ -108,6 +108,28 @@ describe('offline sync (SRS §9.2)', () => {
     await prisma.syncConflict.deleteMany({ where: { entity: 'DailyReading', versions: { path: ['incoming', 'notes'], equals: '[e2e] sync' } } });
   });
 
+  it('an attachment queued before the record it belongs to is applied, not rejected', async () => {
+    const t = await login('OPR001');
+    const asset = await prisma.asset.findFirstOrThrow({ where: { assetNumber: 'DRL-001' } });
+    const date = day(404); const id = crypto.randomUUID();
+    await prisma.dailyReading.deleteMany({ where: { assetId: asset.id, date: new Date(date) } });
+    const reading = { id, assetId: asset.id, date, hourMeter: 1, fuelStart: 2, fuelEnd: 1, engineOil: 'OK', hydraulicOil: 'OK', coolant: 'OK', airFilter: 'OK', battery: 'OK', preStartChecklistDone: true, warningLights: false, unusualNoises: false, leaks: false, conditionRating: 5, notes: '[e2e] ordering' };
+    const png = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+
+    // The device queues the photo first, which is the order the app submits in.
+    const r = await request(app.getHttpServer()).post('/api/v1/sync/push').set(auth(t)).send({ ops: [
+      { opId: 'att-first', kind: 'attachment', payload: { ownerType: 'DailyReading', ownerId: id, kind: 'PHOTO', contentType: 'image/png', base64: png } },
+      { opId: 'reading', kind: 'daily_reading', payload: reading },
+    ] });
+    expect(r.status).toBe(201);
+    const byId = Object.fromEntries(r.body.results.map((x: { opId: string; status: string }) => [x.opId, x.status]));
+    expect(byId).toEqual({ 'att-first': 'applied', reading: 'applied' });
+    expect(await prisma.attachment.count({ where: { ownerType: 'DailyReading', ownerId: id } })).toBe(1);
+
+    await prisma.attachment.deleteMany({ where: { ownerType: 'DailyReading', ownerId: id } });
+    await prisma.dailyReading.deleteMany({ where: { id } });
+  });
+
   it('one malformed op envelope is rejected individually — it does not fail the whole batch', async () => {
     const t = await login('OPR001');
     const asset = await prisma.asset.findFirstOrThrow({ where: { assetNumber: 'DRL-001' } });
