@@ -28,6 +28,8 @@ export default function HomeScreen({ navigation }: Props) {
     } catch (e) { setError((e as Error).message); }
   }, []);
   useEffect(() => { load(); }, [load]);
+  // Refresh on return, so a newly registered asset appears without a manual pull.
+  useEffect(() => navigation.addListener('focus', load), [navigation, load]);
   async function signOut() { await clearSession(); navigation.replace('Login'); }
 
   const greeting = new Date().getHours() < 12 ? 'Good morning' : new Date().getHours() < 17 ? 'Good afternoon' : 'Good evening';
@@ -36,6 +38,7 @@ export default function HomeScreen({ navigation }: Props) {
   const role = who?.role as Role | undefined;
   const allow = (p: Parameters<typeof can>[1]) => !!role && !!can(role, p);
   const tasks = [
+    ...(allow('asset:write') ? [{ key: 'newasset', title: 'Register an asset', sub: 'Add a machine to the register', tone: colors.hazard, onPress: () => navigation.navigate('AssetNew') }] : []),
     ...(allow('maintenance:read') ? [{ key: 'maint', title: 'Maintenance services', sub: 'View assigned services · mark completed', tone: colors.hazard, onPress: () => navigation.navigate('Maintenance') }] : []),
     ...(allow('job_card:read') ? [{ key: 'jc', title: 'Job cards', sub: 'Record work done on a machine', tone: colors.navy700, onPress: () => navigation.navigate('JobCards') }] : []),
     ...(allow('parts:read') ? [{ key: 'parts', title: 'Parts store', sub: 'Search stock levels before a job', tone: colors.steel, onPress: () => navigation.navigate('Parts') }] : []),

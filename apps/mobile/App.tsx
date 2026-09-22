@@ -16,6 +16,7 @@ import NotificationsScreen from './src/screens/NotificationsScreen';
 import ReportsScreen from './src/screens/ReportsScreen';
 import HistoryScreen from './src/screens/HistoryScreen';
 import PartsScreen from './src/screens/PartsScreen';
+import AssetNewScreen from './src/screens/AssetNewScreen';
 import { SyncBadge } from './src/ui/SyncBadge';
 import { startSyncLoop } from './src/sync/outbox';
 import { loadSession, setSessionExpiredHandler } from './src/lib/api';
@@ -40,6 +41,7 @@ function Root({ initial }: { initial: 'Login' | 'Home' }) {
           <Stack.Screen name="Reports" component={ReportsScreen} options={{ title: 'Reports' }} />
           <Stack.Screen name="History" component={HistoryScreen} options={{ title: 'My submissions' }} />
           <Stack.Screen name="Parts" component={PartsScreen} options={{ title: 'Parts store' }} />
+          <Stack.Screen name="AssetNew" component={AssetNewScreen} options={{ title: 'Register asset' }} />
           <Stack.Screen name="Maintenance" component={MaintenanceScreen} options={{ title: 'Maintenance' }} />
           <Stack.Screen name="JobCards" component={JobCardsScreen} options={{ title: 'Job cards' }} />
           <Stack.Screen name="JobCardNew" component={JobCardNewScreen} options={{ title: 'New job card' }} />
