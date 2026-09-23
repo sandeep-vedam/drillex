@@ -17,6 +17,14 @@ import ReportsScreen from './src/screens/ReportsScreen';
 import HistoryScreen from './src/screens/HistoryScreen';
 import PartsScreen from './src/screens/PartsScreen';
 import AssetNewScreen from './src/screens/AssetNewScreen';
+import RolesScreen from './src/screens/RolesScreen';
+import RoleFormScreen from './src/screens/RoleFormScreen';
+import UsersScreen from './src/screens/UsersScreen';
+import UserNewScreen from './src/screens/UserNewScreen';
+import UserRoleScreen from './src/screens/UserRoleScreen';
+import DevicesScreen from './src/screens/DevicesScreen';
+import TwoFaSettingsScreen from './src/screens/TwoFaSettingsScreen';
+import SyncConflictsScreen from './src/screens/SyncConflictsScreen';
 import { SyncBadge } from './src/ui/SyncBadge';
 import { startSyncLoop } from './src/sync/outbox';
 import { loadSession, setSessionExpiredHandler } from './src/lib/api';
@@ -47,6 +55,14 @@ function Root({ initial }: { initial: 'Login' | 'Home' }) {
           <Stack.Screen name="JobCardNew" component={JobCardNewScreen} options={{ title: 'New job card' }} />
           <Stack.Screen name="DailyReading" component={DailyReadingScreen} options={{ title: 'Daily reading' }} />
           <Stack.Screen name="ShiftReport" component={ShiftReportScreen} options={{ title: 'Shift production report' }} />
+          <Stack.Screen name="Roles" component={RolesScreen} options={{ title: 'Roles & permissions' }} />
+          <Stack.Screen name="RoleForm" component={RoleFormScreen} options={{ title: 'Role' }} />
+          <Stack.Screen name="Users" component={UsersScreen} options={{ title: 'User management' }} />
+          <Stack.Screen name="UserNew" component={UserNewScreen} options={{ title: 'New user' }} />
+          <Stack.Screen name="UserRole" component={UserRoleScreen} options={{ title: 'Change role' }} />
+          <Stack.Screen name="Devices" component={DevicesScreen} options={{ title: 'Devices' }} />
+          <Stack.Screen name="TwoFaSettings" component={TwoFaSettingsScreen} options={{ title: 'Security' }} />
+          <Stack.Screen name="SyncConflicts" component={SyncConflictsScreen} options={{ title: 'Sync conflicts' }} />
         </Stack.Navigator>
       </NavigationContainer>
       {locked && signedIn && (

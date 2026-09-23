@@ -3,6 +3,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { Shell } from '@/components/Shell';
 import { I } from '@/components/Icons';
 import { api, getUser } from '@/lib/api';
+import { useRoleMatrix } from '@/lib/permissions';
+import { can } from '@drillex/shared';
 
 type Kpi = { label: string; value: string | number; hint?: string };
 type Section = { title: string; columns: string[]; rows: (string | number | null)[][]; note?: string };
@@ -17,6 +19,8 @@ export default function ReportsPage() {
   const [doc, setDoc] = useState<Doc | null>(null); const [busy, setBusy] = useState<'preview' | 'generate' | null>(null);
   const [archive, setArchive] = useState<Archived[]>([]); const [error, setError] = useState<string | null>(null); const [toast, setToast] = useState<string | null>(null);
   const me = getUser();
+  const matrix = useRoleMatrix();
+  const canGenerate = !!matrix && !!can(matrix, me?.role, 'report:generate');
   const loadArchive = () => api<Archived[]>('/reports').then(setArchive).catch(() => {});
   useEffect(() => { api<{ type: string; title: string }[]>('/reports/types').then((t) => { setTypes(t); setType((x) => x || t[0]?.type || ''); }).catch((e) => setError(e.message)); loadArchive(); }, []);
   useEffect(() => { if (!type) return; setBusy('preview'); api<Doc>(`/reports/preview?type=${type}&from=${from}&to=${to}`).then(setDoc).catch((e) => setError(e.message)).finally(() => setBusy(null)); }, [type, from, to]);
@@ -25,7 +29,7 @@ export default function ReportsPage() {
   const big = useMemo(() => doc?.sections[0], [doc]);
 
   return (
-    <Shell title="Reports" actions={me?.role !== 'TECHNICIAN' ? <button onClick={generate} disabled={!type || busy === 'generate'} className="btn-primary h-9 text-[13px]"><I.Report /> {busy === 'generate' ? 'Generating…' : 'Generate PDF + Excel'}</button> : undefined}>
+    <Shell title="Reports" actions={canGenerate ? <button onClick={generate} disabled={!type || busy === 'generate'} className="btn-primary h-9 text-[13px]"><I.Report /> {busy === 'generate' ? 'Generating…' : 'Generate PDF + Excel'}</button> : undefined}>
       {toast && <div className="card border-l-4 border-l-ok p-3 flex items-center justify-between text-[14px]"><span>{toast}</span><button onClick={() => setToast(null)} className="btn-ghost text-[12px]">Dismiss</button></div>}
       {error && <p className="text-crit text-sm">{error}</p>}
       <div className="grid xl:grid-cols-[260px_minmax(0,1fr)] gap-6">

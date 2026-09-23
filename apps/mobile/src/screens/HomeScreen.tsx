@@ -6,7 +6,7 @@ import { cached } from '../sync/cache';
 import type { RootStackParamList } from '../navigation';
 import { Card, Eyebrow, Stat, StatusChip } from '../ui';
 import { colors } from '../ui/theme';
-import { can, type Role } from '@drillex/shared';
+import { can, type PermissionMatrix } from '@drillex/shared';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
 type Asset = { id: string; assetNumber: string; name: string; status: string; make: string; model: string; siteId: string; category: string };
@@ -16,14 +16,15 @@ export default function HomeScreen({ navigation }: Props) {
   const [assets, setAssets] = useState<Asset[]>([]);
   const [summary, setSummary] = useState<Summary | null>(null);
   const [who, setWho] = useState<{ employeeId: string; role: string } | null>(null);
+  const [matrix, setMatrix] = useState<PermissionMatrix | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [unread, setUnread] = useState(0);
 
   const load = useCallback(async () => {
     try {
-      const [a, sm, sess] = await Promise.all([cached('assets', () => api<Asset[]>('/assets')), cached('summary', () => api<Summary>('/dashboard/summary')), loadSession()]);
-      setAssets(a.data); setSummary(sm.data); setWho(sess?.user ?? null); setError(a.fromCache ? 'Offline — showing last synced data.' : null);
+      const [a, sm, perms, sess] = await Promise.all([cached('assets', () => api<Asset[]>('/assets')), cached('summary', () => api<Summary>('/dashboard/summary')), cached('permissions', () => api<PermissionMatrix>('/roles/matrix')), loadSession()]);
+      setAssets(a.data); setSummary(sm.data); setMatrix(perms.data); setWho(sess?.user ?? null); setError(a.fromCache ? 'Offline — showing last synced data.' : null);
       api<{ count: number }>('/notifications/unread-count').then((r) => setUnread(r.count)).catch(() => {});
     } catch (e) { setError((e as Error).message); }
   }, []);
@@ -35,8 +36,8 @@ export default function HomeScreen({ navigation }: Props) {
   const greeting = new Date().getHours() < 12 ? 'Good morning' : new Date().getHours() < 17 ? 'Good afternoon' : 'Good evening';
   // SRS FR-9.1.1: the same permission matrix the API enforces decides what this screen offers, so the app
   // never shows a task the server would then refuse.
-  const role = who?.role as Role | undefined;
-  const allow = (p: Parameters<typeof can>[1]) => !!role && !!can(role, p);
+  const role = who?.role;
+  const allow = (p: Parameters<typeof can>[2]) => !!role && !!matrix && !!can(matrix, role, p);
   const tasks = [
     ...(allow('asset:write') ? [{ key: 'newasset', title: 'Register an asset', sub: 'Add a machine to the register', tone: colors.hazard, onPress: () => navigation.navigate('AssetNew') }] : []),
     ...(allow('maintenance:read') ? [{ key: 'maint', title: 'Maintenance services', sub: 'View assigned services · mark completed', tone: colors.hazard, onPress: () => navigation.navigate('Maintenance') }] : []),
@@ -46,6 +47,13 @@ export default function HomeScreen({ navigation }: Props) {
     ...(allow('daily_reading:read') || allow('shift_report:read') ? [{ key: 'history', title: 'My submissions', sub: 'Machine readings & drilled production already sent', tone: colors.navy800, onPress: () => navigation.navigate('History') }] : []),
     ...(allow('daily_reading:create') ? [{ key: 'reading', title: 'Daily machine readings', sub: summary ? (summary.readingsToday ? 'Submitted today' : 'Due today — not yet submitted') : '—', tone: summary?.readingsToday ? colors.ok : colors.hazard }] : []),
     ...(allow('shift_report:create') ? [{ key: 'shift', title: 'Shift production report', sub: 'Submit at end of shift', tone: colors.navy700 }] : []),
+  ];
+  const adminTasks = [
+    ...(allow('role:manage') ? [{ key: 'roles', title: 'Roles & permissions', sub: 'Create roles, edit grants', tone: colors.steel, onPress: () => navigation.navigate('Roles') }] : []),
+    ...(allow('user:manage') ? [{ key: 'users', title: 'User management', sub: 'Create users, reset passwords, change roles', tone: colors.navy700, onPress: () => navigation.navigate('Users') }] : []),
+    ...(allow('user:manage') ? [{ key: 'devices', title: 'Devices', sub: 'Approve or revoke signed-in devices', tone: colors.navy700, onPress: () => navigation.navigate('Devices') }] : []),
+    ...(allow('user:manage') ? [{ key: 'security', title: 'Security', sub: 'Which roles require two-factor authentication', tone: colors.steel, onPress: () => navigation.navigate('TwoFaSettings') }] : []),
+    ...(allow('shift_report:approve') ? [{ key: 'conflicts', title: 'Sync conflicts', sub: 'Review rejected duplicate submissions', tone: colors.hazard, onPress: () => navigation.navigate('SyncConflicts') }] : []),
   ];
 
   return (
@@ -75,6 +83,14 @@ export default function HomeScreen({ navigation }: Props) {
             <Pressable key={t.key} onPress={'onPress' in t ? t.onPress : undefined} disabled={!('onPress' in t)}>
               <Card stripe={t.tone} style={{ paddingLeft: 18 }}>
                 <Text style={s.taskTitle}>{t.title}{'onPress' in t ? '  →' : ''}</Text><Text style={s.taskSub}>{t.sub}</Text>
+              </Card>
+            </Pressable>
+          ))}
+          {adminTasks.length > 0 && <Eyebrow>Admin</Eyebrow>}
+          {adminTasks.map((t) => (
+            <Pressable key={t.key} onPress={t.onPress}>
+              <Card stripe={t.tone} style={{ paddingLeft: 18 }}>
+                <Text style={s.taskTitle}>{t.title}  →</Text><Text style={s.taskSub}>{t.sub}</Text>
               </Card>
             </Pressable>
           ))}

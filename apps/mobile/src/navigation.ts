@@ -1,3 +1,5 @@
+import type { RoleRow } from './screens/RolesScreen';
+
 export type RootStackParamList = {
   Login: undefined;
   Home: undefined;
@@ -12,4 +14,12 @@ export type RootStackParamList = {
   JobCardNew: { assetId?: string };
   DailyReading: { assetId: string; assetNumber: string; assetName: string };
   ShiftReport: { assetId: string; assetNumber: string; assetName: string; siteId: string };
+  Roles: undefined;
+  RoleForm: { role?: RoleRow };
+  Users: undefined;
+  UserNew: undefined;
+  UserRole: { userId: string; employeeId: string; currentRole: string };
+  Devices: undefined;
+  TwoFaSettings: undefined;
+  SyncConflicts: undefined;
 };
