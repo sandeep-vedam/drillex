@@ -5,7 +5,8 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { Wordmark } from './Brand';
 import { I } from './Icons';
 import { api, getUser, signOut, type SessionUser } from '@/lib/api';
-import { can, type Permission, type Role } from '@drillex/shared';
+import { useRoleMatrix } from '@/lib/permissions';
+import { can, type Permission, type PermissionMatrix } from '@drillex/shared';
 
 // SRS FR-9.1.1: one permission matrix applied identically across API, web and mobile. Each entry names the
 // permission its page needs, so the menu can never offer less (or more) than the API will actually allow.
@@ -22,16 +23,19 @@ const NAV = [
 const ADMIN = [
   { href: '/sync-conflicts', label: 'Sync conflicts', icon: I.Sync, perm: 'shift_report:approve' },
   { href: '/users', label: 'User management', icon: I.Users, perm: 'user:manage' },
+  { href: '/roles', label: 'Roles & permissions', icon: I.Shield, perm: 'role:manage' },
   { href: '/devices', label: 'Devices', icon: I.Settings, perm: 'user:manage' },
   { href: '/settings', label: 'Settings', icon: I.Settings, perm: null },
 ] as const;
-const visible = (role: string | undefined) => (n: { perm: Permission | null }) => n.perm === null || (!!role && !!can(role as Role, n.perm));
+const visible = (matrix: PermissionMatrix | null, role: string | undefined) => (n: { perm: Permission | null }) =>
+  n.perm === null || (!!role && !!matrix && !!can(matrix, role, n.perm));
 
 export function Shell({ children, title, actions }: { children: ReactNode; title: string; actions?: ReactNode }) {
   const path = usePathname();
   const router = useRouter();
   const [user, setUser] = useState<SessionUser | null>(null);
   const [unread, setUnread] = useState(0);
+  const matrix = useRoleMatrix();
   useEffect(() => { const f = () => api<{ count: number }>('/notifications/unread-count').then((r) => setUnread(r.count)).catch(() => {}); f(); const t = setInterval(f, 30_000); window.addEventListener('notifications:changed', f); return () => { clearInterval(t); window.removeEventListener('notifications:changed', f); }; }, []);
   useEffect(() => { const u = getUser(); if (!u) router.replace('/login'); else if (u.mustChangePassword) router.replace('/change-password'); else setUser(u); }, [router]);
 
@@ -50,9 +54,9 @@ export function Shell({ children, title, actions }: { children: ReactNode; title
         <div className="px-5 py-5 border-b border-white/10"><Wordmark light /></div>
         <nav className="py-3 flex-1 overflow-y-auto">
           <div className="px-4 pb-2 eyebrow !text-white/35">Operations</div>
-          {NAV.filter(visible(user?.role)).map((n) => <Item key={n.href} {...n} />)}
+          {NAV.filter(visible(matrix, user?.role)).map((n) => <Item key={n.href} {...n} />)}
           <div className="px-4 pt-5 pb-2 eyebrow !text-white/35">System</div>
-          {ADMIN.filter(visible(user?.role)).map((n) => <Item key={n.href} {...n} />)}
+          {ADMIN.filter(visible(matrix, user?.role)).map((n) => <Item key={n.href} {...n} />)}
         </nav>
         <div className="border-t border-white/10 p-4 flex items-center gap-3">
           <div className="h-9 w-9 grid place-items-center bg-hazard text-navy-900 font-display font-bold text-[15px]">{user?.employeeId?.slice(0, 2) ?? '··'}</div>

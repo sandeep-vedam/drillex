@@ -5,6 +5,8 @@ import { Shell } from '@/components/Shell';
 import { StatusChip } from '@/components/StatusChip';
 import { I } from '@/components/Icons';
 import { api, getUser } from '@/lib/api';
+import { useRoleMatrix } from '@/lib/permissions';
+import { can } from '@drillex/shared';
 import { AssetDrawer } from '@/components/AssetDrawer';
 
 type Asset = { id: string; assetNumber: string; name: string; category: string; status: string; make: string; model: string; serialNumber: string; yearOfManufacture: number; commissionedAt: string; operators: { userId: string }[] };
@@ -16,7 +18,8 @@ export default function AssetsPage() {
   const [q, setQ] = useState('');
   const [cat, setCat] = useState('ALL');
   const [drawer, setDrawer] = useState(false);
-  const canWrite = ['ADMIN', 'MANAGER', 'SUPERVISOR'].includes(getUser()?.role ?? '');
+  const matrix = useRoleMatrix();
+  const canWrite = !!matrix && !!can(matrix, getUser()?.role, 'asset:write');
   const load = () => api<Asset[]>('/assets').then(setAssets).catch(() => {});
   useEffect(() => { load(); }, []);
   const rows = useMemo(() => assets.filter((a) => (cat === 'ALL' || a.category === cat) && `${a.assetNumber} ${a.name} ${a.make} ${a.model}`.toLowerCase().includes(q.toLowerCase())), [assets, q, cat]);

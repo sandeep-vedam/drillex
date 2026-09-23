@@ -1,5 +1,7 @@
+/** The five built-in system roles seeded on first migration. Custom roles created via the admin UI
+ *  are not members of this list — use `Role` (a plain string, resolved against the database) for those. */
 export const Roles = ['OPERATOR', 'TECHNICIAN', 'SUPERVISOR', 'MANAGER', 'ADMIN'] as const;
-export type Role = (typeof Roles)[number];
+export type Role = string;
 
 export const AssetCategories = ['DRILLING', 'HAULAGE', 'COMPRESSOR', 'ANCILLARY', 'OTHER'] as const;
 export type AssetCategory = (typeof AssetCategories)[number];

@@ -16,13 +16,6 @@ model SystemSetting {
   updatedBy String?
 }
 
-enum Role {
-  OPERATOR
-  TECHNICIAN
-  SUPERVISOR
-  MANAGER
-  ADMIN
-}
 enum UserStatus {
   ACTIVE
   DISABLED
@@ -131,11 +124,35 @@ model Site {
   updatedAt DateTime @updatedAt
 }
 
+/// An admin-editable role: `key` is the stable identifier stored on User.role and carried in the JWT
+/// (business logic and the token both compare against it); `name` is the editable display label, so
+/// renaming a role never breaks a `user.role === 'X'` check elsewhere in the codebase.
+model Role {
+  id          String           @id @default(uuid())
+  key         String           @unique
+  name        String
+  isSystem    Boolean          @default(false) // the 5 seeded roles; cannot be deleted
+  permissions RolePermission[]
+  users       User[]
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+}
+
+model RolePermission {
+  id         String @id @default(uuid())
+  role       Role   @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  roleId     String
+  permission String
+  scope      String // 'self' | 'site' | 'all'
+  @@unique([roleId, permission])
+}
+
 model User {
   id           String     @id @default(uuid())
   employeeId   String     @unique
   name         String
-  role         Role
+  role         String
+  roleRef      Role       @relation(fields: [role], references: [key], onDelete: Restrict)
   status       UserStatus @default(ACTIVE)
   passwordHash String
   totpSecret   String?

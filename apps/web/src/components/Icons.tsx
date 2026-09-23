@@ -20,4 +20,5 @@ export const I = {
   Plus: (p: SVGProps<SVGSVGElement>) => <P {...p}><path d="M12 5v14M5 12h14"/></P>,
   Eye: (p: SVGProps<SVGSVGElement>) => <P {...p}><path d="M2 12s3.7-6.5 10-6.5S22 12 22 12s-3.7 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="2.6"/></P>,
   EyeOff: (p: SVGProps<SVGSVGElement>) => <P {...p}><path d="M4 4l16 16"/><path d="M10.6 6.1A11 11 0 0 1 12 6c6.3 0 10 6 10 6a18 18 0 0 1-3.3 3.8"/><path d="M6.8 8.3C3.9 10 2 12 2 12s3.7 6.5 10 6.5a11 11 0 0 0 3.2-.5"/><path d="M9.9 9.9a2.6 2.6 0 0 0 3.7 3.7"/></P>,
+  Shield: (p: SVGProps<SVGSVGElement>) => <P {...p}><path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z"/><path d="M9 12l2 2 4-4"/></P>,
 };

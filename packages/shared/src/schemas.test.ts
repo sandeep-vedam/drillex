@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { ShiftReportSchema, DailyReadingSchema, readingAlerts, fuelConsumed, can, totalMetersDrilled } from './index';
+import { ShiftReportSchema, DailyReadingSchema, readingAlerts, fuelConsumed, can, totalMetersDrilled, type PermissionMatrix } from './index';
 
 const validShift = {
   assetId: '00000000-0000-0000-0000-000000000001', date: '2026-08-21', shift: 'DAY',
@@ -87,30 +87,45 @@ describe('readingAlerts (SRS §5.3)', () => {
       .toEqual(['WARNING_LIGHTS', 'MAINTENANCE_REVIEW']));
 });
 
+// `can()` is now a pure lookup over a matrix supplied by the caller (fetched from the database in
+// production — see apps/api/src/roles) rather than a hardcoded object, so these tests exercise the
+// lookup semantics against a small fixture shaped like the default seed grants.
+const SEED_MATRIX: PermissionMatrix = {
+  OPERATOR: { 'shift_report:read': 'self' },
+  TECHNICIAN: { 'parts:write': 'all' },
+  SUPERVISOR: { 'shift_report:approve': 'site' },
+  MANAGER: { 'shift_report:read': 'all' },
+  ADMIN: { 'shift_report:read': 'all', 'user:manage': 'all' },
+};
+
 describe('RBAC (packages/shared/src/rbac.ts)', () => {
   it('operator cannot approve a shift report; supervisor can, scoped to their site', () => {
-    expect(can('OPERATOR', 'shift_report:approve')).toBeUndefined();
-    expect(can('SUPERVISOR', 'shift_report:approve')).toBe('site');
+    expect(can(SEED_MATRIX, 'OPERATOR', 'shift_report:approve')).toBeUndefined();
+    expect(can(SEED_MATRIX, 'SUPERVISOR', 'shift_report:approve')).toBe('site');
   });
   it('manager and admin see all shift reports; operator only their own', () => {
-    expect(can('MANAGER', 'shift_report:read')).toBe('all');
-    expect(can('ADMIN', 'shift_report:read')).toBe('all');
-    expect(can('OPERATOR', 'shift_report:read')).toBe('self');
+    expect(can(SEED_MATRIX, 'MANAGER', 'shift_report:read')).toBe('all');
+    expect(can(SEED_MATRIX, 'ADMIN', 'shift_report:read')).toBe('all');
+    expect(can(SEED_MATRIX, 'OPERATOR', 'shift_report:read')).toBe('self');
   });
   it('only admin can manage users', () => {
-    expect(can('ADMIN', 'user:manage')).toBe('all');
-    expect(can('MANAGER', 'user:manage')).toBeUndefined();
-    expect(can('SUPERVISOR', 'user:manage')).toBeUndefined();
+    expect(can(SEED_MATRIX, 'ADMIN', 'user:manage')).toBe('all');
+    expect(can(SEED_MATRIX, 'MANAGER', 'user:manage')).toBeUndefined();
+    expect(can(SEED_MATRIX, 'SUPERVISOR', 'user:manage')).toBeUndefined();
   });
   it('admin cannot approve shift reports or job cards — approval stays with supervisor/manager', () => {
-    expect(can('ADMIN', 'shift_report:approve')).toBeUndefined();
-    expect(can('ADMIN', 'job_card:approve')).toBeUndefined();
+    expect(can(SEED_MATRIX, 'ADMIN', 'shift_report:approve')).toBeUndefined();
+    expect(can(SEED_MATRIX, 'ADMIN', 'job_card:approve')).toBeUndefined();
   });
   it('technician can read and write parts, but cannot generate reports', () => {
-    expect(can('TECHNICIAN', 'parts:write')).toBe('all');
-    expect(can('TECHNICIAN', 'report:generate')).toBeUndefined();
+    expect(can(SEED_MATRIX, 'TECHNICIAN', 'parts:write')).toBe('all');
+    expect(can(SEED_MATRIX, 'TECHNICIAN', 'report:generate')).toBeUndefined();
   });
   it('unknown role/permission combinations return undefined rather than throwing', () => {
-    expect(can('OPERATOR', 'audit:read')).toBeUndefined();
+    expect(can(SEED_MATRIX, 'OPERATOR', 'audit:read')).toBeUndefined();
+  });
+  it('a role missing from the matrix entirely (e.g. deleted) returns undefined, not a throw', () => {
+    expect(can(SEED_MATRIX, 'GHOST_ROLE', 'asset:read')).toBeUndefined();
+    expect(can(SEED_MATRIX, undefined, 'asset:read')).toBeUndefined();
   });
 });

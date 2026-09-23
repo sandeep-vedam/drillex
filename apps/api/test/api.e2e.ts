@@ -269,3 +269,58 @@ describe('negative-scenario hardening', () => {
     expect(allowed.status).toBe(200);
   });
 });
+
+describe('dynamic RBAC (roles & permissions admin)', () => {
+  it('create → grant → assign takes effect with no re-login; rename keeps the key; delete is guarded', async () => {
+    const admin = await login('ADM001');
+
+    const created = await request(app.getHttpServer()).post('/api/v1/roles').set(auth(admin))
+      .send({ name: '[e2e] Site Coordinator', permissions: [{ permission: 'daily_reading:read', scope: 'site' }] });
+    expect(created.status).toBe(201);
+    const roleId = created.body.id as string; const roleKey = created.body.key as string;
+    expect(roleKey).toBe('E2E_SITE_COORDINATOR');
+
+    const site = await prisma.site.findFirstOrThrow();
+    const employeeId = `E2E${Date.now().toString().slice(-6)}`;
+    const newUser = await request(app.getHttpServer()).post('/api/v1/users').set(auth(admin))
+      .send({ employeeId, name: '[e2e] rbac test user', role: roleKey, siteId: site.id, password: 'Password123' });
+    expect(newUser.status).toBe(201);
+
+    const userToken = await login(employeeId);
+    // the role grants daily_reading:read only
+    expect((await request(app.getHttpServer()).get('/api/v1/daily-readings').set(auth(userToken))).status).toBe(200);
+    expect((await request(app.getHttpServer()).get('/api/v1/assets').set(auth(userToken))).status).toBe(403);
+
+    // grant asset:read too — no re-login, proves the matrix cache invalidates on write
+    const updated = await request(app.getHttpServer()).patch(`/api/v1/roles/${roleId}`).set(auth(admin))
+      .send({ permissions: [{ permission: 'daily_reading:read', scope: 'site' }, { permission: 'asset:read', scope: 'site' }] });
+    expect(updated.status).toBe(200);
+    expect((await request(app.getHttpServer()).get('/api/v1/assets').set(auth(userToken))).status).toBe(200);
+
+    // renaming only changes the display name — the key business logic and the JWT rely on is untouched
+    const renamed = await request(app.getHttpServer()).patch(`/api/v1/roles/${roleId}`).set(auth(admin)).send({ name: '[e2e] Renamed Coordinator' });
+    expect(renamed.status).toBe(200);
+    expect(renamed.body.key).toBe(roleKey);
+
+    // delete is blocked while a user still holds the role
+    expect((await request(app.getHttpServer()).delete(`/api/v1/roles/${roleId}`).set(auth(admin))).status).toBe(409);
+
+    const target = await prisma.user.findUniqueOrThrow({ where: { employeeId } });
+    const reassigned = await request(app.getHttpServer()).patch(`/api/v1/users/${target.id}/role`).set(auth(admin)).send({ role: 'OPERATOR' });
+    expect(reassigned.status).toBe(200); expect(reassigned.body.role).toBe('OPERATOR');
+    expect((await request(app.getHttpServer()).delete(`/api/v1/roles/${roleId}`).set(auth(admin))).status).toBe(200);
+
+    // a built-in role can never be deleted, regardless of assignment
+    const opRole = await prisma.role.findUniqueOrThrow({ where: { key: 'OPERATOR' } });
+    expect((await request(app.getHttpServer()).delete(`/api/v1/roles/${opRole.id}`).set(auth(admin))).status).toBe(403);
+
+    await prisma.user.delete({ where: { id: target.id } });
+  });
+
+  it('rejects unknown roles and unknown permissions with 400, not a raw DB error', async () => {
+    const admin = await login('ADM001');
+    const target = await prisma.user.findUniqueOrThrow({ where: { employeeId: 'OPR001' } });
+    expect((await request(app.getHttpServer()).patch(`/api/v1/users/${target.id}/role`).set(auth(admin)).send({ role: 'NOT_A_REAL_ROLE' })).status).toBe(400);
+    expect((await request(app.getHttpServer()).post('/api/v1/roles').set(auth(admin)).send({ name: '[e2e] bad grant', permissions: [{ permission: 'not:a_permission', scope: 'all' }] })).status).toBe(400);
+  });
+});

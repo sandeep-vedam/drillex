@@ -4,6 +4,7 @@ import { can } from '@drillex/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
 import { AuthUser } from '../auth/decorators';
+import { RolesService } from '../roles/roles.service';
 
 export type AttachmentInput = { id?: string; ownerType: string; ownerId: string; kind: 'PHOTO' | 'DOCUMENT' | 'SIGNATURE'; contentType: string; base64: string };
 const MAX_BYTES = 8 * 1024 * 1024;
@@ -20,12 +21,12 @@ const OWNER_PERMISSION = {
 
 @Injectable()
 export class AttachmentsService {
-  constructor(private prisma: PrismaService, private storage: StorageService) {}
+  constructor(private prisma: PrismaService, private storage: StorageService, private roles: RolesService) {}
 
   private async assertOwnerAccess(u: AuthUser, ownerType: string, ownerId: string, mode: 'read' | 'write') {
     const perms = OWNER_PERMISSION[ownerType as keyof typeof OWNER_PERMISSION];
     if (!perms) throw new BadRequestException(`Unknown ownerType: ${ownerType}`);
-    const scope = can(u.role, perms[mode]);
+    const scope = can(await this.roles.getMatrix(), u.role, perms[mode]);
     if (!scope) throw new ForbiddenException(`Missing permission ${perms[mode]}`);
     if (scope === 'all') return;
 

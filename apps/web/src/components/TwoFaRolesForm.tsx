@@ -2,16 +2,15 @@
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 
-const ALL_ROLES = ['OPERATOR', 'TECHNICIAN', 'SUPERVISOR', 'MANAGER', 'ADMIN'];
-
 export function TwoFaRolesForm() {
   const [roles, setRoles] = useState<string[] | null>(null);
   const [saved, setSaved] = useState<string[] | null>(null);
+  const [allRoles, setAllRoles] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    api<{ roles: string[] }>('/settings/2fa-roles').then((r) => { setRoles(r.roles); setSaved(r.roles); }).catch((e) => setError((e as Error).message));
+    api<{ roles: string[]; allRoles: string[] }>('/settings/2fa-roles').then((r) => { setRoles(r.roles); setSaved(r.roles); setAllRoles(r.allRoles); }).catch((e) => setError((e as Error).message));
   }, []);
 
   function toggle(role: string) {
@@ -36,7 +35,7 @@ export function TwoFaRolesForm() {
   return (
     <div className="flex flex-col gap-4 max-w-[480px]">
       <div className="flex flex-wrap gap-3">
-        {ALL_ROLES.map((role) => (
+        {allRoles.map((role) => (
           <label key={role} className="flex items-center gap-2 text-[13px] font-medium border border-line rounded px-3 py-2 cursor-pointer">
             <input type="checkbox" checked={roles.includes(role)} onChange={() => toggle(role)} />
             {role}

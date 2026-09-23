@@ -5,7 +5,6 @@ import { I } from '@/components/Icons';
 import { api, getUser } from '@/lib/api';
 
 type U = { id: string; employeeId: string; name: string; role: string; status: string; totpEnabled: boolean; mustChangePassword: boolean; site?: { name: string } | null };
-const ROLES = ['OPERATOR', 'TECHNICIAN', 'SUPERVISOR', 'MANAGER', 'ADMIN'];
 const roleTone: Record<string, string> = { ADMIN: 'bg-crit/10 text-crit', MANAGER: 'bg-navy-100 text-navy-800', SUPERVISOR: 'bg-hazard/10 text-hazard', TECHNICIAN: 'bg-steel/10 text-steel', OPERATOR: 'bg-ok/10 text-ok' };
 
 export default function UsersPage() {
@@ -18,11 +17,13 @@ export default function UsersPage() {
   const [error, setError] = useState<string | null>(null);
   const me = getUser();
   const [roles2fa, setRoles2fa] = useState<string[]>(['MANAGER', 'ADMIN']); // best-guess default until/unless we can read the admin-configured setting
+  const [roles, setRoles] = useState<{ key: string; name: string }[]>([]);
   const load = () => api<U[]>('/users').then(setUsers).catch((e) => setError(e.message));
   useEffect(() => {
     load();
     api<{ id: string; name: string }[]>('/sites').then((s) => { setSites(s); setForm((f) => ({ ...f, siteId: f.siteId || s[0]?.id || '' })); }).catch(() => {});
     if (me?.role === 'ADMIN') api<{ roles: string[] }>('/settings/2fa-roles').then((r) => setRoles2fa(r.roles)).catch(() => {});
+    api<{ key: string; name: string }[]>('/roles').then(setRoles).catch(() => {}); // silently empty if the caller lacks role:manage
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -32,6 +33,10 @@ export default function UsersPage() {
   }
   async function toggle(u: U) {
     try { await api(`/users/${u.id}/status`, { method: 'PATCH', body: JSON.stringify({ status: u.status === 'ACTIVE' ? 'DISABLED' : 'ACTIVE' }) }); load(); } catch (e) { setError((e as Error).message); }
+  }
+  async function changeRole(u: U, role: string) {
+    if (role === u.role) return;
+    try { await api(`/users/${u.id}/role`, { method: 'PATCH', body: JSON.stringify({ role }) }); load(); } catch (e) { setError((e as Error).message); }
   }
   async function create(e: React.FormEvent) {
     e.preventDefault(); setError(null);
@@ -60,7 +65,15 @@ export default function UsersPage() {
               <tr key={u.id} className="border-b border-line last:border-0 hover:bg-navy-100/40">
                 <td className="px-5 py-3 font-mono text-[13px] font-medium text-navy-800">{u.employeeId}{u.id === me?.id && <span className="ml-2 text-[10px] text-muted">(you)</span>}</td>
                 <td className="px-5 py-3 font-medium">{u.name}{u.mustChangePassword && <span className="ml-2 text-[11px] text-hazard">must change password</span>}</td>
-                <td className="px-5 py-3"><span className={`px-2 py-0.5 text-[11px] font-bold tracking-wider ${roleTone[u.role]}`}>{u.role}</span></td>
+                <td className="px-5 py-3">
+                  {roles.length ? (
+                    <select className={`text-[11px] font-bold tracking-wider border-0 px-2 py-0.5 ${roleTone[u.role] ?? 'bg-navy-100 text-navy-800'}`} value={u.role} onChange={(e) => changeRole(u, e.target.value)} disabled={u.id === me?.id}>
+                      {roles.map((r) => <option key={r.key} value={r.key}>{r.name}</option>)}
+                    </select>
+                  ) : (
+                    <span className={`px-2 py-0.5 text-[11px] font-bold tracking-wider ${roleTone[u.role] ?? 'bg-navy-100 text-navy-800'}`}>{u.role}</span>
+                  )}
+                </td>
                 <td className="px-5 py-3 text-muted">{u.site?.name ?? '—'}</td>
                 <td className="px-5 py-3 text-[12px]">{roles2fa.includes(u.role) ? (u.totpEnabled ? <span className="text-ok font-semibold">Enabled</span> : <span className="text-hazard font-semibold">Pending enrolment</span>) : <span className="text-muted">n/a</span>}</td>
                 <td className="px-5 py-3"><span className={`inline-flex items-center gap-1.5 text-[12px] font-semibold ${u.status === 'ACTIVE' ? 'text-ok' : 'text-crit'}`}><span className={`h-1.5 w-1.5 ${u.status === 'ACTIVE' ? 'bg-ok' : 'bg-crit'}`} />{u.status === 'ACTIVE' ? 'Active' : 'Disabled'}</span></td>
@@ -81,7 +94,7 @@ export default function UsersPage() {
               <label className="flex flex-col gap-1.5 text-[13px] font-medium">Employee ID<input className="input font-mono uppercase" required value={form.employeeId} onChange={(e) => setForm({ ...form, employeeId: e.target.value })} placeholder="OPR002" /></label>
               <label className="flex flex-col gap-1.5 text-[13px] font-medium">Full name<input className="input" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></label>
               <div className="grid grid-cols-2 gap-4">
-                <label className="flex flex-col gap-1.5 text-[13px] font-medium">Role<select className="input" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>{ROLES.map((r) => <option key={r}>{r}</option>)}</select></label>
+                <label className="flex flex-col gap-1.5 text-[13px] font-medium">Role<select className="input" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>{(roles.length ? roles : [{ key: form.role, name: form.role }]).map((r) => <option key={r.key} value={r.key}>{r.name}</option>)}</select></label>
                 <label className="flex flex-col gap-1.5 text-[13px] font-medium">Site<select className="input" value={form.siteId} onChange={(e) => setForm({ ...form, siteId: e.target.value })}>{sites.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
               </div>
               <label className="flex flex-col gap-1.5 text-[13px] font-medium">Temporary password <span className="text-muted font-normal">min. 8 characters</span><input className="input font-mono" required minLength={8} value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} /></label>

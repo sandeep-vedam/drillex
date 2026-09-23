@@ -1,8 +1,9 @@
 import { z } from 'zod';
 import {
   AssetCategories, AssetStatuses, Shifts, FluidLevels, AirFilterConditions,
-  BatteryConditions, ChemicalUnits, Roles,
+  BatteryConditions, ChemicalUnits,
 } from './enums';
+import { Permissions } from './rbac';
 
 export const LoginSchema = z.object({
   employeeId: z.string().min(1),
@@ -17,10 +18,26 @@ export const ChangePasswordSchema = z.object({ currentPassword: z.string().min(8
 export const CreateUserSchema = z.object({
   employeeId: z.string().min(1),
   name: z.string().min(1),
-  role: z.enum(Roles),
+  role: z.string().min(1), // validated against the live role list at the API layer, not a fixed enum
   siteId: z.string().uuid().optional(),
   password: z.string().min(8),
 });
+
+export const AssignRoleSchema = z.object({ role: z.string().min(1) });
+
+export const RolePermissionGrantSchema = z.object({ permission: z.enum(Permissions), scope: z.enum(['self', 'site', 'all']) });
+
+export const RoleCreateSchema = z.object({
+  name: z.string().min(1),
+  permissions: z.array(RolePermissionGrantSchema).default([]),
+});
+export type RoleCreateInput = z.infer<typeof RoleCreateSchema>;
+
+export const RoleUpdateSchema = z.object({
+  name: z.string().min(1).optional(),
+  permissions: z.array(RolePermissionGrantSchema).optional(),
+});
+export type RoleUpdateInput = z.infer<typeof RoleUpdateSchema>;
 
 export const AssetSchema = z.object({
   name: z.string().min(1),
