@@ -3,6 +3,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { Shell } from '@/components/Shell';
 import { I } from '@/components/Icons';
 import { api, getUser } from '@/lib/api';
+import { useRoleMatrix } from '@/lib/permissions';
+import { can } from '@drillex/shared';
 
 type Part = { id: string; partNo: string; name: string; qtyOnHand: number; minQty: number; unitCost?: string };
 type PR = { id: string; quantity: number; status: string; requestedBy: string; notes?: string; createdAt: string; part: Part };
@@ -15,7 +17,7 @@ export default function PartsPage() {
   const [sel, setSel] = useState<Part | null>(null); const [moves, setMoves] = useState<Move[]>([]);
   const [newPart, setNewPart] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const me = getUser(); const canWrite = ['TECHNICIAN', 'MANAGER', 'ADMIN'].includes(me?.role ?? '');
+  const me = getUser(); const matrix = useRoleMatrix(); const canWrite = !!matrix && !!can(matrix, me?.role, 'parts:write');
   const load = () => Promise.all([api<Part[]>('/parts').then(setParts), api<PR[]>('/parts/purchase-requests/all').then(setPrs)]).catch((e) => setError(e.message));
   useEffect(() => { load(); }, []);
   useEffect(() => { if (sel) api<Move[]>(`/parts/${sel.id}/movements`).then(setMoves).catch(() => setMoves([])); }, [sel]);

@@ -1,6 +1,7 @@
 import { ForbiddenException, Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import nodemailer from 'nodemailer';
+import { Roles } from '@drillex/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -14,8 +15,15 @@ export class ReportsService {
   private log = new Logger('Reports');
   constructor(private prisma: PrismaService, private storage: StorageService, private notify: NotificationsService, private builders: ReportBuildersService, private renderer: ReportRendererService) {}
 
-  types(u: AuthUser) { return REPORT_TYPES.filter((t) => REPORT_META[t].roles.includes(u.role)).map((t) => ({ type: t, title: REPORT_META[t].title })); }
-  private assertRole(u: AuthUser, type: ReportType) { if (!REPORT_META[type]?.roles.includes(u.role)) throw new ForbiddenException('This report is not available to your role'); }
+  // REPORT_META.roles restricts individual report types among the 5 built-in roles (e.g. Chemical Usage is
+  // MANAGER/ADMIN-only). That per-type list has no dynamic equivalent — a custom role has no report-type-level
+  // permission to grant — so a custom role gets every type once report:read/report:generate has already let it
+  // through the controller guard; only the 5 built-in role keys stay bound by REPORT_META.
+  private allowedTypesFor(role: string): readonly ReportType[] {
+    return (Roles as readonly string[]).includes(role) ? REPORT_TYPES.filter((t) => REPORT_META[t].roles.includes(role)) : REPORT_TYPES;
+  }
+  types(u: AuthUser) { return this.allowedTypesFor(u.role).map((t) => ({ type: t, title: REPORT_META[t].title })); }
+  private assertRole(u: AuthUser, type: ReportType) { if (!this.allowedTypesFor(u.role).includes(type)) throw new ForbiddenException('This report is not available to your role'); }
 
   /** Live preview (in-app view, custom date range). */
   async preview(u: AuthUser, type: ReportType, from: Date, to: Date) { this.assertRole(u, type); return this.builders.build(type, from, to, u.scope === 'site' ? u.siteId : null); }
@@ -35,7 +43,7 @@ export class ReportsService {
   }
 
   async archive(u: AuthUser) {
-    const rows = await this.prisma.report.findMany({ where: { type: { in: REPORT_TYPES.filter((t) => REPORT_META[t].roles.includes(u.role)) } }, orderBy: { generatedAt: 'desc' }, take: 200 });
+    const rows = await this.prisma.report.findMany({ where: { type: { in: this.allowedTypesFor(u.role) as ReportType[] } }, orderBy: { generatedAt: 'desc' }, take: 200 });
     return Promise.all(rows.map(async (r) => ({ ...r, title: REPORT_META[r.type as ReportType]?.title ?? r.type, pdfUrl: r.pdfKey ? await this.storage.urlFor(r.pdfKey) : null, xlsxUrl: r.xlsxKey ? await this.storage.urlFor(r.xlsxKey) : null })));
   }
 

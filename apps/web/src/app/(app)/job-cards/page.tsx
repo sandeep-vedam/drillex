@@ -4,6 +4,8 @@ import { Shell } from '@/components/Shell';
 import { StatusChip } from '@/components/StatusChip';
 import { I } from '@/components/Icons';
 import { api, getUser } from '@/lib/api';
+import { useRoleMatrix } from '@/lib/permissions';
+import { can } from '@drillex/shared';
 
 type Part = { id: string; partNo: string; name: string; qtyOnHand: number; unitCost?: string };
 type JC = { id: string; jobNo: string; date: string; jobType: string; reportedFault?: string; workPerformed: string; hourMeter?: string; labourHours?: string; technicianIds: string[]; toolsUsed?: string; conditionBefore?: number; conditionAfter?: number; testResult?: string; nextAction?: string; status: string; approvedAt?: string; createdAt: string; asset: { assetNumber: string; name: string }; parts: { id: string; quantity: number; part: { partNo: string; name: string; unitCost?: string } }[]; technicians?: { employeeId: string; name: string }[]; attachments?: { id: string; kind: string; url: string }[] };
@@ -20,6 +22,7 @@ export default function JobCardsPage() {
   const [drawer, setDrawer] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const me = getUser();
+  const matrix = useRoleMatrix();
   const load = () => api<JC[]>('/job-cards').then(setRows).catch((e) => setError(e.message));
   useEffect(() => { load(); }, []);
   useEffect(() => { if (sel) api<JC>(`/job-cards/${sel.id}`).then((d) => setSel((s) => (s && s.id === d.id ? { ...s, ...d } : s))).catch(() => {}); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [sel?.id, sel?.status, sel?.approvedAt]);
@@ -27,7 +30,7 @@ export default function JobCardsPage() {
   const cost = (jc: JC) => jc.parts.reduce((n, p) => n + p.quantity * Number(p.part.unitCost ?? 0), 0);
   async function approve(jc: JC) { try { await api(`/job-cards/${jc.id}/approve`, { method: 'POST' }); await load(); setSel((s) => (s ? { ...s, approvedAt: new Date().toISOString() } : s)); } catch (e) { setError((e as Error).message); } }
   async function setStatus(jc: JC, status: string) { try { await api(`/job-cards/${jc.id}`, { method: 'PATCH', body: JSON.stringify({ status }) }); await load(); setSel((s) => (s ? { ...s, status } : s)); } catch (e) { setError((e as Error).message); } }
-  const canApprove = ['SUPERVISOR', 'MANAGER'].includes(me?.role ?? '');
+  const canApprove = !!matrix && !!can(matrix, me?.role, 'job_card:approve');
 
   return (
     <Shell title="Job cards" actions={<button onClick={() => setDrawer(true)} className="btn-primary h-9 text-[13px]"><I.Plus /> New job card</button>}>

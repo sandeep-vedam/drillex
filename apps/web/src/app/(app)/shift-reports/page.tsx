@@ -4,6 +4,8 @@ import { Shell } from '@/components/Shell';
 import { StatusChip } from '@/components/StatusChip';
 import { I } from '@/components/Icons';
 import { api, getUser } from '@/lib/api';
+import { useRoleMatrix } from '@/lib/permissions';
+import { can } from '@drillex/shared';
 
 type Chem = { id: string; quantity: string; unit: string; purpose?: string; stockOnHand?: string; chemical: { name: string } };
 type Report = {
@@ -20,6 +22,7 @@ export default function ShiftReportsPage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const me = getUser();
+  const matrix = useRoleMatrix();
   const load = () => api<Report[]>('/shift-reports').then((r) => { setRows(r); if (sel) setSel(r.find((x) => x.id === sel.id) ?? null); }).catch((e) => setError(e.message));
   useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
   const list = useMemo(() => rows.filter((r) => tab === 'ALL' || r.status === tab), [rows, tab]);
@@ -31,7 +34,7 @@ export default function ShiftReportsPage() {
     if (!reason) return; setBusy(true);
     try { await api(`/shift-reports/${r.id}/unlock`, { method: 'POST', body: JSON.stringify({ reason }) }); await load(); } catch (e) { setError((e as Error).message); } finally { setBusy(false); }
   }
-  const canApprove = ['SUPERVISOR', 'MANAGER'].includes(me?.role ?? '');
+  const canApprove = !!matrix && !!can(matrix, me?.role, 'shift_report:approve');
 
   return (
     <Shell title="Shift production">

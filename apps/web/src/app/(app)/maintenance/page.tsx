@@ -4,6 +4,8 @@ import { Shell } from '@/components/Shell';
 import { StatusChip } from '@/components/StatusChip';
 import { I } from '@/components/Icons';
 import { api, getUser } from '@/lib/api';
+import { useRoleMatrix } from '@/lib/permissions';
+import { can } from '@drillex/shared';
 
 type Sched = { id: string; serviceType: string; description: string; intervalHours?: number; intervalDays?: number; lastServiceAt?: string; lastServiceHours?: string; nextDueAt?: string; nextDueHours?: string; reminderLeadDays: number; status: string; technicianIds: string[]; estDowntimeHours?: string; notes?: string; currentHours: number | null; hoursRemaining: number | null; asset: { assetNumber: string; name: string; status: string } ; assetId: string };
 type Opt = { id: string; name: string; employeeId?: string; assetNumber?: string };
@@ -19,6 +21,7 @@ export default function MaintenancePage() {
   const [drawer, setDrawer] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const me = getUser();
+  const matrix = useRoleMatrix();
   const load = () => api<Sched[]>('/maintenance/schedules').then((r) => { setRows(r); if (sel) setSel(r.find((x) => x.id === sel.id) ?? null); }).catch((e) => setError(e.message));
   useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
   const list = useMemo(() => rows.filter((r) => tab === 'ALL' ? r.status !== 'COMPLETED' : r.status === tab).sort((a, b) => ORDER[a.status] - ORDER[b.status] || (a.nextDueAt ?? '9').localeCompare(b.nextDueAt ?? '9')), [rows, tab]);
@@ -31,7 +34,7 @@ export default function MaintenancePage() {
     try { await api(`/maintenance/schedules/${s.id}/complete`, { method: 'POST', body: JSON.stringify({ hourMeter: hm ? Number(hm) : undefined, notes: notes || undefined }) }); load(); } catch (e) { setError((e as Error).message); }
   }
   async function remove(s: Sched) { if (!confirm(`Delete schedule "${s.description}" for ${s.asset.assetNumber}?`)) return; await api(`/maintenance/schedules/${s.id}`, { method: 'DELETE' }); setSel(null); load(); }
-  const canWrite = ['SUPERVISOR', 'MANAGER', 'ADMIN'].includes(me?.role ?? '');
+  const canWrite = !!matrix && !!can(matrix, me?.role, 'maintenance:write');
 
   return (
     <Shell title="Maintenance schedule" actions={canWrite ? <button onClick={() => setDrawer(true)} className="btn-primary h-9 text-[13px]"><I.Plus /> New schedule</button> : undefined}>

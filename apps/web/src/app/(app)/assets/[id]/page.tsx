@@ -6,6 +6,8 @@ import { Shell } from '@/components/Shell';
 import { StatusChip } from '@/components/StatusChip';
 import { I } from '@/components/Icons';
 import { api, getUser } from '@/lib/api';
+import { useRoleMatrix } from '@/lib/permissions';
+import { can } from '@drillex/shared';
 import { AssetDrawer } from '@/components/AssetDrawer';
 import { PhotoPicker, uploadPhotos, type AssetPhoto, type PendingPhoto } from '@/components/PhotoPicker';
 
@@ -37,7 +39,8 @@ export default function AssetDetailPage() {
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [drawer, setDrawer] = useState(false);
-  const canWrite = ['ADMIN', 'MANAGER', 'SUPERVISOR'].includes(getUser()?.role ?? '');
+  const matrix = useRoleMatrix();
+  const canWrite = !!matrix && !!can(matrix, getUser()?.role, 'asset:write');
 
   // History lists tolerate a 403 so a role that can see the register but not one of the modules still gets the rest of the page.
   const load = useCallback(async () => {
