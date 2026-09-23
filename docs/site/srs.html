@@ -27,7 +27,7 @@
   <main class="content">
     <p class="page-kicker">Software Requirements Specification</p>
     <h1>Drillex Ops SRS</h1>
-    <p class="subtitle">Version 1.0 · numbered requirements matching the <code>SRS §x.y</code> references used throughout the codebase and test suite.</p>
+    <p class="subtitle">Version 1.1 · numbered requirements matching the <code>SRS §x.y</code> references used throughout the codebase and test suite.</p>
 
     <div class="toc">
       <div class="toc-title">Sections</div>
@@ -43,6 +43,7 @@
         <li><a href="#s9">§9 Cross-cutting &amp; NFRs</a></li>
         <li><a href="#s10">§10 Data requirements</a></li>
         <li><a href="#s11">§11 External interfaces</a></li>
+        <li><a href="#s12">§12 Revision history</a></li>
       </ul>
     </div>
 
@@ -123,8 +124,10 @@
     <h3>§9.1 Role-based access control</h3>
     <table>
       <tr><th>ID</th><th>Requirement</th></tr>
-      <tr><td class="reqid">FR-9.1.1</td><td>The system shall enforce a single permission matrix mapping each of the 5 roles to a scope (self / site / all) per resource, applied identically across API, web, and mobile.</td></tr>
+      <tr><td class="reqid">FR-9.1.1</td><td>The system shall enforce a permission matrix mapping each role to a scope (self / site / all) per resource, applied identically across API, web, and mobile. The matrix is stored in the database and read fresh per request/session — not hardcoded in source — so a grant change takes effect without a redeploy.</td></tr>
       <tr><td class="reqid">FR-9.1.2</td><td>Every API route shall require authentication and pass an explicit permission check by default (deny-by-default).</td></tr>
+      <tr><td class="reqid">FR-9.1.3</td><td>The system shall allow an ADMIN (via the <code>role:manage</code> permission) to create, rename, and delete roles at runtime, and to edit each role's permission grants, without a code change or deployment. Each role has an immutable key (used internally and in the JWT) distinct from its editable display name, so renaming a role never affects access-control logic keyed off it. The 5 built-in roles seeded on installation (OPERATOR, TECHNICIAN, SUPERVISOR, MANAGER, ADMIN) cannot be deleted; a custom role with users still assigned to it cannot be deleted either.</td></tr>
+      <tr><td class="reqid">FR-9.1.4</td><td>The system shall allow an ADMIN to reassign any user's role after account creation, in addition to setting it at creation time.</td></tr>
     </table>
     <h3>§9.2 Offline synchronization</h3>
     <table>
@@ -155,7 +158,7 @@
     </table>
 
     <h2 id="s10">§10 Data requirements</h2>
-    <p>The canonical data model is the Prisma schema at <code>apps/api/prisma/schema.prisma</code> (22 models). See <a href="technical-details.html#data-model">Technical Details → Data model</a> for the full entity reference including fields and relations.</p>
+    <p>The canonical data model is the Prisma schema at <code>apps/api/prisma/schema.prisma</code> (27 models, including <code>Role</code> and <code>RolePermission</code> — see §12). See <a href="technical-details.html#data-model">Technical Details → Data model</a> for the full entity reference including fields and relations.</p>
 
     <h2 id="s11">§11 External interface requirements</h2>
     <table>
@@ -164,6 +167,29 @@
       <tr><td>Push notifications</td><td>Firebase Cloud Messaging HTTP v1 API, authenticated via a Google service account.</td></tr>
       <tr><td>Email</td><td>SMTP (via nodemailer) for report sharing; logs instead of sending if unconfigured.</td></tr>
       <tr><td>API documentation</td><td>OpenAPI/Swagger UI served at <code>/api/docs</code> with Bearer-token auth.</td></tr>
+    </table>
+
+    <h2 id="s12">§12 Revision history</h2>
+    <table>
+      <tr><th>Version</th><th>Date</th><th>Change</th></tr>
+      <tr>
+        <td class="mono">1.1</td>
+        <td>2026-09-23</td>
+        <td>
+          <strong>Dynamic RBAC &amp; role administration.</strong> Roles and their permission grants moved from a hardcoded matrix in <code>packages/shared/src/rbac.ts</code> to the database, with an admin UI to manage them.
+          <ul>
+            <li>§9.1 rewritten: FR-9.1.1 now describes a database-backed, runtime-editable matrix rather than a fixed 5-role hardcoded one.</li>
+            <li>Added FR-9.1.3 — ADMIN can create, rename, and delete roles and edit their permission grants at runtime (<code>role:manage</code> permission); built-in and in-use roles cannot be deleted.</li>
+            <li>Added FR-9.1.4 — ADMIN can reassign an existing user's role, not only set it at creation.</li>
+            <li>§10 updated: data model grew from 22 to 27 models with the addition of <code>Role</code> and <code>RolePermission</code>.</li>
+          </ul>
+          <span class="badge">API</span> new <code>roles</code> module (<code>GET/POST/PATCH/DELETE /roles</code>, <code>GET /roles/matrix</code>, <code>PATCH /users/:id/role</code>) &middot;
+          <span class="badge">Web</span> new <code>/roles</code> admin page &amp; role-assignment control on <code>/users</code> &middot;
+          <span class="badge">Mobile</span> fetches the matrix instead of bundling it &middot;
+          <span class="badge green">Migration</span> backfills the 5 built-in roles and their original grants as data.
+        </td>
+      </tr>
+      <tr><td class="mono">1.0</td><td>—</td><td>Baseline specification (§1–§11 as originally written).</td></tr>
     </table>
 
     <div class="footer-nav">

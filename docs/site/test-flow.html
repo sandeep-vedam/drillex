@@ -1,0 +1,458 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Drillex Test Flow</title>
+<style>
+  html,body{margin:0;padding:0}
+  img{max-width:100%}
+  @import url('https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+  :root{
+    --bg:#eef1f4; --surface:#ffffff; --surface-2:#e6ebef; --ink:#13212f; --muted:#5b7083;
+    --line:#d6dee4; --accent:#c8580f; --accent-ink:#fff7ef;
+    --ok:#2f8f5b; --ok-soft:#e4f3ea; --warn:#b8790f; --warn-soft:#faf0dd; --crit:#c23b3b; --crit-soft:#fbe9e9;
+    --steel:#5b7083; --steel-soft:#e7ebee; --navy:#233a54; --navy-soft:#e6eaf1;
+    --shadow:0 1px 2px rgba(19,33,47,.06),0 8px 24px -12px rgba(19,33,47,.18);
+  }
+  @media (prefers-color-scheme:dark){
+    :root:not([data-theme="light"]){
+      --bg:#0c141d; --surface:#121e2a; --surface-2:#182633; --ink:#e8eef3; --muted:#93a7b7;
+      --line:#25384a; --accent:#ef8a3a; --accent-ink:#1c1004;
+      --ok:#4cb582; --ok-soft:#123322; --warn:#dba53a; --warn-soft:#332711; --crit:#e06868; --crit-soft:#3a1616;
+      --steel:#93a7b7; --steel-soft:#1c2934; --navy:#9db3d6; --navy-soft:#1a2636;
+      --shadow:0 1px 2px rgba(0,0,0,.3),0 12px 28px -14px rgba(0,0,0,.55);
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#0c141d; --surface:#121e2a; --surface-2:#182633; --ink:#e8eef3; --muted:#93a7b7;
+    --line:#25384a; --accent:#ef8a3a; --accent-ink:#1c1004;
+    --ok:#4cb582; --ok-soft:#123322; --warn:#dba53a; --warn-soft:#332711; --crit:#e06868; --crit-soft:#3a1616;
+    --steel:#93a7b7; --steel-soft:#1c2934; --navy:#9db3d6; --navy-soft:#1a2636;
+    --shadow:0 1px 2px rgba(0,0,0,.3),0 12px 28px -14px rgba(0,0,0,.55);
+  }
+
+  *{box-sizing:border-box}
+  body{background:var(--bg);color:var(--ink);font-family:'IBM Plex Sans',system-ui,sans-serif;font-size:14.5px;line-height:1.55;padding-inline:20px}
+  h1,h2,h3{font-family:'Archivo',system-ui,sans-serif;text-wrap:balance;letter-spacing:-.01em}
+  code,.mono{font-family:'IBM Plex Mono',ui-monospace,Consolas,monospace}
+  a{color:var(--accent)}
+  .wrap{max-width:1240px;margin-inline:auto;padding-block:26px 90px}
+
+  .top{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;flex-wrap:wrap;border-bottom:1px solid var(--line);padding-bottom:20px;margin-bottom:20px}
+  .brand{display:flex;align-items:center;gap:10px}
+  .mark{width:32px;height:32px;border-radius:7px;background:var(--accent);color:var(--accent-ink);display:flex;align-items:center;justify-content:center;font-family:'Archivo';font-weight:800;font-size:14px;flex:none}
+  .eyebrow{font-family:'IBM Plex Mono';font-size:11px;text-transform:uppercase;letter-spacing:.14em;color:var(--muted)}
+  h1{font-size:clamp(24px,3.6vw,32px);font-weight:800;margin:4px 0 6px}
+  .dek{color:var(--muted);max-width:62ch;font-size:14.5px}
+
+  .progress-card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 18px;box-shadow:var(--shadow);min-width:200px;display:flex;flex-direction:column;gap:8px}
+  .progress-num{font-family:'Archivo';font-weight:800;font-size:26px;line-height:1}
+  .progress-label{font-size:11.5px;color:var(--muted);font-family:'IBM Plex Mono';text-transform:uppercase;letter-spacing:.06em}
+  .bar{height:6px;border-radius:99px;background:var(--surface-2);overflow:hidden}
+  .bar-fill{height:100%;background:var(--accent);border-radius:99px;width:0%;transition:width .25s ease}
+  .reset-btn{align-self:flex-start;font-family:'IBM Plex Mono';font-size:11px;color:var(--muted);background:none;border:1px solid var(--line);border-radius:6px;padding:3px 8px;cursor:pointer}
+  .reset-btn:hover{color:var(--crit);border-color:var(--crit)}
+
+  .env{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px 20px;box-shadow:var(--shadow);margin-bottom:26px}
+  .env h2{font-size:15px;margin:0 0 10px}
+  .env-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px}
+  .env-grid .k{font-family:'IBM Plex Mono';font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin-bottom:3px}
+  .env-grid .v{font-size:13px}
+  .cred-tbl{width:100%;border-collapse:collapse;margin-top:6px;font-size:12.5px}
+  .cred-tbl th{text-align:left;font-family:'IBM Plex Mono';font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);padding:4px 10px 4px 0}
+  .cred-tbl td{padding:3px 10px 3px 0;font-family:'IBM Plex Mono'}
+
+  .layout{display:grid;grid-template-columns:210px 1fr;gap:36px;align-items:start}
+  nav.toc{position:sticky;top:20px;display:flex;flex-direction:column;gap:1px;border-right:1px solid var(--line);padding-right:14px;max-height:calc(100vh - 40px);overflow-y:auto}
+  nav.toc a{color:var(--muted);text-decoration:none;font-size:12.5px;padding:6px 8px;border-radius:6px;display:flex;justify-content:space-between;gap:6px}
+  nav.toc a .cnt{font-family:'IBM Plex Mono';font-size:10.5px;color:var(--muted)}
+  nav.toc a:hover{background:var(--surface-2);color:var(--ink)}
+  nav.toc a.active{background:var(--surface-2);color:var(--ink);font-weight:600}
+
+  main{min-width:0}
+  section{padding-block:26px;border-bottom:1px solid var(--line)}
+  section:last-child{border-bottom:none}
+  .sec-head{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:4px}
+  .sec-num{font-family:'IBM Plex Mono';color:var(--accent);font-size:12.5px;font-weight:600}
+  h2{font-size:19px;font-weight:700;margin:0}
+  .sec-note{color:var(--muted);font-size:13px;margin:4px 0 14px}
+  .tag{display:inline-block;font-family:'IBM Plex Mono';font-size:10.5px;padding:2px 8px;border-radius:99px;border:1px solid var(--line);background:var(--surface-2);color:var(--muted)}
+  .tag.new{color:var(--ok);border-color:color-mix(in srgb, var(--ok) 40%, var(--line))}
+
+  /* test table */
+  .tbl-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+  table.tests{border-collapse:collapse;width:100%;min-width:640px;font-size:13px}
+  table.tests th{text-align:left;font-family:'IBM Plex Mono';font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600;background:var(--surface-2);padding:9px 12px;border-bottom:1px solid var(--line)}
+  table.tests td{padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  table.tests tr:last-child td{border-bottom:none}
+  table.tests tr.done td{color:var(--muted)}
+  table.tests tr.done .id{text-decoration:line-through}
+  .id{font-family:'IBM Plex Mono';font-weight:600;white-space:nowrap}
+  .chk-cell{width:30px;text-align:center}
+  input[type=checkbox]{width:16px;height:16px;accent-color:var(--accent);cursor:pointer}
+  .role-chip{display:inline-block;font-family:'IBM Plex Mono';font-size:10.5px;font-weight:600;padding:1px 7px;border-radius:99px;white-space:nowrap}
+  .role-ADMIN{background:var(--crit-soft);color:var(--crit)}
+  .role-MANAGER{background:var(--navy-soft);color:var(--navy)}
+  .role-SUPERVISOR{background:var(--warn-soft);color:var(--warn)}
+  .role-TECHNICIAN{background:var(--steel-soft);color:var(--steel)}
+  .role-OPERATOR{background:var(--ok-soft);color:var(--ok)}
+  .role-ANY{background:var(--surface-2);color:var(--muted)}
+
+  /* narrative steps */
+  .steps{list-style:none;padding:0;margin:14px 0;counter-reset:step;display:flex;flex-direction:column;gap:0}
+  .steps li{counter-increment:step;display:flex;gap:14px;padding:13px 0;border-top:1px solid var(--line)}
+  .steps li:first-child{border-top:none}
+  .steps li::before{content:counter(step);font-family:'IBM Plex Mono';font-weight:700;font-size:12px;color:var(--accent-ink);background:var(--accent);width:22px;height:22px;border-radius:99px;display:flex;align-items:center;justify-content:center;flex:none;margin-top:1px}
+  .steps .body{flex:1}
+  .steps .do{font-weight:600;margin-bottom:2px}
+  .steps .expect{color:var(--muted);font-size:13px}
+  .steps .expect b{color:var(--ok);font-weight:600}
+  .steps input[type=checkbox]{margin-top:3px}
+
+  .callout{border-left:3px solid var(--accent);background:color-mix(in srgb, var(--accent) 8%, var(--surface));border-radius:0 8px 8px 0;padding:12px 16px;font-size:13px;margin:14px 0}
+  .callout b{color:var(--accent)}
+
+  footer{margin-top:36px;padding-top:18px;border-top:1px solid var(--line);color:var(--muted);font-size:12px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px}
+
+  @media (max-width:860px){
+    .layout{grid-template-columns:1fr}
+    nav.toc{position:static;flex-direction:row;flex-wrap:wrap;border-right:none;border-bottom:1px solid var(--line);padding-right:0;padding-bottom:10px;max-height:none}
+    nav.toc a{padding:5px 9px;background:var(--surface-2);border-radius:99px}
+    nav.toc a .cnt{display:none}
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <div class="top">
+    <div>
+      <div class="brand"><div class="mark">Dx</div><span class="eyebrow">DrillEx &middot; QA</span></div>
+      <h1>Test Flow</h1>
+      <p class="dek">End-to-end manual test flow derived from the SRS (v1.1) and the current codebase — regression coverage for every functional section, plus a full walkthrough of the new dynamic RBAC admin flow.</p>
+    </div>
+    <div class="progress-card">
+      <div><span class="progress-num" id="prog-num">0</span> <span style="color:var(--muted);font-size:13px">/ <span id="prog-total">0</span></span></div>
+      <div class="progress-label">Checks complete</div>
+      <div class="bar"><div class="bar-fill" id="prog-bar"></div></div>
+      <button class="reset-btn" id="reset-btn" type="button">Reset progress</button>
+    </div>
+  </div>
+
+  <div class="env">
+    <h2>Environment</h2>
+    <div class="env-grid">
+      <div>
+        <div class="k">Start infra + app</div>
+        <div class="v mono">pnpm infra:up &amp;&amp; pnpm db:migrate &amp;&amp; pnpm db:seed &amp;&amp; pnpm dev</div>
+      </div>
+      <div>
+        <div class="k">Web / API</div>
+        <div class="v mono">localhost:3000 &middot; localhost:4000/api/v1</div>
+      </div>
+      <div>
+        <div class="k">Mobile</div>
+        <div class="v">Android emulator or device, API via <code>10.0.2.2:4000</code> (dev)</div>
+      </div>
+    </div>
+    <table class="cred-tbl">
+      <tr><th>Employee ID</th><th>Role</th><th>Password</th></tr>
+      <tr><td>ADM001</td><td><span class="role-chip role-ADMIN">ADMIN</span></td><td>Password123</td></tr>
+      <tr><td>MGR001</td><td><span class="role-chip role-MANAGER">MANAGER</span></td><td>Password123</td></tr>
+      <tr><td>SUP001</td><td><span class="role-chip role-SUPERVISOR">SUPERVISOR</span></td><td>Password123</td></tr>
+      <tr><td>TEC001</td><td><span class="role-chip role-TECHNICIAN">TECHNICIAN</span></td><td>Password123</td></tr>
+      <tr><td>OPR001</td><td><span class="role-chip role-OPERATOR">OPERATOR</span></td><td>Password123</td></tr>
+    </table>
+  </div>
+
+  <div class="layout">
+    <nav class="toc" id="toc">
+      <a href="#s2">§2 Auth &amp; devices <span class="cnt" data-cnt-for="s2"></span></a>
+      <a href="#s3">§3 Asset register <span class="cnt" data-cnt-for="s3"></span></a>
+      <a href="#s4">§4 Shift production <span class="cnt" data-cnt-for="s4"></span></a>
+      <a href="#s5">§5 Daily readings <span class="cnt" data-cnt-for="s5"></span></a>
+      <a href="#s6">§6 Maintenance <span class="cnt" data-cnt-for="s6"></span></a>
+      <a href="#s7">§7 Job cards &amp; parts <span class="cnt" data-cnt-for="s7"></span></a>
+      <a href="#s8">§8 Reporting <span class="cnt" data-cnt-for="s8"></span></a>
+      <a href="#s91a">§9.1 RBAC — regression <span class="cnt" data-cnt-for="s91a"></span></a>
+      <a href="#s91b">§9.1 RBAC — dynamic (new) <span class="cnt" data-cnt-for="s91b"></span></a>
+      <a href="#s92">§9.2 Offline sync <span class="cnt" data-cnt-for="s92"></span></a>
+      <a href="#s93">§9.3 Audit <span class="cnt" data-cnt-for="s93"></span></a>
+      <a href="#s94">§9.4 Notifications <span class="cnt" data-cnt-for="s94"></span></a>
+      <a href="#s95">§9.5 NFRs <span class="cnt" data-cnt-for="s95"></span></a>
+      <a href="#automated">Automated coverage</a>
+    </nav>
+
+    <main>
+
+      <section id="s2">
+        <div class="sec-head"><span class="sec-num">§2</span><h2>Authentication &amp; devices</h2></div>
+        <p class="sec-note">SRS FR-2.1–FR-2.6</p>
+        <div class="tbl-wrap"><table class="tests">
+          <thead><tr><th class="chk-cell"></th><th>ID</th><th>Role</th><th>Steps</th><th>Expected</th></tr></thead>
+          <tbody id="tb-s2">
+            <tr><td class="chk-cell"><input type="checkbox" data-test="s2-1"></td><td class="id">FR-2.1</td><td><span class="role-chip role-OPERATOR">OPR001</span></td><td>Web/mobile login with correct employee ID + password.</td><td>Signed in, landed on dashboard/home.</td></tr>
+            <tr><td class="chk-cell"><input type="checkbox" data-test="s2-2"></td><td class="id">FR-2.1</td><td><span class="role-chip role-ANY">any</span></td><td>Login with a wrong password.</td><td>401, generic "invalid credentials" — no hint whether the ID exists.</td></tr>
+            <tr><td class="chk-cell"><input type="checkbox" data-test="s2-3"></td><td class="id">FR-2.2</td><td><span class="role-chip role-ADMIN">ADM001</span></td><td>Attempt a failed login for OPR001, then inspect <code>LoginEvent</code> rows for that <code>employeeId</code>.</td><td>A row exists with <code>success: false</code>, correct <code>deviceId</code>/IP/timestamp.</td></tr>
+            <tr><td class="chk-cell"><input type="checkbox" data-test="s2-4"></td><td class="id">FR-2.3</td><td><span class="role-chip role-ADMIN">ADM001</span></td><td>Settings → Security: add MANAGER to "roles requiring 2FA", save. Log out, log in as MGR001.</td><td>Login returns <code>requires2faSetup</code> until TOTP is enrolled; subsequent logins need a valid 6-digit code.</td></tr>
+            <tr><td class="chk-cell"><input type="checkbox" data-test="s2-5"></td><td class="id">FR-2.4</td><td><span class="role-chip role-OPERATOR">OPR001</span></td><td>Stay logged in on mobile past the 15-minute access-token TTL, then trigger any API call.</td><td>Call succeeds transparently — silent refresh, no re-login prompt.</td></tr>
+            <tr><td class="chk-cell"><input type="checkbox" data-test="s2-6"></td><td class="id">FR-2.6</td><td><span class="role-chip role-ADMIN">ADM001</span></td><td>Create a user (Users → New user), log in as that user with the temporary password shown.</td><td>Redirected to Change password; other pages are blocked until it's changed.</td></tr>
+          </tbody>
+        </table></div>
+      </section>
+
+      <section id="s3">
+        <div class="sec-head"><span class="sec-num">§3</span><h2>Asset register</h2></div>
+        <p class="sec-note">SRS FR-3.1–FR-3.4</p>
+        <div class="tbl-wrap"><table class="tests">
+          <thead><tr><th class="chk-cell"></th><th>ID</th><th>Role</th><th>Steps</th><th>Expected</th></tr></thead>
+          <tbody id="tb-s3">
+            <tr><td class="chk-cell"><input type="checkbox" data-test="s3-1"></td><td class="id">FR-3.1</td><td><span class="role-chip role-TECHNICIAN">TEC001</span></td><td>Open <code>/assets</code>, try "New asset".</td><td>No write action available (TECHNICIAN has no <code>asset:write</code>) — button hidden.</td></tr>
+            <tr><td class="chk-cell"><input type="checkbox" data-test="s3-2"></td><td class="id">FR-3.1, FR-3.2</td><td><span class="role-chip role-ADMIN">ADM001</span></td><td>Register a new asset; then try editing its category via the API directly.</td><td>Created with a generated <code>PREFIX-###</code> number; category is omitted from the update schema — number/category never change.</td></tr>
+            <tr><td class="chk-cell"><input type="checkbox" data-test="s3-3"></td><td class="id">FR-3.3</td><td><span class="role-chip role-OPERATOR">OPR001</span></td><td>On mobile, open an asset you are <em>not</em> assigned to.</td><td>No "Daily reading" / "Shift report" action offered for that asset's row.</td></tr>
+            <tr><td class="chk-cell"><input type="checkbox" data-test="s3-4"></td><td class="id">FR-3.4</td><td><span class="role-chip role-TECHNICIAN">TEC001</span></td><td>Open a job card against DRL-001; check the asset's status before/after.</td><td>Status flips to <code>UNDER_MAINTENANCE</code> on open, reverts to <code>ACTIVE</code> once every open job card on it is completed.</td></tr>
+          </tbody>
+        </table></div>
+      </section>
+
+      <section id="s4">
+        <div class="sec-head"><span class="sec-num">§4</span><h2>Shift production reporting</h2></div>
+        <p class="sec-note">SRS FR-4.1–FR-4.5 · mobile: Shift production report</p>
+        <div class="tbl-wrap"><table class="tests">
+          <thead><tr><th class="chk-cell"></th><th>ID</th><th>Role</th><th>Steps</th><th>Expected</th></tr></thead>
+          <tbody id="tb-s4">
+            <tr><td class="chk-cell"><input type="checkbox" data-test="s4-1"></td><td class="id">FR-4.1</td><td><span class="role-chip role-OPERATOR">OPR001</span></td><td>Submit a shift report for DRL-001, today's date/shift; submit a second one for the same asset/date/shift.</td><td>First succeeds; second is rejected (duplicate).</td></tr>
+            <tr><td class="chk-cell"><input type="checkbox" data-test="s4-2"></td><td class="id">FR-4.2</td><td><span class="role-chip role-OPERATOR">OPR001</span></td><td>Submit with end depth &lt; start depth.</td><td>Rejected (400); a valid one server-computes <code>totalMeters = end − start</code>.</td></tr>
+            <tr><td class="chk-cell"><input type="checkbox" data-test="s4-3"></td><td class="id">FR-4.4</td><td><span class="role-chip role-OPERATOR">OPR001</span></td><td>Try approving your own submitted report.</td><td>Denied — operators cannot approve (no <code>shift_report:approve</code>).</td></tr>
+            <tr><td class="chk-cell"><input type="checkbox" data-test="s4-4"></td><td class="id">FR-4.4</td><td><span class="role-chip role-SUPERVISOR">SUP001</span></td><td>Approve the pending report from Shift production on web.</td><td>Status moves SUBMITTED → APPROVED.</td></tr>
+            <tr><td class="chk-cell"><input type="checkbox" data-test="s4-5"></td><td class="id">FR-4.5</td><td><span class="role-chip role-SUPERVISOR">SUP001</span></td><td>Try unlocking the report you just approved.</td><td>Denied — supervisors cannot edit approved data; try again as MGR001 with a reason → succeeds and reopens it, audited.</td></tr>
+          </tbody>
+        </table></div>
+      </section>
+
+      <section id="s5">
+        <div class="sec-head"><span class="sec-num">§5</span><h2>Daily equipment readings</h2></div>
+        <p class="sec-note">SRS FR-5.1–FR-5.4 · mobile: Daily machine readings</p>
+        <div class="tbl-wrap"><table class="tests">
+          <thead><tr><th class="chk-cell"></th><th>ID</th><th>Role</th><th>Steps</th><th>Expected</th></tr></thead>
+          <tbody id="tb-s5">
+            <tr><td class="chk-cell"><input type="checkbox" data-test="s5-1"></td><td class="id">FR-5.1</td><td><span class="role-chip role-OPERATOR">OPR001</span></td><td>Submit today's reading twice for the same asset.</td><td>Second attempt rejected as a duplicate for that date.</td></tr>
+            <tr><td class="chk-cell"><input type="checkbox" data-test="s5-2"></td><td class="id">FR-5.3</td><td><span class="role-chip role-OPERATOR">OPR001</span></td><td>Submit a reading with "warning lights" on and condition rating 2.</td><td>Response includes <code>WARNING_LIGHTS</code> and <code>MAINTENANCE_REVIEW</code> alerts; an <code>Alert</code> row is created for the asset.</td></tr>
+            <tr><td class="chk-cell"><input type="checkbox" data-test="s5-3"></td><td class="id">FR-5.4</td><td><span class="role-chip role-OPERATOR">OPR001</span></td><td>Attach a signature to a reading from the mobile form.</td><td>Attachment uploads and is retrievable against that reading afterwards.</td></tr>
+          </tbody>
+        </table></div>
+      </section>
+
+      <section id="s6">
+        <div class="sec-head"><span class="sec-num">§6</span><h2>Maintenance scheduling</h2></div>
+        <p class="sec-note">SRS FR-6.1–FR-6.5 · time-driven items are best verified by backdating a schedule's <code>nextDueAt</code>/hours rather than waiting for the real clock</p>
+        <div class="tbl-wrap"><table class="tests">
+          <thead><tr><th class="chk-cell"></th><th>ID</th><th>Role</th><th>Steps</th><th>Expected</th></tr></thead>
+          <tbody id="tb-s6">
+            <tr><td class="chk-cell"><input type="checkbox" data-test="s6-1"></td><td class="id">FR-6.1, 6.2</td><td><span class="role-chip role-SUPERVISOR">SUP001</span></td><td>Create an HR_250 schedule on DRL-001; submit readings that push its hour meter past the interval.</td><td>Status computes to <code>DUE_NOW</code>/<code>OVERDUE</code> using the latest hour meter, no manual recompute needed.</td></tr>
+            <tr><td class="chk-cell"><input type="checkbox" data-test="s6-2"></td><td class="id">FR-6.5</td><td><span class="role-chip role-TECHNICIAN">TEC001</span></td><td>Complete the due schedule from Maintenance.</td><td>Recurring schedule rolls forward to the next cycle; asset status re-evaluated.</td></tr>
+            <tr><td class="chk-cell"><input type="checkbox" data-test="s6-3"></td><td class="id">FR-6.3, 6.4</td><td><span class="role-chip role-ANY">n/a</span></td><td>Inspect notifications after the 06:00 daily / Monday 07:00 jobs run (or trigger the scheduled task manually in a dev shell).</td><td>Assigned technicians/supervisors get reminders; all MANAGERs get the weekly digest.</td></tr>
+          </tbody>
+        </table></div>
+      </section>
+
+      <section id="s7">
+        <div class="sec-head"><span class="sec-num">§7</span><h2>Job cards &amp; parts</h2></div>
+        <p class="sec-note">SRS FR-7.1–FR-7.6</p>
+        <div class="tbl-wrap"><table class="tests">
+          <thead><tr><th class="chk-cell"></th><th>ID</th><th>Role</th><th>Steps</th><th>Expected</th></tr></thead>
+          <tbody id="tb-s7">
+            <tr><td class="chk-cell"><input type="checkbox" data-test="s7-1"></td><td class="id">FR-7.1</td><td><span class="role-chip role-TECHNICIAN">TEC001</span></td><td>Create two job cards this year.</td><td>Sequential <code>JC-2026-####</code> numbers, no collisions.</td></tr>
+            <tr><td class="chk-cell"><input type="checkbox" data-test="s7-2"></td><td class="id">FR-7.3</td><td><span class="role-chip role-TECHNICIAN">TEC001</span></td><td>Add a part line to a job card; note stock before/after. Remove the line.</td><td>Stock deducts on add, a movement is recorded; removing reverses it exactly.</td></tr>
+            <tr><td class="chk-cell"><input type="checkbox" data-test="s7-3"></td><td class="id">FR-7.3</td><td><span class="role-chip role-TECHNICIAN">TEC001</span></td><td>Try adding more of a part than is on hand.</td><td>Rejected (400); stock untouched.</td></tr>
+            <tr><td class="chk-cell"><input type="checkbox" data-test="s7-4"></td><td class="id">FR-7.4</td><td><span class="role-chip role-MANAGER">MGR001</span></td><td>Drive a part's stock below its minimum qty via a movement.</td><td>MANAGER and TECHNICIAN roles get a low-stock notification.</td></tr>
+            <tr><td class="chk-cell"><input type="checkbox" data-test="s7-5"></td><td class="id">FR-7.5</td><td><span class="role-chip role-TECHNICIAN">TEC001</span></td><td>Raise a purchase request for a low-stock part; move it OPEN → ORDERED → RECEIVED.</td><td>State transitions succeed in order; stock reflects receipt.</td></tr>
+            <tr><td class="chk-cell"><input type="checkbox" data-test="s7-6"></td><td class="id">FR-7.6</td><td><span class="role-chip role-TECHNICIAN">TEC001</span></td><td>Try completing a job card with no signature attached.</td><td>Blocked until a technician signature is captured.</td></tr>
+          </tbody>
+        </table></div>
+      </section>
+
+      <section id="s8">
+        <div class="sec-head"><span class="sec-num">§8</span><h2>Reporting</h2></div>
+        <p class="sec-note">SRS FR-8.1–FR-8.5</p>
+        <div class="tbl-wrap"><table class="tests">
+          <thead><tr><th class="chk-cell"></th><th>ID</th><th>Role</th><th>Steps</th><th>Expected</th></tr></thead>
+          <tbody id="tb-s8">
+            <tr><td class="chk-cell"><input type="checkbox" data-test="s8-1"></td><td class="id">FR-8.2</td><td><span class="role-chip role-SUPERVISOR">SUP001</span></td><td>Open Reports, try generating "Chemical Usage" or "Employee Activity".</td><td>Not offered/denied — restricted to MANAGER/ADMIN.</td></tr>
+            <tr><td class="chk-cell"><input type="checkbox" data-test="s8-2"></td><td class="id">FR-8.1, 8.3</td><td><span class="role-chip role-MANAGER">MGR001</span></td><td>Generate "Drilling Production" for last month.</td><td>Both PDF and XLSX are produced and downloadable; a <code>Report</code> record is archived.</td></tr>
+            <tr><td class="chk-cell"><input type="checkbox" data-test="s8-3"></td><td class="id">FR-8.4</td><td><span class="role-chip role-MANAGER">MGR001</span></td><td>Email a generated report to a test address.</td><td>Delivered (or logged, if SMTP unconfigured in dev).</td></tr>
+          </tbody>
+        </table></div>
+      </section>
+
+      <section id="s91a">
+        <div class="sec-head"><span class="sec-num">§9.1a</span><h2>RBAC — five-role regression</h2><span class="tag">regression</span></div>
+        <p class="sec-note">Confirms the built-in roles behave exactly as before the migration to a database-backed matrix (SRS FR-9.1.1, FR-9.1.2).</p>
+        <div class="tbl-wrap"><table class="tests">
+          <thead><tr><th class="chk-cell"></th><th>ID</th><th>Role</th><th>Steps</th><th>Expected</th></tr></thead>
+          <tbody id="tb-s91a">
+            <tr><td class="chk-cell"><input type="checkbox" data-test="s91a-1"></td><td class="id">FR-9.1.1</td><td><span class="role-chip role-OPERATOR">OPR001</span></td><td>Log in; check the web/mobile menu and what <code>GET /api/v1/users</code> returns.</td><td>Menu shows only operator-permitted items; the users list call returns 403.</td></tr>
+            <tr><td class="chk-cell"><input type="checkbox" data-test="s91a-2"></td><td class="id">FR-9.1.1</td><td><span class="role-chip role-ADMIN">ADM001</span></td><td>Check the web sidebar and mobile home screen.</td><td>Both surfaces expose exactly the same set of pages/actions the API allows (no drift between what's offered and what's enforced).</td></tr>
+            <tr><td class="chk-cell"><input type="checkbox" data-test="s91a-3"></td><td class="id">FR-9.1.2</td><td><span class="role-chip role-ANY">any</span></td><td>Call any non-public endpoint with no <code>Authorization</code> header.</td><td>401, not a silent pass-through.</td></tr>
+          </tbody>
+        </table></div>
+      </section>
+
+      <section id="s91b">
+        <div class="sec-head"><span class="sec-num">§9.1b</span><h2>RBAC — dynamic role administration</h2><span class="tag new">new</span></div>
+        <p class="sec-note">SRS FR-9.1.3, FR-9.1.4 — the full create → grant → assign → edit → rename → delete lifecycle. Do this one in order; each step depends on the last.</p>
+        <ol class="steps">
+          <li><label class="body"><input type="checkbox" data-test="s91b-1"><span class="do">Open the new admin page.</span><br>Log in as <b>ADM001</b>, go to <code>/roles</code> (Roles &amp; permissions in the sidebar).<br><span class="expect">Table lists the 5 built-in roles, each tagged <code>built-in</code>, with their permission counts and current user counts.</span></label></li>
+          <li><label class="body"><input type="checkbox" data-test="s91b-2"><span class="do">Create a custom role.</span><br>"New role" → name it <code>Site Coordinator</code> → grant only <code>daily_reading:read</code> at scope <code>site</code> → Create.<br><span class="expect">Role appears in the table with key <code>SITE_COORDINATOR</code>, 1 permission, 0 users.</span></label></li>
+          <li><label class="body"><input type="checkbox" data-test="s91b-3"><span class="do">Assign it to a user.</span><br>Go to <code>/users</code> → create a test user (or reuse an existing non-critical one) with role <code>Site Coordinator</code>, or change an existing user's role via the row selector.<br><span class="expect">User's role column now shows Site Coordinator; user count on the role goes to 1.</span></label></li>
+          <li><label class="body"><input type="checkbox" data-test="s91b-4"><span class="do">Verify the grant is enforced — and nothing more.</span><br>Log in as that test user. Open Daily readings; try Asset register.<br><span class="expect">Daily readings is visible/readable; Asset register is <b>not</b> offered, and <code>GET /assets</code> returns 403.</span></label></li>
+          <li><label class="body"><input type="checkbox" data-test="s91b-5"><span class="do">Grant a second permission, live.</span><br>Back as ADM001, edit the role → also grant <code>asset:read</code> at scope <code>site</code> → Save. Do <b>not</b> log the test user out.<br><span class="expect">Without re-login, the test user's next request to <code>GET /assets</code> succeeds — proves the permission cache invalidates on write.</span></label></li>
+          <li><label class="body"><input type="checkbox" data-test="s91b-6"><span class="do">Rename the role.</span><br>Edit the role again, change the name to <code>Regional Coordinator</code>, save.<br><span class="expect">Display name updates everywhere; the test user's session is unaffected (still logged in, same access) — the underlying key never changed.</span></label></li>
+          <li><label class="body"><input type="checkbox" data-test="s91b-7"><span class="do">Delete is blocked while in use.</span><br>Try deleting the role while the test user still holds it.<br><span class="expect">Blocked with a message naming how many users hold it; Delete is disabled/greyed in the UI.</span></label></li>
+          <li><label class="body"><input type="checkbox" data-test="s91b-8"><span class="do">Reassign, then delete.</span><br>On <code>/users</code>, change the test user's role back to Operator. Return to <code>/roles</code> and delete Regional Coordinator.<br><span class="expect">Delete now succeeds; the role disappears from the table.</span></label></li>
+          <li><label class="body"><input type="checkbox" data-test="s91b-9"><span class="do">Built-in roles can't be deleted, ever.</span><br>Try deleting Operator (0 users or not — doesn't matter).<br><span class="expect">Blocked — built-in roles are permanently protected.</span></label></li>
+          <li><label class="body"><input type="checkbox" data-test="s91b-10"><span class="do">Unknown role/permission is rejected cleanly.</span><br>Via the API directly: <code>PATCH /users/:id/role</code> with a made-up role string; <code>POST /roles</code> with a made-up permission string.<br><span class="expect">Both return 400 with a clear message — never a raw DB/500 error.</span></label></li>
+        </ol>
+      </section>
+
+      <section id="s92">
+        <div class="sec-head"><span class="sec-num">§9.2</span><h2>Offline synchronization</h2></div>
+        <p class="sec-note">SRS FR-9.2.1–FR-9.2.3 · mobile only, needs airplane mode</p>
+        <ol class="steps">
+          <li><label class="body"><input type="checkbox" data-test="s92-1"><span class="do">Queue while offline.</span><br>As OPR001 on mobile, enable airplane mode, submit a daily reading with a photo attached.<br><span class="expect">Submission succeeds locally; Outbox badge shows a pending item.</span></label></li>
+          <li><label class="body"><input type="checkbox" data-test="s92-2"><span class="do">Auto-flush on reconnect.</span><br>Disable airplane mode.<br><span class="expect">Outbox drains automatically within the periodic sync interval, no manual retry needed; the reading and its photo both land on the server.</span></label></li>
+          <li><label class="body"><input type="checkbox" data-test="s92-3"><span class="do">Idempotent replay.</span><br>Re-open the Outbox screen and force a resend of an already-applied op (or re-send the same <code>opId</code> via the API).<br><span class="expect">Reported as <code>duplicate</code>, not re-applied / not double-counted.</span></label></li>
+          <li><label class="body"><input type="checkbox" data-test="s92-4"><span class="do">Conflict routing.</span><br>Submit the same asset/date reading from two different devices while both were offline, then let both sync.<br><span class="expect">Second one lands in the sync-conflicts queue (<code>/sync-conflicts</code>, SUPERVISOR/MANAGER) rather than silently overwriting the first.</span></label></li>
+        </ol>
+      </section>
+
+      <section id="s93">
+        <div class="sec-head"><span class="sec-num">§9.3</span><h2>Audit</h2></div>
+        <p class="sec-note">SRS FR-9.3.1</p>
+        <div class="tbl-wrap"><table class="tests">
+          <thead><tr><th class="chk-cell"></th><th>ID</th><th>Role</th><th>Steps</th><th>Expected</th></tr></thead>
+          <tbody id="tb-s93">
+            <tr><td class="chk-cell"><input type="checkbox" data-test="s93-1"></td><td class="id">FR-9.3.1</td><td><span class="role-chip role-ADMIN">ADM001</span></td><td>After the §9.1b role walkthrough, inspect <code>AuditLog</code> for <code>entity: 'Role'</code> and <code>entity: 'User'</code>, <code>action: 'ROLE_CHANGED'</code>.</td><td>One row per create/update/delete of the role, and one per user role reassignment — each with actor, device, entity, action.</td></tr>
+            <tr><td class="chk-cell"><input type="checkbox" data-test="s93-2"></td><td class="id">FR-9.3.1</td><td><span class="role-chip role-SUPERVISOR">SUP001</span></td><td>Approve a shift report, then unlock (as MGR001).</td><td>Both actions produce audit rows with a diff.</td></tr>
+          </tbody>
+        </table></div>
+      </section>
+
+      <section id="s94">
+        <div class="sec-head"><span class="sec-num">§9.4</span><h2>Notifications</h2></div>
+        <p class="sec-note">SRS FR-9.4.1</p>
+        <div class="tbl-wrap"><table class="tests">
+          <thead><tr><th class="chk-cell"></th><th>ID</th><th>Role</th><th>Steps</th><th>Expected</th></tr></thead>
+          <tbody id="tb-s94">
+            <tr><td class="chk-cell"><input type="checkbox" data-test="s94-1"></td><td class="id">FR-9.4.1</td><td><span class="role-chip role-SUPERVISOR">SUP001</span></td><td>Trigger a maintenance-due reminder; check the bell icon on web and the Notifications screen on mobile.</td><td>Appears in-app on both, markable read; also arrives as a push if a device token is registered.</td></tr>
+          </tbody>
+        </table></div>
+      </section>
+
+      <section id="s95">
+        <div class="sec-head"><span class="sec-num">§9.5</span><h2>Non-functional spot checks</h2></div>
+        <p class="sec-note">SRS §9.5 — these are sampled manually here; NFR-PERF-1 has a dedicated load test (see Automated coverage).</p>
+        <div class="tbl-wrap"><table class="tests">
+          <thead><tr><th class="chk-cell"></th><th>ID</th><th>Steps</th><th>Expected</th></tr></thead>
+          <tbody id="tb-s95">
+            <tr><td class="chk-cell"><input type="checkbox" data-test="s95-1"></td><td class="id">NFR-SEC-1</td><td>Start the API in production mode with <code>JWT_ACCESS_SECRET</code> unset or &lt;32 chars.</td><td>Refuses to boot.</td></tr>
+            <tr><td class="chk-cell"><input type="checkbox" data-test="s95-2"></td><td class="id">NFR-SEC-2</td><td>Inspect response headers on any API call; hammer the login endpoint &gt;10×/60s.</td><td>Helmet security headers present; login throttles after the limit.</td></tr>
+            <tr><td class="chk-cell"><input type="checkbox" data-test="s95-3"></td><td class="id">NFR-SEC-3</td><td>Inspect the <code>User.passwordHash</code> and <code>RefreshToken.tokenHash</code> columns directly.</td><td>Never plaintext — Argon2id / SHA-256 hashes only.</td></tr>
+            <tr><td class="chk-cell"><input type="checkbox" data-test="s95-4"></td><td class="id">NFR-USAB-1</td><td>Fill in a daily reading, shift report, and job card entirely offline on mobile.</td><td>Every field is usable with no network; nothing silently requires connectivity.</td></tr>
+          </tbody>
+        </table></div>
+      </section>
+
+      <section id="automated">
+        <div class="sec-head"><span class="sec-num">§A</span><h2>Automated coverage</h2></div>
+        <p class="sec-note">Run these alongside the manual pass above — they already cover a good slice of §2, §4, §9.1, §9.2 and should be green before you start.</p>
+        <div class="callout"><b>Before this session</b> — <code class="mono">pnpm typecheck &amp;&amp; pnpm --filter @drillex/api test</code>. The API suite (<code>apps/api/test/api.e2e.ts</code>) includes the dynamic-RBAC create → grant → assign → rename → delete lifecycle from §9.1b as scripted assertions, plus auth, sync idempotency, and asset-register regression tests. <code>pnpm --filter @drillex/shared test</code> covers the RBAC lookup function and schema validation in isolation.</div>
+      </section>
+
+      <footer>
+        <span>Based on SRS v1.1 (§2–§9.5) and the codebase as of the dynamic-RBAC change</span>
+        <span>DrillEx &middot; internal QA document</span>
+      </footer>
+
+    </main>
+  </div>
+</div>
+
+<script>
+(function(){
+  var KEY = 'dx_test_progress_v1';
+  var state = {};
+  try { state = JSON.parse(localStorage.getItem(KEY) || '{}'); } catch(e) { state = {}; }
+
+  var boxes = Array.prototype.slice.call(document.querySelectorAll('input[type=checkbox][data-test]'));
+  var sectionOf = function(box){ var s = box.closest('section'); return s ? s.id : null; };
+
+  function applyRowStyle(box){
+    var row = box.closest('tr');
+    if (row) row.classList.toggle('done', box.checked);
+  }
+
+  function updateCounts(){
+    var total = boxes.length, done = 0;
+    var bySection = {};
+    boxes.forEach(function(b){
+      var sec = sectionOf(b);
+      bySection[sec] = bySection[sec] || { done: 0, total: 0 };
+      bySection[sec].total++;
+      if (b.checked) { done++; bySection[sec].done++; }
+    });
+    var numEl = document.getElementById('prog-num');
+    var totalEl = document.getElementById('prog-total');
+    var barEl = document.getElementById('prog-bar');
+    if (numEl) numEl.textContent = done;
+    if (totalEl) totalEl.textContent = total;
+    if (barEl) barEl.style.width = (total ? (done/total*100) : 0) + '%';
+    document.querySelectorAll('[data-cnt-for]').forEach(function(el){
+      var id = el.getAttribute('data-cnt-for');
+      var c = bySection[id];
+      el.textContent = c ? (c.done + '/' + c.total) : '';
+    });
+  }
+
+  boxes.forEach(function(b){
+    try { b.checked = !!state[b.getAttribute('data-test')]; } catch(e) {}
+    applyRowStyle(b);
+    b.addEventListener('change', function(){
+      state[b.getAttribute('data-test')] = b.checked;
+      try { localStorage.setItem(KEY, JSON.stringify(state)); } catch(e) {}
+      applyRowStyle(b);
+      updateCounts();
+    });
+  });
+  updateCounts();
+
+  var resetBtn = document.getElementById('reset-btn');
+  if (resetBtn) resetBtn.addEventListener('click', function(){
+    if (!confirm('Clear all checked progress on this device?')) return;
+    state = {};
+    try { localStorage.removeItem(KEY); } catch(e) {}
+    boxes.forEach(function(b){ b.checked = false; applyRowStyle(b); });
+    updateCounts();
+  });
+
+  try {
+    var links = Array.prototype.slice.call(document.querySelectorAll('nav.toc a'));
+    var sections = links.map(function(a){ return document.querySelector(a.getAttribute('href')); }).filter(Boolean);
+    if ('IntersectionObserver' in window && sections.length) {
+      var io = new IntersectionObserver(function(entries){
+        entries.forEach(function(e){
+          if (!e.isIntersecting) return;
+          var id = '#' + e.target.id;
+          links.forEach(function(a){ a.classList.toggle('active', a.getAttribute('href') === id); });
+        });
+      }, { rootMargin: '-15% 0px -70% 0px', threshold: 0 });
+      sections.forEach(function(s){ io.observe(s); });
+    }
+  } catch(e) {}
+})();
+</script>
+</body>
+</html>
