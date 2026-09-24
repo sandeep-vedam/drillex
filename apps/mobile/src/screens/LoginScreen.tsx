@@ -25,8 +25,10 @@ export default function LoginScreen({ navigation }: Props) {
       const res = await api<Session & { requires2faSetup?: boolean }>('/auth/login', {
         method: 'POST', body: JSON.stringify({ employeeId: employeeId.trim().toUpperCase(), password, deviceId }),
       });
-      if (res.requires2faSetup) { setError('This role needs two-factor authentication. Enrol on the web portal first.'); return; }
+      if (res.requires2faSetup) { navigation.navigate('TwoFaEnrol', { employeeId: employeeId.trim().toUpperCase(), password }); return; }
       await saveSession(res);
+      // A temporary password must be replaced before anything else, exactly as the web portal enforces.
+      if (res.user?.mustChangePassword) { navigation.replace('ChangePassword', { forced: true }); return; }
       navigation.replace('Home');
     } catch (e) {
       const m = (e as Error).message;

@@ -12,7 +12,7 @@ export const API_URL = __DEV__ ? `http://${DEV_HOST}:4000/api/v1` : `http://${RE
 
 const SERVICE = 'drillex.session';
 
-export type Session = { accessToken: string; refreshToken: string; user: { id: string; employeeId: string; role: string; siteId: string | null } };
+export type Session = { accessToken: string; refreshToken: string; user: { id: string; employeeId: string; role: string; siteId: string | null; mustChangePassword?: boolean } };
 
 export async function saveSession(s: Session) {
   await Keychain.setGenericPassword('session', JSON.stringify(s), { service: SERVICE });

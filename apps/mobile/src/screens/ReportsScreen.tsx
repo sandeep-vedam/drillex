@@ -8,6 +8,8 @@ import { colors } from '../ui/theme';
 
 type R = { id: string; title: string; periodStart: string; periodEnd: string; generatedAt: string; pdfUrl?: string; xlsxUrl?: string };
 type ReportType = { type: string; title: string };
+type Kpi = { label: string; value: string | number; hint?: string };
+type Preview = { title: string; subtitle: string; kpis: Kpi[]; sections: { title: string; columns: string[]; rows: (string | number | null)[][] }[] };
 const iso = (d: Date) => d.toISOString().slice(0, 10);
 const presets = (): [string, string, string][] => {
   const now = new Date(); const y = now.getFullYear(), m = now.getMonth();
@@ -38,6 +40,21 @@ export default function ReportsScreen() {
     }).catch(() => {});
     api<ReportType[]>('/reports/types').then((t) => { setTypes(t); setType((x) => x || t[0]?.type || ''); }).catch(() => {});
   }, []);
+
+  const [preview, setPreview] = useState<Preview | null>(null);
+  const [previewing, setPreviewing] = useState(false);
+
+  // Mirrors the web: the figures are shown before the files are produced, so a wrong period is caught early.
+  useEffect(() => {
+    if (!type || !canGenerate) { setPreview(null); return; }
+    let cancelled = false;
+    setPreviewing(true);
+    api<Preview>(`/reports/preview?type=${type}&from=${period[1]}&to=${period[2]}`)
+      .then((d) => { if (!cancelled) setPreview(d); })
+      .catch(() => { if (!cancelled) setPreview(null); })
+      .finally(() => { if (!cancelled) setPreviewing(false); });
+    return () => { cancelled = true; };
+  }, [type, period, canGenerate]);
 
   async function generate() {
     if (!type) return;
@@ -80,6 +97,22 @@ export default function ReportsScreen() {
                   </Pressable>
                 ))}
               </View>
+              {previewing && <Text style={s.previewNote}>Working out the figures…</Text>}
+              {preview && (
+                <View style={{ gap: 8 }}>
+                  <Text style={s.previewTitle}>{preview.title}</Text>
+                  <Text style={s.previewNote}>{preview.subtitle}</Text>
+                  <View style={{ borderTopWidth: 1, borderTopColor: colors.line }}>
+                    {preview.kpis.map((k) => (
+                      <View key={k.label} style={s.kpi}>
+                        <Text style={s.kpiLabel}>{k.label}</Text>
+                        <Text style={s.kpiValue}>{String(k.value)}</Text>
+                      </View>
+                    ))}
+                  </View>
+                  {preview.kpis.length === 0 && <Text style={s.previewNote}>No data in this period.</Text>}
+                </View>
+              )}
               {error && <Text style={s.err}>{error}</Text>}
               <Button title={busy ? 'Generating…' : 'Generate PDF + Excel'} onPress={generate} disabled={busy || !type} />
             </Card>
@@ -111,6 +144,11 @@ export default function ReportsScreen() {
   );
 }
 const s = StyleSheet.create({
+  previewTitle: { fontSize: 15, fontWeight: '700', color: colors.ink },
+  previewNote: { fontSize: 12.5, color: colors.muted, lineHeight: 17 },
+  kpi: { flexDirection: 'row', justifyContent: 'space-between', gap: 12, paddingVertical: 7, borderBottomWidth: 1, borderBottomColor: colors.line },
+  kpiLabel: { fontSize: 13, color: colors.muted, flexShrink: 1 },
+  kpiValue: { fontSize: 14, fontWeight: '700', color: colors.ink, fontVariant: ['tabular-nums'] },
   title: { fontSize: 16, fontWeight: '700', color: colors.ink }, meta: { color: colors.muted, fontSize: 12 },
   btn: { backgroundColor: colors.navy800, paddingHorizontal: 14, paddingVertical: 9 }, ghost: { backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.line },
   btnText: { color: '#fff', fontWeight: '700', fontSize: 13 },

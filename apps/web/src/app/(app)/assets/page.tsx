@@ -25,7 +25,7 @@ export default function AssetsPage() {
   const rows = useMemo(() => assets.filter((a) => (cat === 'ALL' || a.category === cat) && `${a.assetNumber} ${a.name} ${a.make} ${a.model}`.toLowerCase().includes(q.toLowerCase())), [assets, q, cat]);
 
   return (
-    <Shell title="Asset register" actions={canWrite ? <button onClick={() => setDrawer(true)} className="btn-primary h-9 text-[13px]"><I.Plus /> New asset</button> : undefined}>
+    <Shell title="All machines" actions={canWrite ? <button onClick={() => setDrawer(true)} className="btn-primary h-9 text-[13px]"><I.Plus /> New asset</button> : undefined}>
       <AssetDrawer open={drawer} onClose={() => setDrawer(false)} onSaved={load} />
       <div className="flex flex-wrap items-center gap-3">
         <label className="relative flex-1 min-w-[260px] max-w-md"><I.Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" /><input className="input pl-10" placeholder="Search asset number, name, make…" value={q} onChange={(e) => setQ(e.target.value)} /></label>

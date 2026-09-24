@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { discard, flush, listOps, Op, retry, subscribe } from '../sync/outbox';
-import { Button, Card, Eyebrow } from '../ui';
+import { Action, Button, Card, Eyebrow } from '../ui';
 import { colors } from '../ui/theme';
 
 export default function OutboxScreen() {
@@ -18,7 +18,7 @@ export default function OutboxScreen() {
             <Text style={s.title}>{item.label}</Text>
             <Text style={s.meta}>{item.kind.replace('_', ' ')} · queued {new Date(item.queuedAt).toLocaleString()} · {item.attempts} attempt(s)</Text>
             {item.error && <Text style={s.err}>Rejected: {item.error}</Text>}
-            {item.error && <View style={{ flexDirection: 'row', gap: 16 }}><Pressable onPress={() => retry(item.opId)}><Text style={s.link}>Retry</Text></Pressable><Pressable onPress={() => discard(item.opId)}><Text style={[s.link, { color: colors.crit }]}>Discard</Text></Pressable></View>}
+            {item.error && <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}><Action title="Retry" onPress={() => retry(item.opId)} /><Action title="Discard" tone={colors.crit} onPress={() => discard(item.opId)} /></View>}
           </Card>
         )} />
     </View>

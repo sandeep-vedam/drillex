@@ -1,11 +1,13 @@
 'use client';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRoleMatrix } from '@/lib/permissions';
+import { can } from '@drillex/shared';
 import { Shell } from '@/components/Shell';
 import { StatTile } from '@/components/StatTile';
 import { StatusChip } from '@/components/StatusChip';
 import { I } from '@/components/Icons';
-import { api } from '@/lib/api';
+import { api, getUser } from '@/lib/api';
 
 type Summary = { assets: { total: number; active: number; underMaintenance: number; idle: number; decommissioned: number }; readingsToday: number; pendingApprovals: number; openAlerts: number; overdueMaintenance: number; recentActivity: { employeeId: string; success: boolean; deviceId: string; createdAt: string }[]; alerts: { id: string; severity: string; message: string; createdAt: string; asset: { assetNumber: string; name: string } }[] };
 type Asset = { id: string; assetNumber: string; name: string; category: string; status: string; make: string; model: string };
@@ -15,6 +17,9 @@ export default function Dashboard() {
   const [assets, setAssets] = useState<Asset[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [today, setToday] = useState('');
+  const matrix = useRoleMatrix();
+  const me = getUser();
+  const allow = (p: Parameters<typeof can>[2]) => !!me?.role && !!matrix && !!can(matrix, me.role, p);
   useEffect(() => {
     setToday(new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' }));
     api<Summary>('/dashboard/summary').then(setS).catch((e) => setError(e.message));
@@ -24,6 +29,27 @@ export default function Dashboard() {
   return (
     <Shell title="Dashboard" actions={<Link href="/assets" className="btn-primary h-9 text-[13px]"><I.Plus /> New asset</Link>}>
       <div className="flex items-baseline justify-between"><div className="eyebrow">{today}</div>{error && <span className="text-crit text-sm">{error}</span>}</div>
+
+      {/* The one thing that needs doing, stated as a sentence — the same panel the mobile home screen leads with. */}
+      {(() => {
+        const pending = s?.pendingApprovals ?? 0;
+        const overdue = s?.overdueMaintenance ?? 0;
+        const job =
+          allow('shift_report:approve') && pending > 0
+            ? { title: `${pending} production report${pending > 1 ? 's' : ''} waiting for you`, body: 'Check the figures, then approve or send back.', href: '/shift-reports', cta: 'Review them', tone: 'border-hazard' }
+          : allow('maintenance:read') && overdue > 0
+            ? { title: `${overdue} service${overdue > 1 ? 's are' : ' is'} overdue`, body: 'These machines are past their service point.', href: '/maintenance', cta: 'See servicing', tone: 'border-crit' }
+          : { title: 'Nothing is waiting for you', body: 'Everything is up to date right now.', href: null, cta: null, tone: 'border-ok' };
+        return (
+          <section className={`card border-l-[3px] ${job.tone} px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-4 justify-between`}>
+            <div>
+              <h2 className="font-display font-semibold text-[20px] text-ink leading-tight">{job.title}</h2>
+              <p className="text-muted text-[14px] mt-1">{job.body}</p>
+            </div>
+            {job.href && <Link href={job.href} className="btn-primary h-11 px-6 shrink-0">{job.cta}</Link>}
+          </section>
+        );
+      })()}
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
         <StatTile label="Fleet" value={s?.assets.total ?? '—'} hint={s ? `${s.assets.active} active · ${s.assets.underMaintenance} in workshop · ${s.assets.idle} idle` : undefined} icon={<I.Asset />} />
         <StatTile label="Readings today" value={s?.readingsToday ?? '—'} hint={s ? (() => { const n = Math.max(0, s.assets.active - s.readingsToday); return n === 0 ? 'All active machines have reported' : `${n} machine${n === 1 ? '' : 's'} still to report`; })() : undefined} tone={s && s.readingsToday < s.assets.active ? 'warn' : 'ok'} icon={<I.Gauge />} />

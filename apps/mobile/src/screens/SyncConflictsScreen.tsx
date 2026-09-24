@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { FlatList, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { api } from '../lib/api';
+import { describeSubmission } from '@drillex/shared';
 import { Button, Card, Eyebrow } from '../ui';
 import { colors } from '../ui/theme';
 
@@ -26,7 +27,14 @@ export default function SyncConflictsScreen() {
         <Card stripe={colors.hazard} style={{ paddingLeft: 18, gap: 6 }}>
           <Text style={s.entity}>{item.entity.replace(/([A-Z])/g, ' $1').trim()}</Text>
           <Text style={s.meta}>Rejected duplicate from <Text style={s.mono}>{item.versions.submittedBy}</Text> · device {item.versions.deviceId} · {new Date(item.createdAt).toLocaleString()}</Text>
-          <ScrollView horizontal style={s.dump}><Text style={s.dumpText}>{JSON.stringify(item.versions.incoming, null, 2)}</Text></ScrollView>
+          <View style={s.fields}>
+            {describeSubmission(item.versions.incoming).map((f) => (
+              <View key={f.key} style={s.row}>
+                <Text style={s.fieldLabel}>{f.label}</Text>
+                <Text style={[s.fieldValue, f.tone === 'crit' && s.crit, f.tone === 'warn' && s.warn]}>{f.value}</Text>
+              </View>
+            ))}
+          </View>
           <Button title="Mark reviewed" onPress={() => resolve(item.id)} />
         </Card>
       )} />
@@ -37,6 +45,10 @@ const s = StyleSheet.create({
   entity: { fontSize: 11, fontWeight: '700', letterSpacing: 1.2, textTransform: 'uppercase', color: colors.muted },
   meta: { color: colors.ink, fontSize: 13, fontWeight: '600' },
   mono: { fontFamily: 'Menlo', fontWeight: '700' },
-  dump: { maxHeight: 160, backgroundColor: colors.canvas, borderWidth: 1, borderColor: colors.line, padding: 8 },
-  dumpText: { fontFamily: 'Menlo', fontSize: 11, color: colors.ink },
+  fields: { borderTopWidth: 1, borderTopColor: colors.line, marginTop: 4 },
+  row: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: colors.line },
+  fieldLabel: { color: colors.muted, fontSize: 12, flexShrink: 0 },
+  fieldValue: { color: colors.ink, fontSize: 13, fontWeight: '600', flexShrink: 1, textAlign: 'right' },
+  warn: { color: colors.hazard },
+  crit: { color: colors.crit },
 });

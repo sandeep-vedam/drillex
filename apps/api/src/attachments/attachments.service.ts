@@ -63,6 +63,7 @@ export class AttachmentsService {
     await this.storage.putBase64(key, input.base64, input.contentType);
     const sha256 = createHash('sha256').update(Buffer.from(input.base64, 'base64')).digest('hex');
     const row = await this.prisma.attachment.create({ data: { id, ownerType: input.ownerType, ownerId: input.ownerId, kind: input.kind, storageKey: key, mimeType: input.contentType, sha256, createdBy: u.id } });
+    await this.prisma.auditLog.create({ data: { actorId: u.id, deviceId: u.deviceId, entity: 'Attachment', entityId: id, action: 'CREATE', diff: { ownerType: input.ownerType, ownerId: input.ownerId, kind: input.kind, bytes, sha256 } } });
     return { ...row, url: await this.storage.urlFor(key), duplicate: false };
   }
 

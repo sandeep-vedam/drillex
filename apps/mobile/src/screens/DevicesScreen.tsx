@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Alert, FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { api } from '../lib/api';
-import { Card, Eyebrow } from '../ui';
+import { Action, Card, Eyebrow } from '../ui';
 import { colors } from '../ui/theme';
 
 type D = { id: string; deviceId: string; platform?: string; approved: boolean; lastSeen: string; pushToken?: string; user: { employeeId: string; name: string; role: string } };
@@ -37,7 +37,9 @@ export default function DevicesScreen() {
             <Text style={[s.status, { color: item.approved ? colors.ok : colors.crit }]}>{item.approved ? 'Approved' : 'Blocked'}</Text>
           </View>
           <Text style={s.meta}>{item.platform ?? 'unknown platform'} · push {item.pushToken ? 'registered' : 'none'} · last seen {new Date(item.lastSeen).toLocaleString()}</Text>
-          <Text style={[s.link, { color: item.approved ? colors.crit : colors.navy700, marginTop: 8 }]} onPress={() => setApproved(item, !item.approved)}>{item.approved ? 'Revoke' : 'Approve'}</Text>
+          <View style={{ flexDirection: 'row', marginTop: 10 }}>
+            <Action title={item.approved ? 'Revoke' : 'Approve'} tone={item.approved ? colors.crit : colors.navy700} onPress={() => setApproved(item, !item.approved)} />
+          </View>
         </Card>
       )} />
   );

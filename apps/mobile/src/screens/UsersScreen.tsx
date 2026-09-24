@@ -3,7 +3,7 @@ import { Alert, FlatList, RefreshControl, StyleSheet, Text, View } from 'react-n
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { api } from '../lib/api';
 import type { RootStackParamList } from '../navigation';
-import { Button, Card, Eyebrow } from '../ui';
+import { Action, Button, Card, Eyebrow } from '../ui';
 import { colors } from '../ui/theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Users'>;
@@ -45,9 +45,9 @@ export default function UsersScreen({ navigation }: Props) {
           </View>
           <Text style={s.meta}>{item.role} · {item.site?.name ?? 'no site'} · 2FA {item.totpEnabled ? 'on' : 'off'}</Text>
           <View style={{ flexDirection: 'row', gap: 16, marginTop: 8, flexWrap: 'wrap' }}>
-            <Text style={s.link} onPress={() => navigation.navigate('UserRole', { userId: item.id, employeeId: item.employeeId, currentRole: item.role })}>Change role</Text>
-            <Text style={s.link} onPress={() => reset(item)}>Reset password</Text>
-            <Text style={[s.link, { color: item.status === 'ACTIVE' ? colors.crit : colors.ok }]} onPress={() => toggle(item)}>{item.status === 'ACTIVE' ? 'Disable' : 'Enable'}</Text>
+            <Action title="Change role" onPress={() => navigation.navigate('UserRole', { userId: item.id, employeeId: item.employeeId, currentRole: item.role })} />
+            <Action title="Reset password" onPress={() => reset(item)} />
+            <Action title={item.status === 'ACTIVE' ? 'Disable' : 'Enable'} tone={item.status === 'ACTIVE' ? colors.crit : colors.ok} onPress={() => toggle(item)} />
           </View>
         </Card>
       )} />

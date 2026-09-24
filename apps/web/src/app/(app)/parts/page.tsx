@@ -38,7 +38,7 @@ export default function PartsPage() {
   async function prStatus(pr: PR, status: string) { try { await api(`/parts/purchase-requests/${pr.id}`, { method: 'PATCH', body: JSON.stringify({ status }) }); load(); } catch (e) { setError((e as Error).message); } }
 
   return (
-    <Shell title="Parts inventory" actions={canWrite ? <button onClick={() => setNewPart(true)} className="btn-primary h-9 text-[13px]"><I.Plus /> New part</button> : undefined}>
+    <Shell title="Parts store" actions={canWrite ? <button onClick={() => setNewPart(true)} className="btn-primary h-9 text-[13px]"><I.Plus /> New part</button> : undefined}>
       {newPart && <NewPartDrawer onClose={() => setNewPart(false)} onCreated={load} />}
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
         {[['Part lines', parts.length, ''], ['Below minimum', low, low ? 'crit' : 'ok'], ['Open purchase requests', prs.filter((p) => p.status === 'OPEN' || p.status === 'ORDERED').length, ''], ['Stock value', `$${value.toLocaleString(undefined, { maximumFractionDigits: 0 })}`, '']].map(([k, v, t]) => <div key={k as string} className="card p-4 relative overflow-hidden"><div className={`absolute left-0 top-0 h-full w-1 ${t === 'crit' ? 'bg-crit' : t === 'ok' ? 'bg-ok' : 'bg-navy-600'}`} /><div className="eyebrow">{k}</div><div className="font-display text-[32px] font-semibold tnum leading-none mt-2">{v}</div></div>)}

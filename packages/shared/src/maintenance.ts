@@ -43,6 +43,24 @@ export function scheduleStatus(s: { nextDueAt?: Date | null; nextDueHours?: numb
   return st;
 }
 
+/**
+ * The first due point of a new schedule when the creator gave only an interval (SRS §6.1): counted from the last
+ * service if one was recorded, otherwise from today / the machine's current hour meter. Hour-based schedules on a
+ * machine with no hour reading yet stay open until one arrives — see `anchorHours`.
+ */
+export function initialDue(s: { intervalHours?: number | null; intervalDays?: number | null; lastServiceAt?: Date | null; lastServiceHours?: number | null; nextDueAt?: Date | null; nextDueHours?: number | null }, now: Date, currentHours?: number | null) {
+  const baseHours = s.lastServiceHours ?? currentHours ?? null;
+  return {
+    nextDueAt: s.nextDueAt ?? (s.intervalDays ? new Date((s.lastServiceAt ?? now).getTime() + s.intervalDays * 864e5) : null),
+    nextDueHours: s.nextDueHours ?? (s.intervalHours && baseHours != null ? baseHours + s.intervalHours : null),
+  };
+}
+
+/** An hour-based schedule with no due point yet takes one from the first hour meter reading it sees. */
+export function anchorHours(s: { intervalHours?: number | null; nextDueHours?: number | null }, currentHours?: number | null) {
+  return s.intervalHours && s.nextDueHours == null && currentHours != null ? currentHours + s.intervalHours : null;
+}
+
 /** Roll a schedule forward after completion. */
 export function nextCycle(s: { intervalHours?: number | null; intervalDays?: number | null }, completedAt: Date, hourMeter?: number | null) {
   return {

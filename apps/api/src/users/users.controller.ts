@@ -46,10 +46,11 @@ export class UsersController {
     await this.prisma.auditLog.create({ data: { actorId: actor.id, entity: 'User', entityId: id, action: `STATUS_${b.status}` } });
     return { id: u.id, status: u.status };
   }
-  @Post() @RequirePermission('user:manage') async create(@Body(new ZodPipe(CreateUserSchema)) b: z.infer<typeof CreateUserSchema>) {
+  @Post() @RequirePermission('user:manage') async create(@Body(new ZodPipe(CreateUserSchema)) b: z.infer<typeof CreateUserSchema>, @CurrentUser() actor: AuthUser) {
     if (!(await this.roles.exists(b.role))) throw new BadRequestException(`Unknown role: ${b.role}`);
     const { password, ...rest } = b;
     const u = await this.prisma.user.create({ data: { ...rest, passwordHash: await argon2.hash(password), mustChangePassword: true } });
+    await this.prisma.auditLog.create({ data: { actorId: actor.id, deviceId: actor.deviceId, entity: 'User', entityId: u.id, action: 'CREATE', diff: rest } });
     return { id: u.id, employeeId: u.employeeId };
   }
   @Patch(':id/role') @RequirePermission('user:manage')

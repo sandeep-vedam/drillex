@@ -17,9 +17,12 @@ type Row = { key: number; chemicalId: string; quantity: string; unit: 'LITRES' |
 const ROCK = ['Granite', 'Basalt', 'Sandstone', 'Limestone', 'Shale', 'Quartzite', 'Other'];
 const DOWNTIME = ['None', 'Mechanical breakdown', 'Waiting on blast', 'Weather', 'No water / fuel', 'Operator break', 'Other'];
 let rowKey = 1;
+type ExistingReport = { date: string; siteId: string; shift: 'DAY' | 'NIGHT'; holeRef: string; startDepth: string; endDepth: string; holesCompleted: number; holeDiameterMm: number; rockType: string; penetrationRate: string; downtimeHours: string | null; downtimeReason: string | null; chemicals: { chemicalId: string; quantity: string; unit: Row['unit']; purpose: string | null; stockOnHand: string | null }[] };
 
 export default function ShiftReportScreen({ route, navigation }: Props) {
-  const { assetId, assetNumber, assetName, siteId } = route.params;
+  const { assetId, assetNumber, assetName, siteId, correctId } = route.params;
+  // Correcting an unlocked report (SRS §4.5): the same form, filled from the report, resubmitted in place.
+  const [original, setOriginal] = useState<{ date: string; siteId: string } | null>(null);
   const [chems, setChems] = useState<Chemical[]>([]);
   const [f, setF] = useState({ shift: (new Date().getHours() >= 6 && new Date().getHours() < 18 ? 'DAY' : 'NIGHT') as 'DAY' | 'NIGHT', holeRef: '', startDepth: '', endDepth: '', holesCompleted: '', holeDiameterMm: '', rockType: 'Granite', rockOther: '', penetrationRate: '', downtimeHours: '0', downtimeReason: 'None', downtimeOther: '' });
   const set = <K extends keyof typeof f>(k: K, v: (typeof f)[K]) => setF((x) => ({ ...x, [k]: v }));
@@ -28,6 +31,16 @@ export default function ShiftReportScreen({ route, navigation }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [signature, setSignature] = useState<string | null>(null);
   useEffect(() => { cached('chemicals', () => api<Chemical[]>('/chemicals')).then((r) => setChems(r.data)).catch(() => {}); }, []);
+  useEffect(() => {
+    if (!correctId) return;
+    api<ExistingReport>(`/shift-reports/${correctId}`).then((r) => {
+      const known = (list: string[], v: string | null) => (v == null ? null : list.includes(v) ? v : 'Other');
+      const rock = known(ROCK, r.rockType) ?? 'Granite'; const down = known(DOWNTIME, r.downtimeReason) ?? 'None';
+      setOriginal({ date: r.date.slice(0, 10), siteId: r.siteId });
+      setF({ shift: r.shift, holeRef: r.holeRef, startDepth: String(Number(r.startDepth)), endDepth: String(Number(r.endDepth)), holesCompleted: String(r.holesCompleted), holeDiameterMm: String(r.holeDiameterMm), rockType: rock, rockOther: rock === 'Other' ? r.rockType : '', penetrationRate: String(Number(r.penetrationRate)), downtimeHours: String(Number(r.downtimeHours ?? 0)), downtimeReason: down, downtimeOther: down === 'Other' ? r.downtimeReason ?? '' : '' });
+      setRows(r.chemicals.map((c) => ({ key: rowKey++, chemicalId: c.chemicalId, quantity: String(Number(c.quantity)), unit: c.unit, purpose: c.purpose ?? '', stockOnHand: c.stockOnHand != null ? String(Number(c.stockOnHand)) : '' })));
+    }).catch((e) => setError(`Could not load the report: ${(e as Error).message}`));
+  }, [correctId]);
 
   const total = useMemo(() => (f.startDepth && f.endDepth ? totalMetersDrilled(Number(f.startDepth), Number(f.endDepth)) : null), [f.startDepth, f.endDepth]);
   const depthBad = f.startDepth !== '' && f.endDepth !== '' && Number(f.endDepth) < Number(f.startDepth);
@@ -36,9 +49,10 @@ export default function ShiftReportScreen({ route, navigation }: Props) {
 
   async function submit() {
     setError(null);
-    const reportId = uuid(); const sigId = signature ? uuid() : undefined;
+    if (correctId && !original) { setError('The report is still loading.'); return; }
+    const reportId = correctId ?? uuid(); const sigId = signature ? uuid() : undefined;
     const payload = {
-      id: reportId, signatureAttachmentId: sigId, assetId, siteId, date: new Date().toISOString().slice(0, 10), shift: f.shift, holeRef: f.holeRef,
+      ...(correctId ? {} : { id: reportId }), signatureAttachmentId: sigId, assetId, siteId: original?.siteId ?? siteId, date: original?.date ?? new Date().toISOString().slice(0, 10), shift: f.shift, holeRef: f.holeRef,
       startDepth: Number(f.startDepth), endDepth: Number(f.endDepth), holesCompleted: Number(f.holesCompleted), holeDiameterMm: Number(f.holeDiameterMm),
       rockType: f.rockType === 'Other' ? f.rockOther : f.rockType, penetrationRate: Number(f.penetrationRate), downtimeHours: Number(f.downtimeHours || 0),
       downtimeReason: f.downtimeReason === 'None' ? undefined : f.downtimeReason === 'Other' ? f.downtimeOther : f.downtimeReason,
@@ -48,6 +62,15 @@ export default function ShiftReportScreen({ route, navigation }: Props) {
     if (!parsed.success) { const i = parsed.error.issues[0]; setError(`${i.path.join('.') || 'Form'}: ${i.message}`); return; }
     if (!signature) { setError('Please sign the report.'); return; }
     setBusy(true);
+    if (correctId) {
+      // A correction edits a report already on the server, so it goes straight there rather than through the offline queue.
+      try {
+        await api('/attachments', { method: 'POST', body: JSON.stringify({ id: sigId, ownerType: 'ShiftReport', ownerId: correctId, kind: 'SIGNATURE', contentType: 'image/png', base64: signature.replace(/^data:image\/png;base64,/, '') }) });
+        await api(`/shift-reports/${correctId}`, { method: 'PATCH', body: JSON.stringify(payload) });
+        Alert.alert('Correction sent', `${total ?? 0} m recorded. Your supervisor will be asked to approve it again.`, [{ text: 'OK', onPress: () => navigation.goBack() }]);
+      } catch (e) { setError((e as Error).message); } finally { setBusy(false); }
+      return;
+    }
     try {
       // Queue the record before its attachments: an attachment cannot be stored until its owner exists.
       await enqueue('shift_report', payload, `${assetNumber} · ${f.shift.toLowerCase()} shift ${payload.date}`);
@@ -60,7 +83,7 @@ export default function ShiftReportScreen({ route, navigation }: Props) {
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, backgroundColor: colors.canvas }}>
       <ScrollView contentContainerStyle={{ padding: 16, gap: 14, paddingBottom: 48 }} keyboardShouldPersistTaps="handled">
         <Card stripe={colors.hazard} style={{ paddingLeft: 18 }}>
-          <Eyebrow>Shift production · {new Date().toLocaleDateString()}</Eyebrow>
+          <Eyebrow>{correctId ? `Correction · ${original ? new Date(original.date).toLocaleDateString() : '…'}` : `Shift production · ${new Date().toLocaleDateString()}`}</Eyebrow>
           <Text style={s.asset}>{assetNumber}</Text><Text style={s.assetName}>{assetName}</Text>
         </Card>
         <Segmented label="Shift" value={f.shift} options={[{ v: 'DAY', l: '☀ Day' }, { v: 'NIGHT', l: '☾ Night' }]} onChange={(v) => set('shift', v)} tone={(v) => (v === 'DAY' ? colors.warn : colors.navy800)} />
@@ -105,7 +128,7 @@ export default function ShiftReportScreen({ route, navigation }: Props) {
 
         <Section title="Sign-off"><SignaturePad value={signature} onChange={setSignature} /></Section>
         {error && <Text style={s.err}>{error}</Text>}
-        <Button title={busy ? 'Saving…' : 'Sign & submit shift report'} onPress={submit} disabled={busy || depthBad} />
+        <Button title={busy ? 'Saving…' : correctId ? 'Sign & resubmit' : 'Sign & submit shift report'} onPress={submit} disabled={busy || depthBad || (!!correctId && !original)} />
         <Text style={s.help}>Works offline — saved on this device and synced when you have signal. Submission is final; corrections require a supervisor unlock and are audit-logged.</Text>
       </ScrollView>
     </KeyboardAvoidingView>

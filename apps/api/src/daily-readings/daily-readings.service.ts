@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { StorageService } from '../storage/storage.service';
 import { AuthUser } from '../auth/decorators';
+import { getOperationsSettings } from '../settings/settings.util';
 
 const ALERT_LABEL: Record<string, string> = { WARNING_LIGHTS: 'Warning lights active', LEAKS: 'Leak observed', UNUSUAL_NOISES: 'Unusual noise / vibration', MAINTENANCE_REVIEW: 'Condition rated poor — maintenance review' };
 
@@ -21,7 +22,7 @@ export class DailyReadingsService {
         asset: this.assetScope(u), deletedAt: null,
         ...(q.assetId ? { assetId: q.assetId } : {}),
         ...(q.from || q.to ? { date: { ...(q.from ? { gte: new Date(q.from) } : {}), ...(q.to ? { lte: new Date(q.to) } : {}) } } : {}),
-        ...(q.flagged === '1' ? { OR: [{ warningLights: true }, { leaks: true }, { unusualNoises: true }, { conditionRating: { lte: 2 } }] } : {}),
+        ...(q.flagged === '1' ? { OR: [{ warningLights: true }, { leaks: true }, { unusualNoises: true }, { conditionRating: { lte: (await getOperationsSettings(this.prisma)).readingAlertThreshold } }] } : {}),
       },
       include: { asset: { select: { assetNumber: true, name: true, siteId: true } }, user: { select: { employeeId: true, name: true } } },
       orderBy: [{ date: 'desc' }, { createdAt: 'desc' }], take: 200,
@@ -43,7 +44,7 @@ export class DailyReadingsService {
     const dup = await this.prisma.dailyReading.findUnique({ where: { assetId_date: { assetId: asset.id, date } } });
     if (dup) throw new ConflictException(`A reading for ${asset.assetNumber} on ${date.toISOString().slice(0, 10)} already exists`);
 
-    const alerts = readingAlerts(input);
+    const alerts = readingAlerts(input, (await getOperationsSettings(this.prisma)).readingAlertThreshold);
     const { id, date: _d, signatureAttachmentId, ...rest } = input;
     const reading = await this.prisma.$transaction(async (tx) => {
       const r = await tx.dailyReading.create({ data: { ...(id ? { id } : {}), ...rest, date, userId: u.id, fuelConsumed: fuelConsumed(input.fuelStart, input.fuelEnd), signatureId: signatureAttachmentId ?? null, tyrePressures: input.tyrePressures as never } });

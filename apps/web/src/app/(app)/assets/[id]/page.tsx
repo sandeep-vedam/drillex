@@ -69,8 +69,8 @@ export default function AssetDetailPage() {
     act(() => api(`/assets/${id}`, { method: 'DELETE' }), () => router.push('/assets'));
   };
 
-  if (loadError) return <Shell title="Asset"><div className="card p-8 text-center"><p className="text-[15px] font-medium">{loadError}</p><Link href="/assets" className="btn-ghost mt-4 inline-flex">← Back to the register</Link></div></Shell>;
-  if (!asset) return <Shell title="Asset"><div className="card p-8 text-center text-muted">Loading…</div></Shell>;
+  if (loadError) return <Shell title="Machine"><div className="card p-8 text-center"><p className="text-[15px] font-medium">{loadError}</p><Link href="/assets" className="btn-ghost mt-4 inline-flex">← Back to the register</Link></div></Shell>;
+  if (!asset) return <Shell title="Machine"><div className="card p-8 text-center text-muted">Loading…</div></Shell>;
 
   const nextService = scheds.filter((s) => s.status !== 'COMPLETED' && s.nextDueAt).sort((a, b) => (a.nextDueAt! < b.nextDueAt! ? -1 : 1))[0];
   const TABS: [string, string, number][] = [['jobs', 'Job cards', jobCards.length], ['readings', 'Daily readings', readings.length], ['maintenance', 'Maintenance', scheds.length], ['shifts', 'Shift production', shifts.length], ['photos', 'Photos', photos.length]];

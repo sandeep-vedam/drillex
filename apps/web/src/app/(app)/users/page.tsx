@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { Shell } from '@/components/Shell';
 import { I } from '@/components/Icons';
 import { api, getUser } from '@/lib/api';
+import { roleDescription } from '@drillex/shared';
 
 type U = { id: string; employeeId: string; name: string; role: string; status: string; totpEnabled: boolean; mustChangePassword: boolean; site?: { name: string } | null };
 const roleTone: Record<string, string> = { ADMIN: 'bg-crit/10 text-crit', MANAGER: 'bg-navy-100 text-navy-800', SUPERVISOR: 'bg-hazard/10 text-hazard', TECHNICIAN: 'bg-steel/10 text-steel', OPERATOR: 'bg-ok/10 text-ok' };
@@ -45,7 +46,7 @@ export default function UsersPage() {
   const rows = users.filter((u) => `${u.employeeId} ${u.name} ${u.role}`.toLowerCase().includes(q.toLowerCase()));
 
   return (
-    <Shell title="User management" actions={<button onClick={() => setCreating(true)} className="btn-primary h-9 text-[13px]"><I.Plus /> New user</button>}>
+    <Shell title="People" actions={<button onClick={() => setCreating(true)} className="btn-primary h-9 text-[13px]"><I.Plus /> New user</button>}>
       {toast && (
         <div className="card border-l-4 border-l-ok p-4 flex items-start gap-4">
           <div className="flex-1"><div className="font-semibold">{toast.title}</div><div className="mt-1 font-mono text-[15px] bg-canvas border border-line inline-block px-2 py-1 select-all">{toast.body}</div><div className="text-[12px] text-muted mt-1">Share this once, out of band. It is not shown again.</div></div>
@@ -94,7 +95,7 @@ export default function UsersPage() {
               <label className="flex flex-col gap-1.5 text-[13px] font-medium">Employee ID<input className="input font-mono uppercase" required value={form.employeeId} onChange={(e) => setForm({ ...form, employeeId: e.target.value })} placeholder="OPR002" /></label>
               <label className="flex flex-col gap-1.5 text-[13px] font-medium">Full name<input className="input" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></label>
               <div className="grid grid-cols-2 gap-4">
-                <label className="flex flex-col gap-1.5 text-[13px] font-medium">Role<select className="input" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>{(roles.length ? roles : [{ key: form.role, name: form.role }]).map((r) => <option key={r.key} value={r.key}>{r.name}</option>)}</select></label>
+                <label className="flex flex-col gap-1.5 text-[13px] font-medium">Role<select className="input" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>{(roles.length ? roles : [{ key: form.role, name: form.role }]).map((r) => <option key={r.key} value={r.key}>{r.name}</option>)}</select>{roleDescription(form.role) && <span className="text-[12px] font-normal text-muted">{roleDescription(form.role)}</span>}</label>
                 <label className="flex flex-col gap-1.5 text-[13px] font-medium">Site<select className="input" value={form.siteId} onChange={(e) => setForm({ ...form, siteId: e.target.value })}>{sites.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
               </div>
               <label className="flex flex-col gap-1.5 text-[13px] font-medium">Temporary password <span className="text-muted font-normal">min. 8 characters</span><input className="input font-mono" required minLength={8} value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} /></label>

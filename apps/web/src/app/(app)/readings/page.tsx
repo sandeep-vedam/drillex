@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Shell } from '@/components/Shell';
 import { I } from '@/components/Icons';
 import { api } from '@/lib/api';
+import { DEFAULT_ALERT_THRESHOLD } from '@drillex/shared';
 
 type Reading = {
   id: string; date: string; hourMeter: string; fuelStart: string; fuelEnd: string; fuelConsumed: string;
@@ -13,7 +14,7 @@ type Reading = {
 };
 const LEVEL_TONE: Record<string, string> = { OK: 'text-ok', LOW: 'text-hazard', ADD: 'text-hazard', CHANGE_REQUIRED: 'text-crit', BLOCKED: 'text-crit', CHANGED: 'text-ok', WEAK: 'text-hazard', FLAT: 'text-crit' };
 const fmt = (s: string) => s.replace('_', ' ').toLowerCase().replace(/^\w/, (c) => c.toUpperCase());
-const flagged = (r: Reading) => r.warningLights || r.leaks || r.unusualNoises || r.conditionRating <= 2;
+const flagged = (r: Reading, threshold: number) => r.warningLights || r.leaks || r.unusualNoises || r.conditionRating <= threshold;
 
 function Stars({ n }: { n: number }) { return <span className={`font-mono text-[12px] ${n <= 2 ? 'text-crit' : n === 3 ? 'text-hazard' : 'text-ok'}`}>{'★'.repeat(n)}{'☆'.repeat(5 - n)}</span>; }
 function Flag({ on, label, note }: { on: boolean; label: string; note?: string }) {
@@ -27,13 +28,15 @@ export default function ReadingsPage() {
   const [sel, setSel] = useState<Reading | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [atts, setAtts] = useState<{ id: string; kind: string; url: string }[]>([]);
+  const [threshold, setThreshold] = useState(DEFAULT_ALERT_THRESHOLD); // the server's alert rule (SRS §5.3), admin-configurable
+  useEffect(() => { api<{ readingAlertThreshold: number }>('/settings/operations').then((s) => setThreshold(s.readingAlertThreshold)).catch(() => {}); }, []);
   useEffect(() => { if (!sel) { setAtts([]); return; } api<{ attachments: { id: string; kind: string; url: string }[] }>(`/daily-readings/${sel.id}`).then((d) => setAtts(d.attachments ?? [])).catch(() => setAtts([])); }, [sel]);
   useEffect(() => { api<Reading[]>(`/daily-readings${onlyFlagged ? '?flagged=1' : ''}`).then(setRows).catch((e) => setError(e.message)); }, [onlyFlagged]);
   const list = useMemo(() => rows.filter((r) => `${r.asset.assetNumber} ${r.asset.name} ${r.user.employeeId}`.toLowerCase().includes(q.toLowerCase())), [rows, q]);
   const nFlag = rows.filter(flagged).length;
 
   return (
-    <Shell title="Daily readings">
+    <Shell title="Machine checks">
       <div className="flex flex-wrap items-center gap-3">
         <label className="relative flex-1 min-w-[240px] max-w-md"><I.Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" /><input className="input pl-10" placeholder="Search asset or operator…" value={q} onChange={(e) => setQ(e.target.value)} /></label>
         <button onClick={() => setOnlyFlagged((v) => !v)} className={`inline-flex items-center gap-2 px-3 py-2 text-[13px] font-semibold border transition ${onlyFlagged ? 'bg-crit text-white border-crit' : 'bg-surface border-line text-ink hover:border-crit/50'}`}><I.Alert /> Flagged only {nFlag ? <span className="tnum">({nFlag})</span> : null}</button>
@@ -46,7 +49,7 @@ export default function ReadingsPage() {
             <thead><tr className="text-left eyebrow border-b border-line">{['Date', 'Asset', 'Operator', 'Hour meter', 'Fuel used', 'Fluids', 'Condition', 'Flags'].map((h) => <th key={h} className="px-4 py-2.5 font-semibold">{h}</th>)}</tr></thead>
             <tbody>
               {list.map((r) => (
-                <tr key={r.id} onClick={() => setSel(r)} className={`border-b border-line last:border-0 cursor-pointer transition ${sel?.id === r.id ? 'bg-navy-100/70' : flagged(r) ? 'bg-crit/[.04] hover:bg-crit/[.08]' : 'hover:bg-navy-100/40'}`}>
+                <tr key={r.id} onClick={() => setSel(r)} className={`border-b border-line last:border-0 cursor-pointer transition ${sel?.id === r.id ? 'bg-navy-100/70' : flagged(r, threshold) ? 'bg-crit/[.04] hover:bg-crit/[.08]' : 'hover:bg-navy-100/40'}`}>
                   <td className="px-4 py-3 tnum whitespace-nowrap">{new Date(r.date).toLocaleDateString(undefined, { day: '2-digit', month: 'short' })}</td>
                   <td className="px-4 py-3"><span className="font-mono text-[13px] font-medium text-navy-800">{r.asset.assetNumber}</span><span className="text-muted ml-2">{r.asset.name}</span></td>
                   <td className="px-4 py-3 font-mono text-[13px]">{r.user.employeeId}</td>
@@ -54,7 +57,7 @@ export default function ReadingsPage() {
                   <td className="px-4 py-3 tnum">{Number(r.fuelConsumed)}</td>
                   <td className="px-4 py-3 text-[12px] whitespace-nowrap">{(['engineOil', 'hydraulicOil', 'coolant'] as const).map((k) => <span key={k} className={`mr-2 font-semibold ${LEVEL_TONE[r[k]] ?? ''}`}>{k === 'engineOil' ? 'Eng' : k === 'hydraulicOil' ? 'Hyd' : 'Cool'} {r[k] === 'OK' ? '✓' : fmt(r[k])}</span>)}</td>
                   <td className="px-4 py-3"><Stars n={r.conditionRating} /></td>
-                  <td className="px-4 py-3">{flagged(r) ? <span className="inline-flex items-center gap-1 text-[12px] font-bold text-crit"><I.Alert width={14} height={14} />{[r.warningLights && 'Lights', r.leaks && 'Leak', r.unusualNoises && 'Noise', r.conditionRating <= 2 && 'Poor'].filter(Boolean).join(' · ')}</span> : <span className="text-[12px] text-ok font-semibold">Clear</span>}</td>
+                  <td className="px-4 py-3">{flagged(r, threshold) ? <span className="inline-flex items-center gap-1 text-[12px] font-bold text-crit"><I.Alert width={14} height={14} />{[r.warningLights && 'Lights', r.leaks && 'Leak', r.unusualNoises && 'Noise', r.conditionRating <= threshold && 'Poor'].filter(Boolean).join(' · ')}</span> : <span className="text-[12px] text-ok font-semibold">Clear</span>}</td>
                 </tr>
               ))}
               {!list.length && <tr><td colSpan={8} className="px-5 py-12 text-center text-muted">No readings yet.</td></tr>}

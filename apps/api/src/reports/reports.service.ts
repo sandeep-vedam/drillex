@@ -69,10 +69,27 @@ export class ReportsService {
     const made: string[] = [];
     for (const type of REPORT_TYPES) { try { const r = await this.generate(null, type, from, to); made.push(r.title); } catch (e) { this.log.error(`Month-end ${type} failed: ${(e as Error).message}`); } }
     await this.notify.notifyRoles(null, ['MANAGER'], { type: 'report_ready', title: `Monthly reports ready — ${from.toLocaleString('en', { month: 'long', year: 'numeric', timeZone: 'UTC' })}`, body: made.join(', ') });
+    await this.prisma.auditLog.create({ data: { entity: 'ScheduledJob', entityId: 'month-end-reports', action: 'RUN', diff: { from, to, generated: made } } });
     return { period: [from, to], generated: made };
   }
 
-  /** Retention: keep ≥ 24 months (SRS §8.3) — purge older archive rows quarterly. */
-  @Cron('0 3 1 */3 *')
-  async purgeOld() { const cutoff = new Date(); cutoff.setMonth(cutoff.getMonth() - 24); const r = await this.prisma.report.deleteMany({ where: { generatedAt: { lt: cutoff } } }); this.log.log(`Purged ${r.count} report(s) older than 24 months`); }
+  /** Retention (SRS §8.3): a report is kept for 24 months, then its record and both files are deleted. Runs daily. */
+  @Cron('0 3 * * *', { timeZone: 'UTC' })
+  async purgeOldCron() { await this.purgeOld(); }
+  async purgeOld(now = new Date()) {
+    const cutoff = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 24, now.getUTCDate(), now.getUTCHours(), now.getUTCMinutes()));
+    const old = await this.prisma.report.findMany({ where: { generatedAt: { lt: cutoff } } });
+    let purged = 0;
+    for (const r of old) {
+      try {
+        // Files first: if storage fails the record stays, and tomorrow's run tries again rather than orphaning the files.
+        for (const key of [r.pdfKey, r.xlsxKey]) if (key) await this.storage.remove(key);
+        await this.prisma.report.delete({ where: { id: r.id } });
+        purged++;
+      } catch (e) { this.log.error(`Could not purge report ${r.id}: ${(e as Error).message}`); }
+    }
+    this.log.log(`Purged ${purged} report(s) older than 24 months`);
+    if (purged) await this.prisma.auditLog.create({ data: { entity: 'ScheduledJob', entityId: 'report-retention', action: 'PURGE', diff: { cutoff, purged, ids: old.map((r) => r.id) } } });
+    return { cutoff, purged };
+  }
 }

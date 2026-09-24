@@ -6,6 +6,13 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import LoginScreen from './src/screens/LoginScreen';
 import HomeScreen from './src/screens/HomeScreen';
 import LockScreen from './src/screens/LockScreen';
+import ChangePasswordScreen from './src/screens/ChangePasswordScreen';
+import MainTabs from './src/MainTabs';
+import TwoFaEnrolScreen from './src/screens/TwoFaEnrolScreen';
+import ShiftReportsScreen from './src/screens/ShiftReportsScreen';
+import ReadingsScreen from './src/screens/ReadingsScreen';
+import AssetsScreen from './src/screens/AssetsScreen';
+import AssetDetailScreen from './src/screens/AssetDetailScreen';
 import DailyReadingScreen from './src/screens/DailyReadingScreen';
 import ShiftReportScreen from './src/screens/ShiftReportScreen';
 import OutboxScreen from './src/screens/OutboxScreen';
@@ -24,8 +31,9 @@ import UserNewScreen from './src/screens/UserNewScreen';
 import UserRoleScreen from './src/screens/UserRoleScreen';
 import DevicesScreen from './src/screens/DevicesScreen';
 import TwoFaSettingsScreen from './src/screens/TwoFaSettingsScreen';
+import OperationsSettingsScreen from './src/screens/OperationsSettingsScreen';
+import ChemicalsScreen from './src/screens/ChemicalsScreen';
 import SyncConflictsScreen from './src/screens/SyncConflictsScreen';
-import { SyncBadge } from './src/ui/SyncBadge';
 import { startSyncLoop } from './src/sync/outbox';
 import { loadSession, setSessionExpiredHandler } from './src/lib/api';
 import type { RootStackParamList } from './src/navigation';
@@ -43,11 +51,17 @@ function Root({ initial }: { initial: 'Login' | 'Home' }) {
       <NavigationContainer ref={navRef} onStateChange={() => setRoute(navRef.getCurrentRoute()?.name)}>
         <Stack.Navigator initialRouteName={initial} screenOptions={{ headerStyle: { backgroundColor: '#0B1B30' }, headerTintColor: '#fff', headerTitleStyle: { fontWeight: '700' } }}>
           <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
-          <Stack.Screen name="Home" component={HomeScreen} options={{ title: 'Drillex Ops', headerRight: () => <SyncBadge onPress={() => navRef.navigate('Outbox')} /> }} />
+          <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} options={({ route }) => ({ title: route.params?.forced ? 'Set your password' : 'Change password', headerBackVisible: !route.params?.forced, gestureEnabled: !route.params?.forced })} />
+          <Stack.Screen name="TwoFaEnrol" component={TwoFaEnrolScreen} options={{ title: 'Two-factor setup' }} />
+          <Stack.Screen name="Home" component={MainTabs} options={{ headerShown: false }} />
           <Stack.Screen name="Outbox" component={OutboxScreen} options={{ title: 'Sync queue' }} />
           <Stack.Screen name="Notifications" component={NotificationsScreen} options={{ title: 'Notifications' }} />
           <Stack.Screen name="Reports" component={ReportsScreen} options={{ title: 'Reports' }} />
           <Stack.Screen name="History" component={HistoryScreen} options={{ title: 'My submissions' }} />
+          <Stack.Screen name="ShiftReports" component={ShiftReportsScreen} options={{ title: 'Shift production' }} />
+          <Stack.Screen name="Readings" component={ReadingsScreen} options={{ title: 'Daily readings' }} />
+          <Stack.Screen name="Assets" component={AssetsScreen} options={{ title: 'Machine register' }} />
+          <Stack.Screen name="AssetDetail" component={AssetDetailScreen} options={{ title: 'Machine' }} />
           <Stack.Screen name="Parts" component={PartsScreen} options={{ title: 'Parts store' }} />
           <Stack.Screen name="AssetNew" component={AssetNewScreen} options={{ title: 'Register asset' }} />
           <Stack.Screen name="Maintenance" component={MaintenanceScreen} options={{ title: 'Maintenance' }} />
@@ -62,6 +76,8 @@ function Root({ initial }: { initial: 'Login' | 'Home' }) {
           <Stack.Screen name="UserRole" component={UserRoleScreen} options={{ title: 'Change role' }} />
           <Stack.Screen name="Devices" component={DevicesScreen} options={{ title: 'Devices' }} />
           <Stack.Screen name="TwoFaSettings" component={TwoFaSettingsScreen} options={{ title: 'Security' }} />
+          <Stack.Screen name="OperationsSettings" component={OperationsSettingsScreen} options={{ title: 'Operations' }} />
+          <Stack.Screen name="Chemicals" component={ChemicalsScreen} options={{ title: 'Chemicals' }} />
           <Stack.Screen name="SyncConflicts" component={SyncConflictsScreen} options={{ title: 'Sync conflicts' }} />
         </Stack.Navigator>
       </NavigationContainer>

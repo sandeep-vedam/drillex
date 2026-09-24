@@ -10,7 +10,7 @@ export default function DevicesPage() {
   useEffect(() => { load(); }, []);
   async function set(d: D, approved: boolean) { if (!approved && !confirm(`Revoke ${d.user.employeeId}'s device ${d.deviceId}? Their sessions on it are signed out.`)) return; await api(`/devices/${d.id}`, { method: 'PATCH', body: JSON.stringify({ approved }) }); load(); }
   return (
-    <Shell title="Devices">
+    <Shell title="Phones">
       <p className="text-[14px] text-muted max-w-[72ch]">Every sign-in registers the device. With <span className="font-mono">DEVICE_REGISTRATION_REQUIRED=true</span> on the server, only approved devices can sign in (SRS §9.3). Revoking a device signs it out remotely.</p>
       {error && <p className="text-crit text-sm">{error}</p>}
       <section className="card overflow-x-auto"><table className="w-full text-[14px]">

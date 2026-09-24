@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { ReportDoc, ReportType, REPORT_META } from './report-types';
+import { getOperationsSettings } from '../settings/settings.util';
 
 const n = (v: unknown) => (v == null ? 0 : Number(v));
 const r1 = (v: number) => Math.round(v * 10) / 10;
@@ -14,7 +15,8 @@ export class ReportBuildersService {
 
   async build(type: ReportType, from: Date, to: Date, siteId?: string | null): Promise<ReportDoc> {
     const base = { type, title: REPORT_META[type].title, subtitle: `${d(from)} to ${d(to)}${siteId ? ' · site-scoped' : ' · all sites'}`, periodStart: from, periodEnd: to, generatedAt: new Date() };
-    const range = { gte: from, lte: to };
+    // `to` is a calendar day: include all of it, so timestamped rows (audit, logins, alerts) from the last day count too.
+    const range = { gte: from, lt: new Date(Date.UTC(to.getUTCFullYear(), to.getUTCMonth(), to.getUTCDate() + 1)) };
     const assetWhere = siteId ? { siteId } : {};
     switch (type) {
       case 'DRILLING_PRODUCTION': {
@@ -64,7 +66,8 @@ export class ReportBuildersService {
       }
       case 'ASSET_HEALTH': {
         const assets = await this.prisma.asset.findMany({ where: { deletedAt: null, ...assetWhere }, include: { dailyReadings: { where: { date: range }, orderBy: { date: 'desc' } }, alerts: { where: { createdAt: range } } }, orderBy: { assetNumber: 'asc' } });
-        const attention = assets.filter((a) => a.status === 'UNDER_MAINTENANCE' || a.alerts.some((x) => !x.resolvedAt) || (a.dailyReadings[0]?.conditionRating ?? 5) <= 2);
+        const { readingAlertThreshold } = await getOperationsSettings(this.prisma);
+        const attention = assets.filter((a) => a.status === 'UNDER_MAINTENANCE' || a.alerts.some((x) => !x.resolvedAt) || (a.dailyReadings[0]?.conditionRating ?? 5) <= readingAlertThreshold);
         return { ...base, kpis: [{ label: 'Fleet', value: assets.length, hint: `${assets.filter((a) => a.status === 'ACTIVE').length} active` }, { label: 'Under maintenance', value: assets.filter((a) => a.status === 'UNDER_MAINTENANCE').length }, { label: 'Alerts in period', value: sum(assets, (a) => a.alerts.length) }, { label: 'Need attention', value: attention.length }],
           sections: [{ title: 'Fleet condition overview', columns: ['Asset', 'Name', 'Status', 'Readings', 'Latest condition', 'Avg condition', 'Alerts', 'Open alerts'], rows: assets.map((a) => [a.assetNumber, a.name, a.status, a.dailyReadings.length, a.dailyReadings[0]?.conditionRating ?? '—', a.dailyReadings.length ? r1(avg(a.dailyReadings, (x) => x.conditionRating)) : '—', a.alerts.length, a.alerts.filter((x) => !x.resolvedAt).length]) }, { title: 'Machines requiring attention', columns: ['Asset', 'Name', 'Why'], rows: attention.map((a) => [a.assetNumber, a.name, [a.status === 'UNDER_MAINTENANCE' && 'under maintenance', a.alerts.some((x) => !x.resolvedAt) && `${a.alerts.filter((x) => !x.resolvedAt).length} open alert(s)`, (a.dailyReadings[0]?.conditionRating ?? 5) <= 2 && 'latest condition poor'].filter(Boolean).join('; ')]) }, { title: 'Alert history', columns: ['Date', 'Asset', 'Severity', 'Message', 'Resolved'], rows: assets.flatMap((a) => a.alerts.map((x) => [d(x.createdAt), a.assetNumber, x.severity, x.message, x.resolvedAt ? 'yes' : 'no'])).sort((x, y) => String(y[0]).localeCompare(String(x[0]))) }] };
       }

@@ -35,9 +35,12 @@ export default function ShiftReportsPage() {
     try { await api(`/shift-reports/${r.id}/unlock`, { method: 'POST', body: JSON.stringify({ reason }) }); await load(); } catch (e) { setError((e as Error).message); } finally { setBusy(false); }
   }
   const canApprove = !!matrix && !!can(matrix, me?.role, 'shift_report:approve');
+  // Unlock is its own permission on the API, so a role granted approve alone must not be offered a
+  // button that 403s. Mobile has always gated it separately; this matches it.
+  const canUnlock = !!matrix && !!can(matrix, me?.role, 'shift_report:unlock');
 
   return (
-    <Shell title="Shift production">
+    <Shell title="Approve production">
       <div className="flex flex-wrap items-center gap-3">
         <div className="flex border border-line bg-surface">{TABS.map(([k, l]) => { const n = k === 'ALL' ? rows.length : rows.filter((r) => r.status === k).length; return <button key={k} onClick={() => setTab(k)} className={`px-3 py-2 text-[12px] font-semibold tracking-wide transition ${tab === k ? 'bg-navy-800 text-white' : 'text-muted hover:text-ink'}`}>{l} <span className="tnum opacity-70">{n}</span></button>; })}</div>
         <div className="ml-auto flex gap-5 text-[13px] text-muted tnum"><span><b className="text-ink font-semibold">{totals.m.toLocaleString()} m</b> drilled</span><span><b className="text-ink font-semibold">{totals.holes}</b> holes</span><span><b className="text-ink font-semibold">{totals.down} h</b> downtime</span></div>
@@ -78,10 +81,10 @@ export default function ShiftReportsPage() {
                 {sel.chemicals.length ? <table className="w-full text-[13px]"><thead><tr className="text-left text-muted"><th className="py-1 font-medium">Chemical</th><th className="py-1 font-medium text-right">Qty</th><th className="py-1 font-medium">Purpose</th><th className="py-1 font-medium text-right">Stock</th></tr></thead><tbody>{sel.chemicals.map((c) => <tr key={c.id} className="border-t border-line"><td className="py-1.5 font-medium">{c.chemical.name}</td><td className="py-1.5 text-right tnum">{Number(c.quantity)} {c.unit.toLowerCase()}</td><td className="py-1.5 text-muted">{c.purpose ?? '—'}</td><td className="py-1.5 text-right tnum text-muted">{c.stockOnHand != null ? Number(c.stockOnHand) : '—'}</td></tr>)}</tbody></table> : <div className="text-[13px] text-muted">None recorded.</div>}
               </div>
               <div className="text-[12px] text-muted">Submitted {new Date(sel.submittedAt).toLocaleString()}{sel.approvedAt && ` · Approved ${new Date(sel.approvedAt).toLocaleString()}`}</div>
-              {canApprove && (
+              {(canApprove || canUnlock) && (
                 <div className="flex gap-2 pt-2 border-t border-line">
-                  {sel.status === 'SUBMITTED' && <button disabled={busy} onClick={() => approve(sel)} className="btn-primary h-10 flex-1"><I.Check /> Approve</button>}
-                  {sel.status !== 'UNLOCKED' && <button disabled={busy} onClick={() => unlock(sel)} className="btn-ghost border border-line h-10 flex-1 justify-center">Unlock for correction</button>}
+                  {canApprove && sel.status === 'SUBMITTED' && <button disabled={busy} onClick={() => approve(sel)} className="btn-primary h-10 flex-1"><I.Check /> Approve</button>}
+                  {canUnlock && sel.status !== 'UNLOCKED' && <button disabled={busy} onClick={() => unlock(sel)} className="btn-ghost border border-line h-10 flex-1 justify-center">Unlock for correction</button>}
                   {sel.status === 'UNLOCKED' && <div className="text-[13px] text-hazard">Unlocked — waiting for the driller to resubmit.</div>}
                 </div>
               )}

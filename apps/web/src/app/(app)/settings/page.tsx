@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Shell } from '@/components/Shell';
 import { PasswordForm } from '@/components/PasswordForm';
 import { TwoFaRolesForm } from '@/components/TwoFaRolesForm';
+import { OperationsForm } from '@/components/OperationsForm';
 import { getUser } from '@/lib/api';
 import { useRoleMatrix } from '@/lib/permissions';
 import { can } from '@drillex/shared';
@@ -17,6 +18,9 @@ export default function SettingsPage() {
         <section className="card p-6"><h2 className="font-display font-semibold text-[22px] text-navy-800 mb-1">Change password</h2><p className="text-[13px] text-muted mb-5">Minimum 8 characters (SRS §2.2). You stay signed in on this device.</p>{done ? <p className="text-ok font-medium">Password updated.</p> : <PasswordForm onDone={() => setDone(true)} />}</section>
         {canManageUsers && (
           <section className="card p-6 lg:col-span-2"><h2 className="font-display font-semibold text-[22px] text-navy-800 mb-1">Security</h2><p className="text-[13px] text-muted mb-5">Choose which roles must enrol in two-factor authentication to sign in. Unchecked roles sign in with just employee ID + password.</p><TwoFaRolesForm /></section>
+        )}
+        {canManageUsers && (
+          <section className="card p-6 lg:col-span-2"><h2 className="font-display font-semibold text-[22px] text-navy-800 mb-1">Operations</h2><p className="text-[13px] text-muted mb-5">When machine checks raise an alert, and whether finished repairs need sign-off.</p><OperationsForm /></section>
         )}
       </div>
     </Shell>

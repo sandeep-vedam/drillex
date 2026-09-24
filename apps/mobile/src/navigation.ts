@@ -1,11 +1,19 @@
 import type { RoleRow } from './screens/RolesScreen';
+import type { Asset as AssetRow } from './screens/AssetsScreen';
 
 export type RootStackParamList = {
   Login: undefined;
+  ChangePassword: { forced?: boolean } | undefined;
+  TwoFaEnrol: { employeeId: string; password: string };
   Home: undefined;
+  More: undefined;
   Outbox: undefined;
   Notifications: undefined;
   Reports: undefined;
+  ShiftReports: undefined;
+  Readings: undefined;
+  Assets: undefined;
+  AssetDetail: { asset: AssetRow };
   History: undefined;
   Parts: undefined;
   AssetNew: undefined;
@@ -13,7 +21,7 @@ export type RootStackParamList = {
   JobCards: undefined;
   JobCardNew: { assetId?: string };
   DailyReading: { assetId: string; assetNumber: string; assetName: string };
-  ShiftReport: { assetId: string; assetNumber: string; assetName: string; siteId: string };
+  ShiftReport: { assetId: string; assetNumber: string; assetName: string; siteId: string; correctId?: string };
   Roles: undefined;
   RoleForm: { role?: RoleRow };
   Users: undefined;
@@ -21,5 +29,7 @@ export type RootStackParamList = {
   UserRole: { userId: string; employeeId: string; currentRole: string };
   Devices: undefined;
   TwoFaSettings: undefined;
+  OperationsSettings: undefined;
+  Chemicals: undefined;
   SyncConflicts: undefined;
 };

@@ -118,12 +118,15 @@ export type DailyReadingInput = z.infer<typeof DailyReadingSchema>;
 
 export const fuelConsumed = (start: number, end: number) => Math.max(0, start - end);
 
+/** Condition rating at or below which a reading raises a maintenance review, unless an admin configures another (SRS §5.3). */
+export const DEFAULT_ALERT_THRESHOLD = 2;
+
 /** SRS §5.3 escalation rules */
-export function readingAlerts(r: Pick<DailyReadingInput, 'warningLights' | 'unusualNoises' | 'leaks' | 'conditionRating'>) {
+export function readingAlerts(r: Pick<DailyReadingInput, 'warningLights' | 'unusualNoises' | 'leaks' | 'conditionRating'>, threshold = DEFAULT_ALERT_THRESHOLD) {
   const alerts: string[] = [];
   if (r.warningLights) alerts.push('WARNING_LIGHTS');
   if (r.leaks) alerts.push('LEAKS');
   if (r.unusualNoises) alerts.push('UNUSUAL_NOISES');
-  if (r.conditionRating <= 2) alerts.push('MAINTENANCE_REVIEW');
+  if (r.conditionRating <= threshold) alerts.push('MAINTENANCE_REVIEW');
   return alerts;
 }

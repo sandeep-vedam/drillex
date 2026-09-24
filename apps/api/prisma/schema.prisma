@@ -493,6 +493,17 @@ model AuditLog {
   @@index([entity, entityId])
 }
 
+/// One row per offline operation the server has processed, keyed by the client-generated op ID (SRS §9.2.2),
+/// so a replayed op is answered as a duplicate instead of being applied again.
+model SyncOperation {
+  opId      String   @id
+  userId    String
+  kind      String
+  status    String
+  entityId  String?
+  createdAt DateTime @default(now())
+}
+
 model SyncConflict {
   id         String    @id @default(uuid())
   entity     String

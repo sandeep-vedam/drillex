@@ -14,6 +14,7 @@ import type { RootStackParamList } from '../navigation';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'JobCardNew'>;
 type Asset = { id: string; assetNumber: string; name: string }; type Part = { id: string; partNo: string; name: string; qtyOnHand: number };
+type Tech = { id: string; employeeId: string; name: string };
 const TYPES = [{ v: 'BREAKDOWN_REPAIR', l: 'Breakdown' }, { v: 'SCHEDULED_SERVICE', l: 'Service' }, { v: 'INSPECTION', l: 'Inspection' }, { v: 'MODIFICATION', l: 'Modification' }] as const;
 const STATUSES = [{ v: 'OPEN', l: 'Open' }, { v: 'IN_PROGRESS', l: 'In progress' }, { v: 'AWAITING_PARTS', l: 'Await. parts' }, { v: 'COMPLETED', l: 'Completed' }] as const;
 
@@ -23,16 +24,21 @@ export default function JobCardNewScreen({ route, navigation }: Props) {
   const [f, setF] = useState({ jobType: 'BREAKDOWN_REPAIR', reportedFault: '', workPerformed: '', hourMeter: '', labourHours: '', toolsUsed: '', conditionBefore: 0, conditionAfter: 0, testResult: '' as '' | 'PASSED' | 'FAILED' | 'PENDING', nextAction: '', status: 'OPEN' });
   const set = <K extends keyof typeof f>(k: K, v: (typeof f)[K]) => setF((x) => ({ ...x, [k]: v }));
   const [rows, setRows] = useState<{ partId: string; quantity: string }[]>([]);
+  const [techs, setTechs] = useState<Tech[]>([]); const [techIds, setTechIds] = useState<string[]>([]);
   const [before, setBefore] = useState<Photo[]>([]); const [after, setAfter] = useState<Photo[]>([]);
   const [signature, setSignature] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null); const [busy, setBusy] = useState(false);
-  useEffect(() => { cached('assets', () => api<Asset[]>('/assets')).then((r) => { setAssets(r.data); if (!assetId) setAssetId(r.data[0]?.id ?? ''); }).catch(() => {}); cached('parts', () => api<Part[]>('/parts')).then((r) => setParts(r.data)).catch(() => {}); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
+  useEffect(() => {
+    cached('assets', () => api<Asset[]>('/assets')).then((r) => { setAssets(r.data); if (!assetId) setAssetId(r.data[0]?.id ?? ''); }).catch(() => {});
+    cached('parts', () => api<Part[]>('/parts')).then((r) => setParts(r.data)).catch(() => {});
+    cached('technicians', () => api<Tech[]>('/job-cards/technicians')).then((r) => setTechs(r.data)).catch(() => {});
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- load once; the default machine is only picked when none was passed in
   const asset = assets.find((a) => a.id === assetId);
 
   async function submit() {
     setError(null);
     const id = uuid(); const sigId = signature ? uuid() : undefined;
-    const payload = { id, assetId, date: new Date().toISOString().slice(0, 10), jobType: f.jobType, reportedFault: f.reportedFault || undefined, workPerformed: f.workPerformed, hourMeter: f.hourMeter ? Number(f.hourMeter) : undefined, labourHours: f.labourHours ? Number(f.labourHours) : undefined, toolsUsed: f.toolsUsed || undefined, conditionBefore: f.conditionBefore || undefined, conditionAfter: f.conditionAfter || undefined, testResult: f.testResult || undefined, nextAction: f.nextAction || undefined, status: f.status, parts: rows.filter((r) => r.partId && Number(r.quantity) > 0).map((r) => ({ partId: r.partId, quantity: Number(r.quantity) })), techSignatureAttachmentId: sigId };
+    const payload = { id, assetId, date: new Date().toISOString().slice(0, 10), jobType: f.jobType, reportedFault: f.reportedFault || undefined, workPerformed: f.workPerformed, hourMeter: f.hourMeter ? Number(f.hourMeter) : undefined, labourHours: f.labourHours ? Number(f.labourHours) : undefined, toolsUsed: f.toolsUsed || undefined, conditionBefore: f.conditionBefore || undefined, conditionAfter: f.conditionAfter || undefined, testResult: f.testResult || undefined, nextAction: f.nextAction || undefined, status: f.status, technicianIds: techIds, parts: rows.filter((r) => r.partId && Number(r.quantity) > 0).map((r) => ({ partId: r.partId, quantity: Number(r.quantity) })), techSignatureAttachmentId: sigId };
     const parsed = JobCardSchema.safeParse(payload);
     if (!parsed.success) { const i = parsed.error.issues[0]; setError(`${i.path.join('.') || 'Form'}: ${i.message}`); return; }
     if (f.status === 'COMPLETED' && !signature) { setError('Sign the job card before marking it completed.'); return; }
@@ -59,6 +65,11 @@ export default function JobCardNewScreen({ route, navigation }: Props) {
           <TextInput style={[s.area, { minHeight: 100 }]} value={f.workPerformed} onChangeText={(v) => set('workPerformed', v)} placeholder="Work performed — what was done (required)" placeholderTextColor="#9AA6B3" multiline />
           <View style={{ flexDirection: 'row', gap: 10 }}><NumberField label="Hour meter" value={f.hourMeter} onChange={(v) => set('hourMeter', v)} unit="h" /><NumberField label="Labour hours" value={f.labourHours} onChange={(v) => set('labourHours', v)} unit="h" /></View>
           <TextInput style={s.input} value={f.toolsUsed} onChangeText={(v) => set('toolsUsed', v)} placeholder="Special tools used" placeholderTextColor="#9AA6B3" />
+        </Section>
+        <Section title="Technicians">
+          {techs.length ? (
+            <View style={s.chips}>{techs.map((t) => { const on = techIds.includes(t.id); return <Pressable key={t.id} onPress={() => setTechIds((x) => (on ? x.filter((y) => y !== t.id) : [...x, t.id]))} style={[s.chip, on && s.chipOn]} accessibilityRole="checkbox" accessibilityState={{ checked: on }}><Text style={[s.chipText, on && { color: '#fff' }]}>{t.employeeId} <Text style={{ fontWeight: '400', fontFamily: undefined }}>{t.name}</Text></Text></Pressable>; })}</View>
+          ) : <Text style={s.help}>No technician list on this device yet — it loads the next time you are online.</Text>}
         </Section>
         <Section title="Parts replaced / used">
           {rows.map((r, i) => (

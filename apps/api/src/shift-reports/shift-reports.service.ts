@@ -53,8 +53,9 @@ export class ShiftReportsService {
   /** Submission is final; supervisor unlock is required for edits and is audit-logged with a reason (SRS §4.3). */
   async unlock(u: AuthUser, id: string, reason: string) {
     if (!reason?.trim()) throw new BadRequestException('A reason is required to unlock a report');
+    // Who may unlock is the shift_report:unlock grant (SRS §4.5), not a role name; site scope comes from get().
     const r = await this.get(u, id);
-    if (r.status === 'APPROVED' && u.role === 'SUPERVISOR') throw new ForbiddenException('Supervisors cannot edit approved data; ask a manager');
+    if (r.status === 'UNLOCKED') throw new ConflictException('Report is already unlocked for correction');
     const out = await this.prisma.shiftReport.update({ where: { id }, data: { status: 'UNLOCKED', approvedById: null, approvedAt: null }, include: this.include });
     await this.prisma.auditLog.create({ data: { actorId: u.id, deviceId: u.deviceId, entity: 'ShiftReport', entityId: id, action: 'UNLOCK', diff: { reason } as never } });
     await this.prisma.notification.create({ data: { userId: r.userId, type: 'report_unlocked', title: `${r.asset.assetNumber} shift report unlocked for correction`, body: reason } });
@@ -69,7 +70,7 @@ export class ShiftReportsService {
     const { id: _i, chemicals, signatureAttachmentId, date: _d, assetId: _a, ...rest } = input;
     const out = await this.prisma.$transaction(async (tx) => {
       await tx.shiftReportChemical.deleteMany({ where: { shiftReportId: id } });
-      const upd = await tx.shiftReport.update({ where: { id }, data: { ...rest, totalMeters: totalMetersDrilled(input.startDepth, input.endDepth), status: 'SUBMITTED', submittedAt: new Date(),
+      const upd = await tx.shiftReport.update({ where: { id }, data: { ...rest, totalMeters: totalMetersDrilled(input.startDepth, input.endDepth), status: 'SUBMITTED', submittedAt: new Date(), ...(signatureAttachmentId ? { signatureId: signatureAttachmentId } : {}),
         chemicals: { create: chemicals.map((c) => ({ chemicalId: c.chemicalId, quantity: c.quantity, unit: c.unit, purpose: c.purpose, stockOnHand: c.stockOnHand })) } }, include: this.include });
       await tx.auditLog.create({ data: { actorId: u.id, deviceId: u.deviceId, entity: 'ShiftReport', entityId: id, action: 'RESUBMIT', diff: { before: { startDepth: r.startDepth, endDepth: r.endDepth, holesCompleted: r.holesCompleted, downtimeHours: r.downtimeHours }, after: { startDepth: input.startDepth, endDepth: input.endDepth, holesCompleted: input.holesCompleted, downtimeHours: input.downtimeHours } } as never } });
       return upd;

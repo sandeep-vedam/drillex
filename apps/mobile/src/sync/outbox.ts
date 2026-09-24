@@ -47,7 +47,7 @@ export function flush(): Promise<void> {
   flushing = (async () => {
     const q = await load();
     const net = await NetInfo.fetch(); state = { ...state, online: !!net.isConnected }; emit();
-    if (!net.isConnected) return;
+    if (!net.isConnected) { console.warn('[outbox] flush skipped: NetInfo reports offline', net); return; }
     const batch = q.filter((o) => !o.error).slice(0, 50);
     if (!batch.length) return;
     state = { ...state, syncing: true }; emit();
@@ -61,7 +61,7 @@ export function flush(): Promise<void> {
       state = { ...state, lastSyncAt: new Date().toISOString() };
       await save();
       if (q.some((o) => !o.error)) { flushing = null; return flush(); }
-    } catch { batch.forEach((o) => { o.attempts += 1; }); await save(); /* network or 5xx: keep everything, try later */ }
+    } catch (e) { console.warn('[outbox] flush failed, will retry', e); batch.forEach((o) => { o.attempts += 1; }); await save(); /* network or 5xx: keep everything, try later */ }
     finally { state = { ...state, syncing: false }; emit(); }
   })().finally(() => { flushing = null; });
   return flushing;

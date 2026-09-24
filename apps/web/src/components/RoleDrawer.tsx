@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
-import { Permissions, type Permission } from '@drillex/shared';
+import { Permissions, permissionDescription, type Permission } from '@drillex/shared';
 import { I } from './Icons';
 
 type Grant = { permission: string; scope: string };
@@ -77,10 +77,13 @@ export function RoleDrawer({ open, onClose, onSaved, role }: { open: boolean; on
                   {g.perms.map((p) => {
                     const scope = grants[p];
                     return (
-                      <div key={p} className="flex items-center gap-3 px-3 py-2 text-[13px]">
-                        <label className="flex items-center gap-2.5 flex-1 cursor-pointer">
-                          <input type="checkbox" checked={!!scope} onChange={() => toggle(p)} />
-                          <span className="font-mono">{p}</span>
+                      <div key={p} className="flex items-start gap-3 px-3 py-2 text-[13px]">
+                        <label className="flex items-start gap-2.5 flex-1 cursor-pointer">
+                          <input type="checkbox" className="mt-1" checked={!!scope} onChange={() => toggle(p)} />
+                          <span className="flex flex-col gap-0.5">
+                            <span className="font-mono">{p}</span>
+                            <span className="text-[12px] text-muted leading-snug">{permissionDescription(p)}</span>
+                          </span>
                         </label>
                         {scope && (
                           <select className="input !py-1 !px-2 w-auto text-[12px]" value={scope} onChange={(e) => setScope(p, e.target.value as Scope)}>

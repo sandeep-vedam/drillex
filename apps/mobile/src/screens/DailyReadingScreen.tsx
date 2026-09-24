@@ -1,7 +1,9 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { DailyReadingSchema, readingAlerts, fuelConsumed } from '@drillex/shared';
+import { DailyReadingSchema, readingAlerts, fuelConsumed, DEFAULT_ALERT_THRESHOLD } from '@drillex/shared';
+import { api } from '../lib/api';
+import { cached } from '../sync/cache';
 import { enqueue, uuid } from '../sync/outbox';
 import { SignaturePad } from '../ui/SignaturePad';
 import { PhotoPicker, Photo } from '../ui/PhotoPicker';
@@ -30,7 +32,10 @@ export default function DailyReadingScreen({ route, navigation }: Props) {
   const [photos, setPhotos] = useState<Photo[]>([]);
 
   const consumed = useMemo(() => (f.fuelStart && f.fuelEnd ? fuelConsumed(Number(f.fuelStart), Number(f.fuelEnd)) : null), [f.fuelStart, f.fuelEnd]);
-  const alerts = readingAlerts({ warningLights: f.warningLights, leaks: f.leaks, unusualNoises: f.unusualNoises, conditionRating: f.conditionRating || 5 });
+  // The server decides; this mirrors its admin-configured threshold (SRS §5.3) so the preview tells the operator the same thing.
+  const [threshold, setThreshold] = useState(DEFAULT_ALERT_THRESHOLD);
+  useEffect(() => { cached('settings.operations', () => api<{ readingAlertThreshold: number }>('/settings/operations')).then((r) => setThreshold(r.data.readingAlertThreshold)).catch(() => {}); }, []);
+  const alerts = readingAlerts({ warningLights: f.warningLights, leaks: f.leaks, unusualNoises: f.unusualNoises, conditionRating: f.conditionRating || 5 }, threshold);
 
   async function submit() {
     setError(null);

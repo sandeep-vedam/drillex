@@ -3,7 +3,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { Shell } from '@/components/Shell';
 import { StatusChip } from '@/components/StatusChip';
 import { I } from '@/components/Icons';
-import { api, getUser } from '@/lib/api';
+import { api, getUser, uuid } from '@/lib/api';
+import { SignaturePad } from '@/components/SignaturePad';
 import { useRoleMatrix } from '@/lib/permissions';
 import { can } from '@drillex/shared';
 
@@ -21,6 +22,8 @@ export default function JobCardsPage() {
   const [sel, setSel] = useState<JC | null>(null);
   const [drawer, setDrawer] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [signing, setSigning] = useState(false); const [signature, setSignature] = useState<string | null>(null); const [busy, setBusy] = useState(false);
+  useEffect(() => { setSigning(false); setSignature(null); }, [sel?.id]);
   const me = getUser();
   const matrix = useRoleMatrix();
   const load = () => api<JC[]>('/job-cards').then(setRows).catch((e) => setError(e.message));
@@ -29,11 +32,23 @@ export default function JobCardsPage() {
   const list = useMemo(() => rows.filter((r) => tab === 'ALL' ? true : tab === 'APPROVAL' ? r.status === 'COMPLETED' && !r.approvedAt : r.status === tab), [rows, tab]);
   const cost = (jc: JC) => jc.parts.reduce((n, p) => n + p.quantity * Number(p.part.unitCost ?? 0), 0);
   async function approve(jc: JC) { try { await api(`/job-cards/${jc.id}/approve`, { method: 'POST' }); await load(); setSel((s) => (s ? { ...s, approvedAt: new Date().toISOString() } : s)); } catch (e) { setError((e as Error).message); } }
-  async function setStatus(jc: JC, status: string) { try { await api(`/job-cards/${jc.id}`, { method: 'PATCH', body: JSON.stringify({ status }) }); await load(); setSel((s) => (s ? { ...s, status } : s)); } catch (e) { setError((e as Error).message); } }
+  async function setStatus(jc: JC, status: string) {
+    // Completion needs the technician's signature first (SRS §7.6), so that choice opens the sign-off panel instead.
+    if (status === 'COMPLETED') { setSigning(true); return; }
+    try { await api(`/job-cards/${jc.id}`, { method: 'PATCH', body: JSON.stringify({ status }) }); await load(); setSel((s) => (s ? { ...s, status } : s)); } catch (e) { setError((e as Error).message); }
+  }
+  async function complete(jc: JC) {
+    if (!signature) return;
+    setBusy(true); setError(null);
+    try {
+      await completeWithSignature(jc.id, signature);
+      await load(); setSel((s) => (s ? { ...s, status: 'COMPLETED' } : s)); setSigning(false); setSignature(null);
+    } catch (e) { setError((e as Error).message); } finally { setBusy(false); }
+  }
   const canApprove = !!matrix && !!can(matrix, me?.role, 'job_card:approve');
 
   return (
-    <Shell title="Job cards" actions={<button onClick={() => setDrawer(true)} className="btn-primary h-9 text-[13px]"><I.Plus /> New job card</button>}>
+    <Shell title="Repair records" actions={<button onClick={() => setDrawer(true)} className="btn-primary h-9 text-[13px]"><I.Plus /> New job card</button>}>
       <JobCardDrawer open={drawer} onClose={() => setDrawer(false)} onCreated={load} />
       <div className="flex flex-wrap items-center gap-3">
         <div className="flex border border-line bg-surface">{[['ALL', 'All'], ['OPEN', 'Open'], ['IN_PROGRESS', 'In progress'], ['AWAITING_PARTS', 'Awaiting parts'], ['APPROVAL', 'To approve'], ['COMPLETED', 'Completed']].map(([k, l]) => <button key={k} onClick={() => setTab(k)} className={`px-3 py-2 text-[12px] font-semibold tracking-wide transition ${tab === k ? 'bg-navy-800 text-white' : 'text-muted hover:text-ink'}`}>{l} <span className="tnum opacity-70">{k === 'ALL' ? rows.length : k === 'APPROVAL' ? rows.filter((r) => r.status === 'COMPLETED' && !r.approvedAt).length : rows.filter((r) => r.status === k).length}</span></button>)}</div>
@@ -72,7 +87,13 @@ export default function JobCardsPage() {
               {sel.nextAction && <div className="border-l-2 border-hazard pl-3"><div className="eyebrow mb-0.5">Next action required</div>{sel.nextAction}</div>}
               {!!sel.attachments?.length && <div><div className="eyebrow mb-1">Photos & sign-off</div><div className="flex flex-wrap gap-2">{sel.attachments.map((a) => <a key={a.id} href={a.url} target="_blank" rel="noreferrer"><img src={a.url} alt={a.kind} className={`border border-line ${a.kind === 'SIGNATURE' ? 'h-14 bg-white' : 'h-20 w-20 object-cover'}`} /></a>)}</div></div>}
               <div className="flex flex-wrap gap-2 pt-2 border-t border-line">
-                {!sel.approvedAt && sel.status !== 'COMPLETED' && <select className="input h-10 w-auto text-[13px]" value={sel.status} onChange={(e) => setStatus(sel, e.target.value)}>{STATUSES.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select>}
+                {signing && sel.status !== 'COMPLETED' && (
+                  <div className="w-full flex flex-col gap-2 border border-line p-3 bg-canvas">
+                    <SignaturePad key={sel.id} onChange={setSignature} />
+                    <div className="flex gap-2"><button type="button" onClick={() => { setSigning(false); setSignature(null); }} className="btn-ghost h-10">Cancel</button><button type="button" disabled={!signature || busy} onClick={() => complete(sel)} className="btn-primary h-10 flex-1"><I.Check /> {busy ? 'Saving…' : 'Sign & mark completed'}</button></div>
+                  </div>
+                )}
+                {!signing && !sel.approvedAt && sel.status !== 'COMPLETED' && <select className="input h-10 w-auto text-[13px]" value={sel.status} onChange={(e) => setStatus(sel, e.target.value)}>{STATUSES.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select>}
                 {canApprove && sel.status === 'COMPLETED' && !sel.approvedAt && <button onClick={() => approve(sel)} className="btn-primary h-10 flex-1"><I.Check /> Approve job card</button>}
                 {sel.approvedAt && <div className="text-ok font-semibold">Approved {new Date(sel.approvedAt).toLocaleString()}</div>}
               </div>
@@ -84,16 +105,36 @@ export default function JobCardsPage() {
   );
 }
 
+/** Uploads the signature against the card, then marks it completed — the API checks the signature is on file. */
+async function completeWithSignature(jobCardId: string, dataUrl: string) {
+  const sigId = uuid();
+  await api('/attachments', { method: 'POST', body: JSON.stringify({ id: sigId, ownerType: 'JobCard', ownerId: jobCardId, kind: 'SIGNATURE', contentType: 'image/png', base64: dataUrl.replace(/^data:image\/png;base64,/, '') }) });
+  await api(`/job-cards/${jobCardId}`, { method: 'PATCH', body: JSON.stringify({ status: 'COMPLETED', techSignatureAttachmentId: sigId }) });
+}
+
 function JobCardDrawer({ open, onClose, onCreated }: { open: boolean; onClose: () => void; onCreated: () => void }) {
   const [assets, setAssets] = useState<Opt[]>([]); const [techs, setTechs] = useState<Opt[]>([]); const [parts, setParts] = useState<Part[]>([]);
   const [f, setF] = useState({ assetId: '', date: new Date().toISOString().slice(0, 10), jobType: 'BREAKDOWN_REPAIR', reportedFault: '', workPerformed: '', hourMeter: '', labourHours: '', technicianIds: [] as string[], toolsUsed: '', conditionBefore: '', conditionAfter: '', testResult: '', nextAction: '', status: 'OPEN', parts: [] as { partId: string; quantity: number }[] });
   const [error, setError] = useState<string | null>(null); const [busy, setBusy] = useState(false);
-  useEffect(() => { if (!open) return; api<Opt[]>('/assets').then((a) => { setAssets(a); setF((x) => ({ ...x, assetId: x.assetId || a[0]?.id || '' })); }).catch(() => {}); api<Opt[]>('/users/lookup?role=TECHNICIAN').then(setTechs).catch(() => {}); api<Part[]>('/parts').then(setParts).catch(() => {}); }, [open]);
+  const [signature, setSignature] = useState<string | null>(null);
+  useEffect(() => { if (!open) return; setSignature(null); api<Opt[]>('/assets').then((a) => { setAssets(a); setF((x) => ({ ...x, assetId: x.assetId || a[0]?.id || '' })); }).catch(() => {}); api<Opt[]>('/job-cards/technicians').then(setTechs).catch(() => {}); api<Part[]>('/parts').then(setParts).catch(() => {}); }, [open]);
   const set = (k: string, v: unknown) => setF((x) => ({ ...x, [k]: v }));
   const n = (v: string) => (v === '' ? undefined : Number(v));
   async function submit(e: React.FormEvent) {
-    e.preventDefault(); setBusy(true); setError(null);
-    try { await api('/job-cards', { method: 'POST', body: JSON.stringify({ ...f, hourMeter: n(f.hourMeter), labourHours: n(f.labourHours), conditionBefore: n(f.conditionBefore), conditionAfter: n(f.conditionAfter), testResult: f.testResult || undefined, reportedFault: f.reportedFault || undefined, toolsUsed: f.toolsUsed || undefined, nextAction: f.nextAction || undefined }) }); onCreated(); onClose(); }
+    e.preventDefault();
+    const completing = f.status === 'COMPLETED';
+    if (completing && !signature) { setError('The technician must sign before the job card can be saved as completed.'); return; }
+    setBusy(true); setError(null);
+    try {
+      // A completed card is saved as in progress first, so the signature has a card to attach to, then completed.
+      const jc = await api<{ id: string }>('/job-cards', { method: 'POST', body: JSON.stringify({ ...f, status: completing ? 'IN_PROGRESS' : f.status, hourMeter: n(f.hourMeter), labourHours: n(f.labourHours), conditionBefore: n(f.conditionBefore), conditionAfter: n(f.conditionAfter), testResult: f.testResult || undefined, reportedFault: f.reportedFault || undefined, toolsUsed: f.toolsUsed || undefined, nextAction: f.nextAction || undefined }) });
+      if (completing && signature) {
+        try { await completeWithSignature(jc.id, signature); }
+        // The card exists now, so close rather than let a retry create a second one; it can be completed from its panel.
+        catch (err) { onCreated(); onClose(); window.alert(`The job card was saved as in progress, but could not be marked completed: ${(err as Error).message}\n\nOpen it from the list to sign and complete it.`); return; }
+      }
+      onCreated(); onClose();
+    }
     catch (err) { setError((err as Error).message); } finally { setBusy(false); }
   }
   if (!open) return null;
@@ -121,6 +162,7 @@ function JobCardDrawer({ open, onClose, onCreated }: { open: boolean; onClose: (
           <L label="Parts replaced / used"><div className="border border-line divide-y divide-line">{f.parts.map((p, i) => { const part = parts.find((x) => x.id === p.partId); return <div key={i} className="flex items-center gap-2 px-3 py-2"><select className="input h-9 flex-1 text-[13px]" value={p.partId} onChange={(e) => set('parts', f.parts.map((x, j) => (j === i ? { ...x, partId: e.target.value } : x)))}>{parts.map((x) => <option key={x.id} value={x.id}>{x.partNo} — {x.name} ({x.qtyOnHand} in stock)</option>)}</select><input className="input h-9 w-20 tnum" type="number" min={1} value={p.quantity} onChange={(e) => set('parts', f.parts.map((x, j) => (j === i ? { ...x, quantity: Number(e.target.value) } : x)))} />{part && p.quantity > part.qtyOnHand && <span className="text-[11px] text-hazard font-semibold">exceeds stock</span>}<button type="button" onClick={() => set('parts', f.parts.filter((_, j) => j !== i))} className="text-crit text-[12px] font-semibold">Remove</button></div>; })}<button type="button" onClick={() => set('parts', [...f.parts, { partId: parts[0]?.id ?? '', quantity: 1 }])} className="w-full px-3 py-2 text-[13px] text-navy-600 hover:bg-canvas text-left">+ Add part row</button></div></L>
           <L label="Tools used"><input className="input" value={f.toolsUsed} onChange={(e) => set('toolsUsed', e.target.value)} /></L>
           <L label="Next action required"><textarea className="input min-h-[50px]" value={f.nextAction} onChange={(e) => set('nextAction', e.target.value)} /></L>
+          {f.status === 'COMPLETED' && <SignaturePad onChange={setSignature} />}
           {error && <p className="text-[13px] text-crit border-l-2 border-crit pl-3">{error}</p>}
         </div>
         <footer className="px-6 py-4 border-t border-line flex justify-end gap-2"><button type="button" onClick={onClose} className="btn-ghost">Cancel</button><button disabled={busy} className="btn-primary h-10"><I.Plus /> {busy ? 'Saving…' : 'Create job card'}</button></footer>

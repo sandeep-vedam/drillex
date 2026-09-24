@@ -1,9 +1,11 @@
 import { ForbiddenException, Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
-import { MaintenanceScheduleInput, nextCycle, scheduleStatus } from '@drillex/shared';
+import { anchorHours, initialDue, MaintenanceScheduleInput, nextCycle, scheduleStatus } from '@drillex/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { AuthUser } from '../auth/decorators';
+import { openJobCardWhere } from '../job-cards/open-jobs';
+import { getOperationsSettings } from '../settings/settings.util';
 
 @Injectable()
 export class MaintenanceService {
@@ -37,7 +39,9 @@ export class MaintenanceService {
   async create(u: AuthUser, input: MaintenanceScheduleInput) {
     const asset = await this.prisma.asset.findFirstOrThrow({ where: { id: input.assetId, deletedAt: null, ...this.assetScope(u) } });
     const { parts, ...data } = input;
-    const row = await this.prisma.maintenanceSchedule.create({ data: { ...data, parts: { create: parts } }, include: this.include });
+    // An interval alone must still produce a due point, or the schedule never comes due (SRS §6.1).
+    const due = initialDue(data, new Date(), (await this.currentHours([asset.id])).get(asset.id) ?? null);
+    const row = await this.prisma.maintenanceSchedule.create({ data: { ...data, ...due, parts: { create: parts } }, include: this.include });
     await this.prisma.auditLog.create({ data: { actorId: u.id, deviceId: u.deviceId, entity: 'MaintenanceSchedule', entityId: row.id, action: 'CREATE', diff: input as never } });
     if (input.technicianIds.length) await this.prisma.notification.createMany({ data: input.technicianIds.map((userId) => ({ userId, type: 'maintenance_assigned', title: `${asset.assetNumber} · ${input.description}`, body: `You have been assigned this service.`, payload: { scheduleId: row.id } as never })) });
     return row;
@@ -64,12 +68,13 @@ export class MaintenanceService {
     if (u.scope === 'self' && !s.technicianIds.includes(u.id)) throw new ForbiddenException('You are not assigned to this service');
     const completedAt = b.completedAt ?? new Date();
     const hm = b.hourMeter ?? (await this.currentHours([s.assetId])).get(s.assetId) ?? null;
+    const { jobCardApprovalRequired: approvalRequired } = await getOperationsSettings(this.prisma);
     const recurring = !!(s.intervalHours || s.intervalDays);
     const next = nextCycle(s, completedAt, hm);
     const row = await this.prisma.$transaction(async (tx) => {
       const r = await tx.maintenanceSchedule.update({ where: { id }, data: { lastServiceAt: completedAt, lastServiceHours: hm, nextDueAt: recurring ? next.nextDueAt : null, nextDueHours: recurring ? next.nextDueHours : null, status: recurring ? 'UPCOMING' : 'COMPLETED', notes: b.notes ? `${s.notes ? s.notes + '\n' : ''}[${completedAt.toISOString().slice(0, 10)} ${u.employeeId}] ${b.notes}` : s.notes } });
       await tx.auditLog.create({ data: { actorId: u.id, deviceId: u.deviceId, entity: 'MaintenanceSchedule', entityId: id, action: 'COMPLETE', diff: { completedAt, hourMeter: hm, notes: b.notes } as never } });
-      const stillOpen = await tx.jobCard.count({ where: { assetId: s.assetId, status: { in: ['OPEN', 'IN_PROGRESS', 'AWAITING_PARTS'] } } });
+      const stillOpen = await tx.jobCard.count({ where: { assetId: s.assetId, ...openJobCardWhere(approvalRequired) } });
       if (s.asset.status === 'UNDER_MAINTENANCE' && !stillOpen) await tx.asset.update({ where: { id: s.assetId }, data: { status: 'ACTIVE' } });
       return r;
     });
@@ -79,18 +84,22 @@ export class MaintenanceService {
 
   /** Daily 06:00: refresh statuses, send reminders inside lead time, flag overdue (SRS §6.3). */
   @Cron('0 6 * * *')
-  async dailyReminders() { const n = await this.runReminders(); this.log.log(`Reminders: ${n.reminded} reminded, ${n.overdue} overdue`); }
+  async dailyReminders() { const n = await this.runReminders(); this.log.log(`Reminders: ${n.reminded} reminded, ${n.overdue} overdue`); await this.prisma.auditLog.create({ data: { entity: 'ScheduledJob', entityId: 'maintenance-reminders', action: 'RUN', diff: n } }); }
 
   async runReminders() {
     const rows = await this.prisma.maintenanceSchedule.findMany({ where: { deletedAt: null, status: { not: 'COMPLETED' } }, include: { asset: true } });
     const hours = await this.currentHours([...new Set(rows.map((r) => r.assetId))]);
     const now = new Date(); let reminded = 0, overdue = 0;
     for (const r of rows) {
-      const st = scheduleStatus({ nextDueAt: r.nextDueAt, nextDueHours: r.nextDueHours ? Number(r.nextDueHours) : null, reminderLeadDays: r.reminderLeadDays }, now, hours.get(r.assetId) ?? null);
+      // Hour-based schedules created before the machine had any hour reading take their due point from the first one.
+      const anchored = anchorHours({ intervalHours: r.intervalHours, nextDueHours: r.nextDueHours != null ? Number(r.nextDueHours) : null }, hours.get(r.assetId) ?? null);
+      if (anchored != null) await this.prisma.maintenanceSchedule.update({ where: { id: r.id }, data: { nextDueHours: anchored } });
+      const nextDueHours = anchored ?? (r.nextDueHours != null ? Number(r.nextDueHours) : null);
+      const st = scheduleStatus({ nextDueAt: r.nextDueAt, nextDueHours, reminderLeadDays: r.reminderLeadDays }, now, hours.get(r.assetId) ?? null);
       if (st !== r.status) await this.prisma.maintenanceSchedule.update({ where: { id: r.id }, data: { status: st } });
       if (st === 'DUE_NOW' || st === 'OVERDUE') {
         const title = `${r.asset.assetNumber} · ${r.description} ${st === 'OVERDUE' ? 'is OVERDUE' : 'due soon'}`;
-        const body = r.nextDueAt ? `Due ${r.nextDueAt.toISOString().slice(0, 10)}` : r.nextDueHours ? `Due at ${Number(r.nextDueHours)} h` : '';
+        const body = r.nextDueAt ? `Due ${r.nextDueAt.toISOString().slice(0, 10)}` : nextDueHours ? `Due at ${nextDueHours} h` : '';
         // de-dupe: one reminder per schedule per day
         const since = new Date(now.getTime() - 20 * 3600e3);
         const already = await this.prisma.notification.count({ where: { type: 'maintenance_due', payload: { path: ['scheduleId'], equals: r.id }, createdAt: { gte: since } } });
@@ -107,7 +116,7 @@ export class MaintenanceService {
 
   /** Monday 07:00: manager digest of upcoming + overdue (SRS §6.3). */
   @Cron('0 7 * * 1')
-  async weeklyDigest() { await this.runWeeklyDigest(); }
+  async weeklyDigest() { const n = await this.runWeeklyDigest(); await this.prisma.auditLog.create({ data: { entity: 'ScheduledJob', entityId: 'weekly-digest', action: 'RUN', diff: n } }); }
   async runWeeklyDigest() {
     const rows = await this.prisma.maintenanceSchedule.findMany({ where: { deletedAt: null, status: { in: ['DUE_NOW', 'OVERDUE'] } }, include: { asset: true }, orderBy: { nextDueAt: 'asc' } });
     const lines = rows.map((r) => `${r.status === 'OVERDUE' ? '🔴' : '🟠'} ${r.asset.assetNumber} ${r.description}${r.nextDueAt ? ` · ${r.nextDueAt.toISOString().slice(0, 10)}` : ''}`);

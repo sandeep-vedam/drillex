@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
-import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-import { mkdirSync, writeFileSync, existsSync } from 'fs';
+import { mkdirSync, writeFileSync, existsSync, rmSync } from 'fs';
 import { join, dirname } from 'path';
 
 /**
@@ -32,6 +32,11 @@ export class StorageService {
   async presignPut(key: string, contentType: string) {
     if (!this.s3Public) return null;
     return getSignedUrl(this.s3Public, new PutObjectCommand({ Bucket: process.env.S3_BUCKET, Key: key, ContentType: contentType }), { expiresIn: 900 });
+  }
+  /** Removes a stored object; a key that is already gone is not an error. */
+  async remove(key: string) {
+    if (this.s3) await this.s3.send(new DeleteObjectCommand({ Bucket: process.env.S3_BUCKET, Key: key }));
+    else rmSync(join(this.localDir, key), { force: true });
   }
   async urlFor(key: string) {
     if (this.s3Public) return getSignedUrl(this.s3Public, new GetObjectCommand({ Bucket: process.env.S3_BUCKET, Key: key }), { expiresIn: 3600 });

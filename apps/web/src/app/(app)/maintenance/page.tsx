@@ -37,7 +37,7 @@ export default function MaintenancePage() {
   const canWrite = !!matrix && !!can(matrix, me?.role, 'maintenance:write');
 
   return (
-    <Shell title="Maintenance schedule" actions={canWrite ? <button onClick={() => setDrawer(true)} className="btn-primary h-9 text-[13px]"><I.Plus /> New schedule</button> : undefined}>
+    <Shell title="Servicing" actions={canWrite ? <button onClick={() => setDrawer(true)} className="btn-primary h-9 text-[13px]"><I.Plus /> New schedule</button> : undefined}>
       <ScheduleDrawer open={drawer} onClose={() => setDrawer(false)} onCreated={load} />
       <div className="flex flex-wrap items-center gap-3">
         <div className="flex border border-line bg-surface">{[['ALL', 'Open'], ['OVERDUE', 'Overdue'], ['DUE_NOW', 'Due now'], ['UPCOMING', 'Upcoming'], ['COMPLETED', 'Completed']].map(([k, l]) => <button key={k} onClick={() => setTab(k)} className={`px-3 py-2 text-[12px] font-semibold tracking-wide transition ${tab === k ? (k === 'OVERDUE' ? 'bg-crit text-white' : 'bg-navy-800 text-white') : 'text-muted hover:text-ink'}`}>{l} <span className="tnum opacity-70">{k === 'ALL' ? rows.filter((r) => r.status !== 'COMPLETED').length : count(k)}</span></button>)}</div>

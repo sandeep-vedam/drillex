@@ -3,6 +3,12 @@
 -- the new editable display label. The 5 built-in roles are seeded below as isSystem so they can't be
 -- deleted, with the exact grants the static matrix held.
 
+-- Free the name "Role" before the table below can take it: in PostgreSQL a table implicitly creates a
+-- type of the same name, so the old enum must go first. User.role moves onto a plain string here; the
+-- FK to Role.key is added at the end, once the rows it references have been seeded.
+ALTER TABLE "User" ALTER COLUMN "role" TYPE TEXT USING ("role"::TEXT);
+DROP TYPE IF EXISTS "Role";
+
 -- CreateTable
 CREATE TABLE "Role" (
     "id" TEXT NOT NULL,
@@ -109,8 +115,6 @@ INSERT INTO "RolePermission" ("id", "roleId", "permission", "scope") VALUES
   ('rp_admin_audit_read',             'role_admin', 'audit:read',             'all'),
   ('rp_admin_role_manage',            'role_admin', 'role:manage',            'all');
 
--- Move User.role off the enum onto a plain string FK to Role.key, so renaming a role's display name
--- never touches this column and every existing `u.role === 'X'` check keeps working unchanged.
-ALTER TABLE "User" ALTER COLUMN "role" TYPE TEXT USING ("role"::TEXT);
+-- Now that every role key above exists as a row, point User.role at it. Renaming a role's display
+-- name never touches this column, so every existing `u.role === 'X'` check keeps working unchanged.
 ALTER TABLE "User" ADD CONSTRAINT "User_role_fkey" FOREIGN KEY ("role") REFERENCES "Role"("key") ON DELETE RESTRICT ON UPDATE CASCADE;
-DROP TYPE "Role";

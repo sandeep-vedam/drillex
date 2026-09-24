@@ -89,7 +89,13 @@ describe('shift reports (SRS §4) + approval', () => {
     expect((await request(app.getHttpServer()).post(`/api/v1/shift-reports/${r.body.id}/approve`).set(auth(op))).status).toBe(403);
     const a = await request(app.getHttpServer()).post(`/api/v1/shift-reports/${r.body.id}/approve`).set(auth(sup));
     expect(a.status).toBe(201); expect(a.body.status).toBe('APPROVED');
-    expect((await request(app.getHttpServer()).post(`/api/v1/shift-reports/${r.body.id}/unlock`).set(auth(sup)).send({ reason: 'e2e' })).status).toBe(403); // supervisors cannot edit approved data
+    // SRS §4.5: any holder of shift_report:unlock (supervisors by default) may return an approved report for correction.
+    expect((await request(app.getHttpServer()).post(`/api/v1/shift-reports/${r.body.id}/unlock`).set(auth(op)).send({ reason: 'e2e' })).status).toBe(403);
+    const u = await request(app.getHttpServer()).post(`/api/v1/shift-reports/${r.body.id}/unlock`).set(auth(sup)).send({ reason: 'e2e wrong depth' });
+    expect(u.status).toBe(201); expect(u.body.status).toBe('UNLOCKED');
+    expect(await prisma.auditLog.count({ where: { entity: 'ShiftReport', entityId: r.body.id, action: 'UNLOCK' } })).toBe(1);
+    const fixed = await request(app.getHttpServer()).patch(`/api/v1/shift-reports/${r.body.id}`).set(auth(op)).send({ ...body, endDepth: 30 });
+    expect(fixed.status).toBe(200); expect(fixed.body.status).toBe('SUBMITTED'); expect(Number(fixed.body.totalMeters)).toBe(20);
   });
 });
 
@@ -100,10 +106,10 @@ describe('offline sync (SRS §9.2)', () => {
     const date = day(402); const id = crypto.randomUUID();
     await prisma.dailyReading.deleteMany({ where: { assetId: asset.id, date: new Date(date) } });
     const payload = { id, assetId: asset.id, date, hourMeter: 1, fuelStart: 2, fuelEnd: 1, engineOil: 'OK', hydraulicOil: 'OK', coolant: 'OK', airFilter: 'OK', battery: 'OK', preStartChecklistDone: true, warningLights: false, unusualNoises: false, leaks: false, conditionRating: 5, notes: '[e2e] sync' };
-    const ops = { ops: [{ opId: 'a', kind: 'daily_reading', payload }] };
+    const ops = { ops: [{ opId: crypto.randomUUID(), kind: 'daily_reading', payload }] };
     expect((await request(app.getHttpServer()).post('/api/v1/sync/push').set(auth(t)).send(ops)).body.results[0].status).toBe('applied');
     expect((await request(app.getHttpServer()).post('/api/v1/sync/push').set(auth(t)).send(ops)).body.results[0].status).toBe('duplicate');
-    const c = await request(app.getHttpServer()).post('/api/v1/sync/push').set(auth(t)).send({ ops: [{ opId: 'b', kind: 'daily_reading', payload: { ...payload, id: crypto.randomUUID() } }] });
+    const c = await request(app.getHttpServer()).post('/api/v1/sync/push').set(auth(t)).send({ ops: [{ opId: crypto.randomUUID(), kind: 'daily_reading', payload: { ...payload, id: crypto.randomUUID() } }] });
     expect(c.body.results[0].status).toBe('conflict');
     await prisma.syncConflict.deleteMany({ where: { entity: 'DailyReading', versions: { path: ['incoming', 'notes'], equals: '[e2e] sync' } } });
   });
@@ -118,12 +124,12 @@ describe('offline sync (SRS §9.2)', () => {
 
     // The device queues the photo first, which is the order the app submits in.
     const r = await request(app.getHttpServer()).post('/api/v1/sync/push').set(auth(t)).send({ ops: [
-      { opId: 'att-first', kind: 'attachment', payload: { ownerType: 'DailyReading', ownerId: id, kind: 'PHOTO', contentType: 'image/png', base64: png } },
-      { opId: 'reading', kind: 'daily_reading', payload: reading },
+      { opId: `att-first-${id}`, kind: 'attachment', payload: { ownerType: 'DailyReading', ownerId: id, kind: 'PHOTO', contentType: 'image/png', base64: png } },
+      { opId: `reading-${id}`, kind: 'daily_reading', payload: reading },
     ] });
     expect(r.status).toBe(201);
     const byId = Object.fromEntries(r.body.results.map((x: { opId: string; status: string }) => [x.opId, x.status]));
-    expect(byId).toEqual({ 'att-first': 'applied', reading: 'applied' });
+    expect(byId).toEqual({ [`att-first-${id}`]: 'applied', [`reading-${id}`]: 'applied' });
     expect(await prisma.attachment.count({ where: { ownerType: 'DailyReading', ownerId: id } })).toBe(1);
 
     await prisma.attachment.deleteMany({ where: { ownerType: 'DailyReading', ownerId: id } });
@@ -136,10 +142,11 @@ describe('offline sync (SRS §9.2)', () => {
     const date = day(403);
     await prisma.dailyReading.deleteMany({ where: { assetId: asset.id, date: new Date(date) } });
     const good = { id: crypto.randomUUID(), assetId: asset.id, date, hourMeter: 1, fuelStart: 2, fuelEnd: 1, engineOil: 'OK', hydraulicOil: 'OK', coolant: 'OK', airFilter: 'OK', battery: 'OK', preStartChecklistDone: true, warningLights: false, unusualNoises: false, leaks: false, conditionRating: 5, notes: '[e2e] batch' };
-    const r = await request(app.getHttpServer()).post('/api/v1/sync/push').set(auth(t)).send({ ops: [{ opId: 'bad-1', kind: 'not_a_real_kind' }, { opId: 'good-1', kind: 'daily_reading', payload: good }] });
+    const bad = `bad-${good.id}`, ok = `good-${good.id}`;
+    const r = await request(app.getHttpServer()).post('/api/v1/sync/push').set(auth(t)).send({ ops: [{ opId: bad, kind: 'not_a_real_kind' }, { opId: ok, kind: 'daily_reading', payload: good }] });
     expect(r.status).toBe(201);
-    expect(r.body.results.find((x: { opId: string }) => x.opId === 'bad-1').status).toBe('rejected');
-    expect(r.body.results.find((x: { opId: string }) => x.opId === 'good-1').status).toBe('applied');
+    expect(r.body.results.find((x: { opId: string }) => x.opId === bad).status).toBe('rejected');
+    expect(r.body.results.find((x: { opId: string }) => x.opId === ok).status).toBe('applied');
     await prisma.dailyReading.deleteMany({ where: { assetId: asset.id, date: new Date(date) } });
   });
 });
@@ -155,6 +162,8 @@ describe('asset register management', () => {
     return r.body.id as string;
   }
   async function scrub(id: string) {
+    const cards = await prisma.jobCard.findMany({ where: { assetId: id }, select: { id: true } });
+    await prisma.attachment.deleteMany({ where: { ownerType: 'JobCard', ownerId: { in: cards.map((c) => c.id) } } });
     await prisma.jobCard.deleteMany({ where: { assetId: id } });
     await prisma.assetOperator.deleteMany({ where: { assetId: id } });
     await prisma.auditLog.deleteMany({ where: { entity: 'Asset', entityId: id } });
@@ -221,8 +230,15 @@ describe('asset register management', () => {
     expect((await request(app.getHttpServer()).delete(`/api/v1/assets/${id}`).set(auth(admin))).status).toBe(400);
     expect((await patch({ status: 'DECOMMISSIONED' })).status).toBe(200); // the one status the job-card flow leaves alone
 
-    const closed = await request(app.getHttpServer()).patch(`/api/v1/job-cards/${jc.body.id}`).set(auth(techToken)).send({ status: 'COMPLETED' });
+    // SRS §7.6: no completion without the technician's signature…
+    expect((await request(app.getHttpServer()).patch(`/api/v1/job-cards/${jc.body.id}`).set(auth(techToken)).send({ status: 'COMPLETED' })).status).toBe(400);
+    const sigId = crypto.randomUUID();
+    expect((await request(app.getHttpServer()).post('/api/v1/attachments').set(auth(techToken)).send({ id: sigId, ownerType: 'JobCard', ownerId: jc.body.id, kind: 'SIGNATURE', contentType: 'image/png', base64: 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==' })).status).toBe(201);
+    const closed = await request(app.getHttpServer()).patch(`/api/v1/job-cards/${jc.body.id}`).set(auth(techToken)).send({ status: 'COMPLETED', techSignatureAttachmentId: sigId });
     expect(closed.status).toBe(200);
+    // …and, with approval required (the default), it still holds the machine until a supervisor signs it off.
+    expect((await request(app.getHttpServer()).delete(`/api/v1/assets/${id}`).set(auth(admin))).status).toBe(400);
+    expect((await request(app.getHttpServer()).post(`/api/v1/job-cards/${jc.body.id}/approve`).set(auth(await login('MGR001')))).status).toBe(201);
     const deleted = await request(app.getHttpServer()).delete(`/api/v1/assets/${id}`).set(auth(admin));
     expect(deleted.status).toBe(200);
 
@@ -314,6 +330,8 @@ describe('dynamic RBAC (roles & permissions admin)', () => {
     const opRole = await prisma.role.findUniqueOrThrow({ where: { key: 'OPERATOR' } });
     expect((await request(app.getHttpServer()).delete(`/api/v1/roles/${opRole.id}`).set(auth(admin))).status).toBe(403);
 
+    await prisma.device.deleteMany({ where: { userId: target.id } }); // signing in registered a device
+    await prisma.refreshToken.deleteMany({ where: { userId: target.id } });
     await prisma.user.delete({ where: { id: target.id } });
   });
 
@@ -322,5 +340,187 @@ describe('dynamic RBAC (roles & permissions admin)', () => {
     const target = await prisma.user.findUniqueOrThrow({ where: { employeeId: 'OPR001' } });
     expect((await request(app.getHttpServer()).patch(`/api/v1/users/${target.id}/role`).set(auth(admin)).send({ role: 'NOT_A_REAL_ROLE' })).status).toBe(400);
     expect((await request(app.getHttpServer()).post('/api/v1/roles').set(auth(admin)).send({ name: '[e2e] bad grant', permissions: [{ permission: 'not:a_permission', scope: 'all' }] })).status).toBe(400);
+  });
+});
+
+describe('SRS gap fixes (2026-09)', () => {
+  const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+  const post = (path: string, t: string, body?: object) => request(app.getHttpServer()).post(`/api/v1${path}`).set(auth(t)).send(body ?? {});
+  const patch = (path: string, t: string, body: object) => request(app.getHttpServer()).patch(`/api/v1${path}`).set(auth(t)).send(body);
+  const get = (path: string, t: string) => request(app.getHttpServer()).get(`/api/v1${path}`).set(auth(t));
+  const reading = (assetId: string, date: string, extra: object = {}) => ({ id: crypto.randomUUID(), assetId, date, hourMeter: 1200, fuelStart: 2, fuelEnd: 1, engineOil: 'OK', hydraulicOil: 'OK', coolant: 'OK', airFilter: 'OK', battery: 'OK', preStartChecklistDone: true, warningLights: false, unusualNoises: false, leaks: false, conditionRating: 5, notes: '[e2e] gap', ...extra });
+
+  it('FR-6.1: a schedule given only an interval gets a due point, and an hour-based one anchors on the first hour reading', async () => {
+    const mgr = await login('MGR001');
+    const asset = await prisma.asset.findFirstOrThrow({ where: { assetNumber: 'DRL-001' } });
+    const days = await post('/maintenance/schedules', mgr, { assetId: asset.id, serviceType: 'ANNUAL', description: '[e2e] annual', intervalDays: 365 });
+    expect(days.status).toBe(201);
+    expect(new Date(days.body.nextDueAt).getTime()).toBeGreaterThan(Date.now() + 360 * 864e5);
+
+    const latest = await prisma.dailyReading.aggregate({ where: { assetId: asset.id }, _max: { hourMeter: true } });
+    const hours = await post('/maintenance/schedules', mgr, { assetId: asset.id, serviceType: 'HR_250', description: '[e2e] 250h', intervalHours: 250 });
+    expect(hours.status).toBe(201);
+    if (latest._max.hourMeter != null) expect(Number(hours.body.nextDueHours)).toBe(Number(latest._max.hourMeter) + 250);
+
+    // A machine with no readings yet: no due point until the first one, then the daily job fills it in.
+    const bare = await prisma.asset.create({ data: { assetNumber: `E2E-${Date.now()}`, name: '[e2e] no readings', category: 'OTHER', make: 'x', model: 'y', serialNumber: 's', yearOfManufacture: 2020, commissionedAt: new Date(), siteId: asset.siteId } });
+    const pending = await post('/maintenance/schedules', mgr, { assetId: bare.id, serviceType: 'HR_500', description: '[e2e] 500h', intervalHours: 500 });
+    expect(pending.body.nextDueHours).toBeNull();
+    await prisma.dailyReading.create({ data: { assetId: bare.id, userId: (await prisma.user.findUniqueOrThrow({ where: { employeeId: 'OPR001' } })).id, date: new Date(day(1)), hourMeter: 40, fuelStart: 1, fuelEnd: 0, fuelConsumed: 1, engineOil: 'OK', hydraulicOil: 'OK', coolant: 'OK', airFilter: 'OK', battery: 'OK', preStartChecklistDone: true, warningLights: false, unusualNoises: false, leaks: false, conditionRating: 5 } });
+    await post('/maintenance/jobs/reminders', mgr);
+    expect(Number((await prisma.maintenanceSchedule.findUniqueOrThrow({ where: { id: pending.body.id } })).nextDueHours)).toBe(540);
+
+    await prisma.maintenanceSchedule.deleteMany({ where: { description: { startsWith: '[e2e]' } } });
+    await prisma.dailyReading.deleteMany({ where: { assetId: bare.id } });
+    await prisma.asset.delete({ where: { id: bare.id } });
+  });
+
+  it('FR-7.1 / FR-3.2: numbers stay unique under concurrent creates and keep counting past 999', async () => {
+    const tec = await login('TEC001');
+    const asset = await prisma.asset.findFirstOrThrow({ where: { assetNumber: 'DRL-001' } });
+    const res = await Promise.all(Array.from({ length: 6 }, () => post('/job-cards', tec, { assetId: asset.id, date: day(0), jobType: 'INSPECTION', workPerformed: '[e2e] concurrent numbering' })));
+    expect(res.map((r) => r.status)).toEqual(Array(6).fill(201));
+    expect(new Set(res.map((r) => r.body.jobNo)).size).toBe(6);
+    await prisma.jobCard.deleteMany({ where: { workPerformed: '[e2e] concurrent numbering' } });
+    await prisma.asset.update({ where: { id: asset.id }, data: { status: 'ACTIVE' } });
+
+    const admin = await login('ADM001'); const site = await prisma.site.findFirstOrThrow(); const opr = await prisma.user.findUniqueOrThrow({ where: { employeeId: 'OPR001' } });
+    const leftovers = await prisma.asset.findMany({ where: { name: { in: ['[e2e] 999', '[e2e] past 999'] } }, select: { id: true } }); // from an interrupted run
+    await prisma.assetOperator.deleteMany({ where: { assetId: { in: leftovers.map((x) => x.id) } } });
+    await prisma.asset.deleteMany({ where: { id: { in: leftovers.map((x) => x.id) } } });
+    const filler = await prisma.asset.create({ data: { assetNumber: 'EQP-999', name: '[e2e] 999', category: 'OTHER', make: 'x', model: 'y', serialNumber: 's', yearOfManufacture: 2020, commissionedAt: new Date(), siteId: site.id } });
+    const mk = () => post('/assets', admin, { name: '[e2e] past 999', category: 'OTHER', make: 'x', model: 'y', serialNumber: `E2E-${Math.random()}`, yearOfManufacture: 2020, commissionedAt: day(10), siteId: site.id, operatorIds: [opr.id] });
+    const a = await mk(); const b = await mk();
+    expect([a.status, b.status]).toEqual([201, 201]);
+    expect([a.body.assetNumber, b.body.assetNumber]).toEqual(['EQP-1000', 'EQP-1001']);
+    await prisma.auditLog.deleteMany({ where: { entity: 'Asset', entityId: { in: [a.body.id, b.body.id] } } });
+    await prisma.assetOperator.deleteMany({ where: { assetId: { in: [a.body.id, b.body.id] } } });
+    await prisma.asset.deleteMany({ where: { id: { in: [filler.id, a.body.id, b.body.id] } } });
+  });
+
+  it('FR-7.6 / FR-7.2: a card cannot be created completed without a signature; technicians can be listed for the picker', async () => {
+    const tec = await login('TEC001');
+    const asset = await prisma.asset.findFirstOrThrow({ where: { assetNumber: 'DRL-001' } });
+    const r = await post('/job-cards', tec, { assetId: asset.id, date: day(0), jobType: 'INSPECTION', workPerformed: '[e2e] no signature', status: 'COMPLETED' });
+    expect(r.status).toBe(400);
+    const techs = await get('/job-cards/technicians', tec);
+    expect(techs.status).toBe(200);
+    expect(techs.body.some((t: { employeeId: string }) => t.employeeId === 'TEC001')).toBe(true);
+    expect((await get('/job-cards/technicians', await login('OPR001'))).status).toBe(403);
+  });
+
+  it('FR-7.5: purchase requests only move forward, and receiving books stock in exactly once', async () => {
+    const tec = await login('TEC001');
+    const part = await prisma.part.findUniqueOrThrow({ where: { partNo: 'FLT-OIL-01' } });
+    const pr = await post('/parts/purchase-requests', tec, { partId: part.id, quantity: 3 });
+    expect(pr.status).toBe(201);
+    expect((await patch(`/parts/purchase-requests/${pr.body.id}`, tec, { status: 'RECEIVED' })).status).toBe(409); // must be ordered first
+    expect((await patch(`/parts/purchase-requests/${pr.body.id}`, tec, { status: 'ORDERED' })).status).toBe(200);
+    const twice = await Promise.all([patch(`/parts/purchase-requests/${pr.body.id}`, tec, { status: 'RECEIVED' }), patch(`/parts/purchase-requests/${pr.body.id}`, tec, { status: 'RECEIVED' })]);
+    expect(twice.map((x) => x.status).sort()).toEqual([200, 409]);
+    expect((await prisma.part.findUniqueOrThrow({ where: { id: part.id } })).qtyOnHand).toBe(part.qtyOnHand + 3);
+    expect((await patch(`/parts/purchase-requests/${pr.body.id}`, tec, { status: 'CANCELLED' })).status).toBe(409); // received is final
+    expect(await prisma.auditLog.count({ where: { entity: 'PurchaseRequest', entityId: pr.body.id } })).toBe(3); // create, ordered, received
+
+    await prisma.part.update({ where: { id: part.id }, data: { qtyOnHand: part.qtyOnHand } });
+    await prisma.purchaseRequest.delete({ where: { id: pr.body.id } });
+  });
+
+  it('FR-9.2.2: an op replayed with the same op ID is a duplicate even when the record carries no id of its own', async () => {
+    const tec = await login('TEC001');
+    const asset = await prisma.asset.findFirstOrThrow({ where: { assetNumber: 'DRL-001' } });
+    const op = { opId: crypto.randomUUID(), kind: 'job_card', payload: { assetId: asset.id, date: day(0), jobType: 'INSPECTION', workPerformed: '[e2e] replayed op' } };
+    const first = await post('/sync/push', tec, { ops: [op] });
+    const again = await post('/sync/push', tec, { ops: [op] });
+    expect(first.body.results[0].status).toBe('applied');
+    expect(again.body.results[0]).toMatchObject({ status: 'duplicate', id: first.body.results[0].id });
+    expect(await prisma.jobCard.count({ where: { workPerformed: '[e2e] replayed op' } })).toBe(1);
+    await prisma.jobCard.deleteMany({ where: { workPerformed: '[e2e] replayed op' } });
+    await prisma.asset.update({ where: { id: asset.id }, data: { status: 'ACTIVE' } });
+  });
+
+  it('FR-5.3: the alert threshold is configurable by an admin and applied to new readings', async () => {
+    const admin = await login('ADM001'); const op = await login('OPR001');
+    expect((await get('/settings/operations', op)).body).toMatchObject({ readingAlertThreshold: 2 });
+    expect((await patch('/settings/operations', op, { readingAlertThreshold: 3 })).status).toBe(403);
+    expect((await patch('/settings/operations', admin, { readingAlertThreshold: 9 })).status).toBe(400);
+    expect((await patch('/settings/operations', admin, { readingAlertThreshold: 3 })).body).toMatchObject({ readingAlertThreshold: 3, jobCardApprovalRequired: true });
+    const asset = await prisma.asset.findFirstOrThrow({ where: { assetNumber: 'DRL-001' } });
+    const date = day(405); await prisma.dailyReading.deleteMany({ where: { assetId: asset.id, date: new Date(date) } });
+    const r = await post('/daily-readings', op, reading(asset.id, date, { conditionRating: 3 }));
+    expect(r.status).toBe(201);
+    expect(r.body.alerts).toContain('MAINTENANCE_REVIEW');
+    await prisma.systemSetting.deleteMany({ where: { key: 'operations' } });
+    await prisma.alert.deleteMany({ where: { source: `DAILY_READING:${r.body.id}` } });
+    await prisma.dailyReading.delete({ where: { id: r.body.id } });
+  });
+
+  it('FR-7.6: switching the approval rule off releases machines held only by completed-unapproved cards, and back on holds them again', async () => {
+    const admin = await login('ADM001'); const tec = await login('TEC001');
+    const asset = await prisma.asset.findFirstOrThrow({ where: { assetNumber: 'DRL-001' } });
+    const jc = await post('/job-cards', tec, { assetId: asset.id, date: day(0), jobType: 'INSPECTION', workPerformed: '[e2e] policy toggle' });
+    const sig = crypto.randomUUID();
+    await post('/attachments', tec, { id: sig, ownerType: 'JobCard', ownerId: jc.body.id, kind: 'SIGNATURE', contentType: 'image/png', base64: PNG });
+    expect((await patch(`/job-cards/${jc.body.id}`, tec, { status: 'COMPLETED', techSignatureAttachmentId: sig })).status).toBe(200);
+    const status = async () => (await prisma.asset.findUniqueOrThrow({ where: { id: asset.id } })).status;
+    expect(await status()).toBe('UNDER_MAINTENANCE');
+    await patch('/settings/operations', admin, { jobCardApprovalRequired: false });
+    expect(await status()).toBe('ACTIVE');
+    await patch('/settings/operations', admin, { jobCardApprovalRequired: true });
+    expect(await status()).toBe('UNDER_MAINTENANCE');
+
+    await prisma.systemSetting.deleteMany({ where: { key: 'operations' } });
+    await prisma.attachment.deleteMany({ where: { ownerId: jc.body.id } });
+    await prisma.jobCard.delete({ where: { id: jc.body.id } });
+    await prisma.asset.update({ where: { id: asset.id }, data: { status: 'ACTIVE' } });
+  });
+
+  it('chemical master list can be managed by stores, not by operators', async () => {
+    const tec = await login('TEC001'); const op = await login('OPR001');
+    const name = `[e2e] Foam ${Date.now()}`;
+    expect((await post('/chemicals', op, { name, defaultUnit: 'LITRES' })).status).toBe(403);
+    const c = await post('/chemicals', tec, { name, defaultUnit: 'LITRES', unitCost: 4.5 });
+    expect(c.status).toBe(201);
+    expect((await post('/chemicals', tec, { name: name.toUpperCase(), defaultUnit: 'KG' })).status).toBe(409);
+    expect((await patch(`/chemicals/${c.body.id}`, tec, { defaultUnit: 'KG' })).body.defaultUnit).toBe('KG');
+    expect((await get('/chemicals', op)).body.some((x: { id: string }) => x.id === c.body.id)).toBe(true);
+    await prisma.chemical.delete({ where: { id: c.body.id } });
+  });
+
+  it('FR-9.3.1: creating a user and uploading a file are audited', async () => {
+    const admin = await login('ADM001');
+    const emp = `E2E${Date.now().toString().slice(-6)}`;
+    const u = await post('/users', admin, { employeeId: emp, name: 'Audit Target', role: 'OPERATOR', password: 'Password123' });
+    expect(u.status).toBe(201);
+    expect(await prisma.auditLog.count({ where: { entity: 'User', entityId: u.body.id, action: 'CREATE' } })).toBe(1);
+    const asset = await prisma.asset.findFirstOrThrow({ where: { assetNumber: 'DRL-001' } });
+    const att = await post('/attachments', admin, { ownerType: 'Asset', ownerId: asset.id, kind: 'PHOTO', contentType: 'image/png', base64: PNG });
+    expect(att.status).toBe(201);
+    expect(await prisma.auditLog.count({ where: { entity: 'Attachment', entityId: att.body.id, action: 'CREATE' } })).toBe(1);
+    await prisma.attachment.delete({ where: { id: att.body.id } });
+    await prisma.user.delete({ where: { id: u.body.id } });
+  });
+
+  it('FR-8.3: reports past 24 months are purged with their files; the last day of a range is included', async () => {
+    const { ReportsService } = await import('../src/reports/reports.service');
+    const { ReportBuildersService } = await import('../src/reports/report-builders.service');
+    const { StorageService } = await import('../src/storage/storage.service');
+    const storage = app.get(StorageService); const reports = app.get(ReportsService);
+    const key = `reports/e2e-old-${Date.now()}.pdf`;
+    await storage.putBase64(key, PNG, 'application/pdf');
+    const old = await prisma.report.create({ data: { type: 'ASSET_HEALTH', periodStart: new Date('2020-01-01'), periodEnd: new Date('2020-01-31'), pdfKey: key, generatedBy: 'e2e', generatedAt: new Date(Date.now() - 25 * 30 * 864e5) } });
+    const recent = await prisma.report.create({ data: { type: 'ASSET_HEALTH', periodStart: new Date('2026-01-01'), periodEnd: new Date('2026-01-31'), generatedBy: 'e2e', generatedAt: new Date(Date.now() - 23 * 30 * 864e5) } });
+    await reports.purgeOld();
+    expect(await prisma.report.findUnique({ where: { id: old.id } })).toBeNull();
+    expect(await prisma.report.findUnique({ where: { id: recent.id } })).not.toBeNull();
+    const { existsSync } = await import('fs'); const { join } = await import('path');
+    if (storage.driver === 'local') expect(existsSync(join(process.env.UPLOAD_DIR ?? join(process.cwd(), 'uploads'), key))).toBe(false);
+    await prisma.report.delete({ where: { id: recent.id } });
+
+    const today = new Date(`${day(0)}T00:00:00Z`);
+    await prisma.auditLog.create({ data: { entity: 'MaintenanceSchedule', entityId: 'e2e-range', action: 'COMPLETE' } });
+    const doc = await app.get(ReportBuildersService).build('MAINTENANCE_SUMMARY', today, today);
+    expect(Number(doc.kpis.find((k) => k.label === 'Services completed')?.value)).toBeGreaterThanOrEqual(1);
+    await prisma.auditLog.deleteMany({ where: { entityId: 'e2e-range' } });
   });
 });

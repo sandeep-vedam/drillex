@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Alert, KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { Permissions, type Permission } from '@drillex/shared';
+import { Permissions, permissionDescription, type Permission } from '@drillex/shared';
 import { api } from '../lib/api';
 import type { RootStackParamList } from '../navigation';
 import { Button, Field } from '../ui';
@@ -65,7 +65,10 @@ export default function RoleFormScreen({ navigation, route }: Props) {
                   <View key={p} style={s.row}>
                     <Pressable onPress={() => toggle(p)} style={s.rowTop}>
                       <View style={[s.box, !!scope && { backgroundColor: colors.navy800, borderColor: colors.navy800 }]}>{!!scope && <Text style={s.tick}>✓</Text>}</View>
-                      <Text style={s.perm}>{p}</Text>
+                      <View style={{ flex: 1 }}>
+                        <Text style={s.perm}>{p}</Text>
+                        <Text style={s.permDesc}>{permissionDescription(p)}</Text>
+                      </View>
                     </Pressable>
                     {scope && <View style={{ marginTop: 8 }}><Segmented label="Scope" value={scope} options={SCOPES} onChange={(v) => setScope(p, v)} /></View>}
                   </View>
@@ -82,10 +85,11 @@ export default function RoleFormScreen({ navigation, route }: Props) {
 }
 const s = StyleSheet.create({
   lead: { color: colors.muted, fontSize: 13 },
+  permDesc: { color: colors.muted, fontSize: 12, lineHeight: 16, marginTop: 2 },
   mono: { fontFamily: 'Menlo', color: colors.ink },
   list: { borderWidth: 1, borderColor: colors.line, backgroundColor: colors.surface },
   row: { paddingHorizontal: 12, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.line },
-  rowTop: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  rowTop: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
   box: { width: 20, height: 20, borderWidth: 1.5, borderColor: colors.line, alignItems: 'center', justifyContent: 'center' },
   tick: { color: '#fff', fontSize: 13, fontWeight: '800', lineHeight: 16 },
   perm: { fontFamily: 'Menlo', fontSize: 13, color: colors.ink, flex: 1 },

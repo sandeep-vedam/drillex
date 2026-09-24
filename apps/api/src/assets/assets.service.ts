@@ -1,8 +1,11 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { z } from 'zod';
-import { AssetPrefix, AssetSchema, AssetUpdateSchema, OPEN_JOB_STATUSES } from '@drillex/shared';
+import { AssetPrefix, AssetSchema, AssetUpdateSchema } from '@drillex/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthUser } from '../auth/decorators';
+import { nextSequence } from '../common/sequence';
+import { openJobCardWhere } from '../job-cards/open-jobs';
+import { getOperationsSettings } from '../settings/settings.util';
 
 @Injectable()
 export class AssetsService {
@@ -35,8 +38,7 @@ export class AssetsService {
   async create(input: z.infer<typeof AssetSchema>, actorId: string) {
     const prefix = AssetPrefix[input.category];
     return this.prisma.$transaction(async (tx) => {
-      const last = await tx.asset.findFirst({ where: { assetNumber: { startsWith: `${prefix}-` } }, orderBy: { assetNumber: 'desc' } });
-      const seq = last ? parseInt(last.assetNumber.split('-')[1], 10) + 1 : 1;
+      const seq = await nextSequence(tx, 'Asset', 'assetNumber', `${prefix}-`);
       const assetNumber = `${prefix}-${String(seq).padStart(3, '0')}`;
       const { operatorIds, ...data } = input;
       const asset = await tx.asset.create({ data: { ...data, assetNumber, operators: { create: operatorIds.map((userId) => ({ userId })) } } });
@@ -79,7 +81,8 @@ export class AssetsService {
   }
 
   private async assertNoOpenWork(assetId: string, verb: string) {
-    const open = await this.prisma.jobCard.count({ where: { assetId, deletedAt: null, status: { in: [...OPEN_JOB_STATUSES] } } });
+    const { jobCardApprovalRequired } = await getOperationsSettings(this.prisma);
+    const open = await this.prisma.jobCard.count({ where: { assetId, ...openJobCardWhere(jobCardApprovalRequired) } });
     if (open) throw new BadRequestException(`${open} open job card${open > 1 ? 's' : ''} on this asset — close or approve them before it can be ${verb}`);
   }
 }

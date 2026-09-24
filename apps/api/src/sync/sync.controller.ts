@@ -53,8 +53,23 @@ export class SyncController {
     return { results, serverTime: new Date().toISOString() };
   }
 
-  /** Applies one op. Every outcome is a Result — the caller decides whether a rejection is worth retrying. */
+  /**
+   * Applies one op, at most once per client op ID (SRS §9.2.2): an op already processed is answered as a duplicate
+   * without touching the data again. Rejections are not recorded, so a device can retry them after a fix.
+   */
   private async applyOp(u: AuthUser, op: z.infer<typeof OpSchema>): Promise<Result> {
+    const seen = await this.prisma.syncOperation.findUnique({ where: { opId: op.opId } });
+    if (seen) return { opId: op.opId, status: 'duplicate', ...(seen.entityId ? { id: seen.entityId } : {}) };
+    const r = await this.applyOnce(u, op);
+    if (r.status !== 'rejected') {
+      await this.prisma.syncOperation.create({ data: { opId: op.opId, userId: u.id, kind: op.kind, status: r.status, entityId: r.id ?? null } })
+        .catch((e: { code?: string }) => { if (e.code !== 'P2002') throw e; }); // same op sent twice at once: first one wins
+    }
+    return r;
+  }
+
+  /** Every outcome is a Result — the caller decides whether a rejection is worth retrying. */
+  private async applyOnce(u: AuthUser, op: z.infer<typeof OpSchema>): Promise<Result> {
     try {
       if (op.kind === 'attachment') {
         const a = AttachmentSchema.parse(op.payload);
@@ -91,8 +106,10 @@ export class SyncController {
     }
   }
 
-  private conflict(u: AuthUser, entity: string, entityId: string | undefined, incoming: unknown) {
-    return this.prisma.syncConflict.create({ data: { entity, entityId: entityId ?? 'unknown', versions: { incoming, submittedBy: u.employeeId, deviceId: u.deviceId } as never } });
+  private async conflict(u: AuthUser, entity: string, entityId: string | undefined, incoming: unknown) {
+    const c = await this.prisma.syncConflict.create({ data: { entity, entityId: entityId ?? 'unknown', versions: { incoming, submittedBy: u.employeeId, deviceId: u.deviceId } as never } });
+    await this.prisma.auditLog.create({ data: { actorId: u.id, deviceId: u.deviceId, entity: 'SyncConflict', entityId: c.id, action: 'CREATE', diff: { entity, entityId } } });
+    return c;
   }
 
   @Get('conflicts') @RequirePermission('shift_report:approve')

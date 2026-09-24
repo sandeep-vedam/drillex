@@ -2,8 +2,9 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Alert, FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { api } from '../lib/api';
+import { roleDescription } from '@drillex/shared';
 import type { RootStackParamList } from '../navigation';
-import { Button, Card, Eyebrow } from '../ui';
+import { Action, Button, Card, Eyebrow } from '../ui';
 import { colors } from '../ui/theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Roles'>;
@@ -35,10 +36,11 @@ export default function RolesScreen({ navigation }: Props) {
               <Text style={s.key}>{item.key}</Text>
             </View>
           </View>
+          {roleDescription(item.key) && <Text style={s.desc}>{roleDescription(item.key)}</Text>}
           <Text style={s.meta}>{item.permissions.length} permission(s) · {item.userCount} user(s)</Text>
-          <View style={{ flexDirection: 'row', gap: 16, marginTop: 8 }}>
-            <Text style={s.link} onPress={() => navigation.navigate('RoleForm', { role: item })}>Edit</Text>
-            <Text style={[s.link, { color: colors.crit }]} onPress={() => remove(item)}>Delete</Text>
+          <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
+            <Action title="Edit" onPress={() => navigation.navigate('RoleForm', { role: item })} />
+            <Action title="Delete" tone={colors.crit} onPress={() => remove(item)} />
           </View>
         </Card>
       )} />
@@ -48,6 +50,7 @@ const s = StyleSheet.create({
   name: { fontSize: 16, fontWeight: '700', color: colors.ink },
   badge: { fontSize: 10, fontWeight: '800', color: colors.steel, letterSpacing: 0.6 },
   key: { fontFamily: 'Menlo', fontSize: 12, color: colors.muted, marginTop: 2 },
+  desc: { color: colors.ink, fontSize: 13, lineHeight: 18, marginTop: 6 },
   meta: { color: colors.muted, fontSize: 12, marginTop: 4 },
   link: { color: colors.navy700, fontWeight: '700', fontSize: 13 },
 });

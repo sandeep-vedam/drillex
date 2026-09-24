@@ -83,7 +83,67 @@ export function Stat({ label, value, tone = colors.navy700 }: { label: string; v
   );
 }
 
+/**
+ * Compact two-up navigation tile. The home screen offers up to fourteen destinations to an admin; as
+ * full-width cards that was a wall of near-identical rows, so they go two to a line instead, with the
+ * accent carried on a top rule rather than a side stripe to keep the tile short.
+ */
+export function Tile({ title, sub, tone, onPress }: { title: string; sub?: string; tone: string; onPress: () => void }) {
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={sub ? `${title}. ${sub}` : title}
+      style={({ pressed }) => [s.tile, pressed && { backgroundColor: colors.navy100 }]}
+    >
+      <View style={[s.tileRule, { backgroundColor: tone }]} />
+      <Text style={s.tileTitle} numberOfLines={2}>{title}</Text>
+      {sub ? <Text style={s.tileSub} numberOfLines={2}>{sub}</Text> : null}
+    </Pressable>
+  );
+}
+
+/** A status line that is deliberately not a button — it reports, it does not navigate. */
+export function StatusLine({ label, value, tone }: { label: string; value: string; tone: string }) {
+  return (
+    <View style={s.statusLine}>
+      <View style={[s.dot, { backgroundColor: tone }]} />
+      <Text style={s.statusLabel}>{label}</Text>
+      <Text style={[s.statusValue, { color: tone }]}>{value}</Text>
+    </View>
+  );
+}
+
+/**
+ * Inline row action. These were bare <Text onPress> before, which gave a tap target only as tall as the
+ * text — easy to miss with a gloved hand. This keeps the same quiet look but pads out to a real target.
+ */
+export function Action({ title, onPress, tone, disabled }: { title: string; onPress: () => void; tone?: string; disabled?: boolean }) {
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={disabled}
+      accessibilityRole="button"
+      hitSlop={6}
+      style={({ pressed }) => [s.action, pressed && { backgroundColor: colors.navy100 }, disabled && { opacity: 0.4 }]}
+    >
+      <Text style={[s.actionText, tone ? { color: tone } : null]}>{title}</Text>
+    </Pressable>
+  );
+}
+
 const s = StyleSheet.create({
+  action: { minHeight: 40, paddingHorizontal: 12, paddingVertical: 10, borderWidth: 1, borderColor: colors.line, justifyContent: 'center', alignItems: 'center' },
+  actionText: { color: colors.navy700, fontWeight: '700', fontSize: 13 },
+  tile: { flex: 1, minHeight: 78, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line, paddingHorizontal: 12, paddingTop: 11, paddingBottom: 12, gap: 3, justifyContent: 'flex-start' },
+  tileRule: { position: 'absolute', left: 0, right: 0, top: 0, height: 3 },
+  tileTitle: { fontSize: 14, fontWeight: '700', color: colors.ink, lineHeight: 18 },
+  tileSub: { fontSize: 11.5, color: colors.muted, lineHeight: 15 },
+  statusLine: { flexDirection: 'row', alignItems: 'center', gap: 9, paddingVertical: 9, borderBottomWidth: 1, borderBottomColor: colors.line },
+  dot: { width: 8, height: 8 },
+  statusLabel: { flex: 1, fontSize: 13.5, color: colors.ink, fontWeight: '600' },
+  statusValue: { fontSize: 12, fontWeight: '800', letterSpacing: 0.3 },
+
   eyebrow: { fontSize: 11, fontWeight: '700', letterSpacing: 1.6, textTransform: 'uppercase', color: colors.muted },
   label: { fontSize: 13, fontWeight: '600', color: colors.ink },
   eyeBtn: { position: 'absolute', right: 0, top: 0, bottom: 0, width: 48, alignItems: 'center', justifyContent: 'center' },

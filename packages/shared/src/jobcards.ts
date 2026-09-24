@@ -24,3 +24,6 @@ export const JobCardSchema = z.object({
 });
 export type JobCardInput = z.infer<typeof JobCardSchema>;
 export const OPEN_JOB_STATUSES = ['OPEN', 'IN_PROGRESS', 'AWAITING_PARTS'] as const;
+
+/** Purchase-request lifecycle (SRS §7.5): OPEN → ORDERED → RECEIVED, or CANCELLED before receipt. RECEIVED and CANCELLED are final. */
+export const PR_TRANSITIONS: Record<string, readonly string[]> = { OPEN: ['ORDERED', 'CANCELLED'], ORDERED: ['RECEIVED', 'CANCELLED'], RECEIVED: [], CANCELLED: [] };

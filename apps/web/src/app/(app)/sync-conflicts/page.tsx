@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import { Shell } from '@/components/Shell';
 import { api } from '@/lib/api';
+import { describeSubmission } from '@drillex/shared';
 
 type Conflict = { id: string; entity: string; entityId: string; versions: { incoming: Record<string, unknown>; submittedBy: string; deviceId: string }; createdAt: string };
 export default function SyncConflictsPage() {
@@ -11,7 +12,7 @@ export default function SyncConflictsPage() {
   useEffect(() => { load(); }, []);
   async function resolve(id: string) { await api(`/sync/conflicts/${id}/resolve`, { method: 'POST' }); load(); }
   return (
-    <Shell title="Sync conflicts">
+    <Shell title="Duplicate entries">
       <p className="text-[14px] text-muted max-w-[70ch]">When two devices submit the same record offline (same machine, same day/shift), the first one wins and the second is held here for review (SRS §9.2). Compare with the accepted record, then mark as reviewed.</p>
       {error && <p className="text-crit text-sm">{error}</p>}
       {!rows.length && <div className="card p-8 text-center text-muted">No unresolved conflicts.</div>}
@@ -22,7 +23,14 @@ export default function SyncConflictsPage() {
               <div><div className="eyebrow">{c.entity.replace(/([A-Z])/g, ' $1').trim()}</div><div className="font-semibold">Rejected duplicate from <span className="font-mono">{c.versions.submittedBy}</span> <span className="text-muted font-normal">· device {c.versions.deviceId} · {new Date(c.createdAt).toLocaleString()}</span></div></div>
               <button onClick={() => resolve(c.id)} className="btn-primary h-9 text-[13px]">Mark reviewed</button>
             </div>
-            <pre className="mt-3 text-[12px] bg-canvas border border-line p-3 overflow-x-auto max-h-64">{JSON.stringify(c.versions.incoming, null, 2)}</pre>
+            <dl className="mt-3 border-t border-line">
+              {describeSubmission(c.versions.incoming).map((f) => (
+                <div key={f.key} className="flex items-start justify-between gap-6 border-b border-line py-1.5">
+                  <dt className="text-[12px] text-muted shrink-0">{f.label}</dt>
+                  <dd className={`text-[13px] font-semibold text-right whitespace-pre-line ${f.tone === 'crit' ? 'text-crit' : f.tone === 'warn' ? 'text-hazard' : ''}`}>{f.value}</dd>
+                </div>
+              ))}
+            </dl>
           </section>
         ))}
       </div>
