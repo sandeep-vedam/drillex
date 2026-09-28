@@ -1,5 +1,9 @@
 'use client';
-const BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000/api/v1';
+// NEXT_PUBLIC_* is inlined at build time, so a forgotten var silently baked this localhost fallback into
+// the production bundle and broke login for every user. Production now defaults to a same-origin relative
+// path — nginx serves web on / and the API on /api/ from one origin — so there is no host left to get
+// wrong. Deployments that put the API on a separate domain still set NEXT_PUBLIC_API_URL explicitly.
+const BASE = process.env.NEXT_PUBLIC_API_URL || (process.env.NODE_ENV === 'production' ? '/api/v1' : 'http://localhost:4000/api/v1');
 export type SessionUser = { id: string; employeeId: string; role: string; siteId: string | null; mustChangePassword?: boolean };
 export function getUser(): SessionUser | null { if (typeof window === 'undefined') return null; try { return JSON.parse(localStorage.getItem('user') ?? 'null'); } catch { return null; } }
 export function signOut() { localStorage.removeItem('accessToken'); localStorage.removeItem('refreshToken'); localStorage.removeItem('user'); window.location.href = '/login'; }

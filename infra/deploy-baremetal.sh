@@ -35,7 +35,9 @@ pnpm install
 pnpm --filter @drillex/shared build
 pnpm --filter @drillex/api exec prisma generate
 pnpm --filter @drillex/api build
-NEXT_PUBLIC_API_URL="http://${SERVER_IP}/api/v1" pnpm --filter @drillex/web build
+# Same-origin behind nginx (web on /, API on /api/) — a relative base URL means no server IP or domain is
+# baked into the client bundle, so this keeps working if the host changes and cannot silently regress.
+NEXT_PUBLIC_API_URL=/api/v1 pnpm --filter @drillex/web build
 
 echo "==> Wiring web standalone static assets"
 cd apps/web
