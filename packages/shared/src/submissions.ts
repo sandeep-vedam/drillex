@@ -8,11 +8,18 @@
 export type FieldTone = 'warn' | 'crit';
 export type SubmissionField = { key: string; label: string; value: string; tone?: FieldTone };
 
-/** Opaque identifiers: meaningless to a reviewer, and the row header already says who and which machine. */
-const HIDDEN = new Set(['id', 'assetId', 'siteId', 'signatureAttachmentId']);
+/**
+ * Opaque identifiers and record bookkeeping: meaningless to a reviewer, and the row header already says who
+ * and which machine. Relations (asset, user, attachments) are hidden too, so a full record fetched from the API
+ * can be passed in as well as a queued payload; callers show those in their own form.
+ */
+const HIDDEN = new Set([
+  'id', 'assetId', 'siteId', 'userId', 'signatureId', 'signatureAttachmentId',
+  'createdAt', 'updatedAt', 'deletedAt', 'asset', 'user', 'attachments',
+]);
 
 const LABELS: Record<string, string> = {
-  date: 'Date', hourMeter: 'Hour meter', fuelStart: 'Fuel at start', fuelEnd: 'Fuel at end',
+  date: 'Date', hourMeter: 'Hour meter', fuelStart: 'Fuel at start', fuelEnd: 'Fuel at end', fuelConsumed: 'Fuel used',
   engineOil: 'Engine oil', hydraulicOil: 'Hydraulic oil', coolant: 'Coolant', airFilter: 'Air filter',
   battery: 'Battery', tyrePressures: 'Tyre pressures', warningLights: 'Warning lights',
   warningLightsNote: 'Warning lights note', unusualNoises: 'Unusual noises', unusualNoisesNote: 'Noise note',
@@ -25,13 +32,13 @@ const LABELS: Record<string, string> = {
 };
 
 const UNITS: Record<string, string> = {
-  hourMeter: 'h', fuelStart: 'L', fuelEnd: 'L', startDepth: 'm', endDepth: 'm',
+  hourMeter: 'h', fuelStart: 'L', fuelEnd: 'L', fuelConsumed: 'L', startDepth: 'm', endDepth: 'm',
   holeDiameterMm: 'mm', penetrationRate: 'm/h', downtimeHours: 'h',
 };
 
 /** Schema order reads like the form the operator filled in; unknown keys are appended rather than dropped. */
 const ORDER = [
-  'date', 'shift', 'holeRef', 'rockType', 'hourMeter', 'fuelStart', 'fuelEnd',
+  'date', 'shift', 'holeRef', 'rockType', 'hourMeter', 'fuelStart', 'fuelEnd', 'fuelConsumed',
   'startDepth', 'endDepth', 'holesCompleted', 'holeDiameterMm', 'penetrationRate',
   'downtimeHours', 'downtimeReason', 'chemicals',
   'engineOil', 'hydraulicOil', 'coolant', 'airFilter', 'battery', 'tyrePressures',
@@ -75,11 +82,14 @@ function formatValue(key: string, value: unknown): string | null {
   if (typeof value === 'boolean') return value ? 'Yes' : 'No';
   if (key === 'conditionRating' && typeof value === 'number') return `${value} / 5`;
 
+  // Prisma serialises Decimal columns (hour meter, fuel, depths) as strings, so give those their unit too.
+  if (typeof value === 'string' && UNITS[key] && /^-?\d+(\.\d+)?$/.test(value)) value = Number(value);
   if (typeof value === 'number') {
     const unit = UNITS[key];
     return unit ? `${value} ${unit}` : String(value);
   }
-  if (typeof value === 'string') return humanizeEnum(value);
+  // Free text (notes, reasons, hole references) is shown as typed — "ABS" must not become "Abs".
+  if (typeof value === 'string') return /note|reason|ref/i.test(key) ? value : humanizeEnum(value);
 
   // Tyre pressures: { FL: 12, FR: 25 } -> "FL 12 · FR 25 psi"
   if (key === 'tyrePressures' && typeof value === 'object') {

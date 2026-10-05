@@ -11,6 +11,10 @@ type Reading = {
   warningLights: boolean; leaks: boolean; unusualNoises: boolean;
   asset: { assetNumber: string; name: string }; user: { employeeId: string; name: string };
 };
+type ReadingDetail = Record<string, unknown> & {
+  asset?: { assetNumber: string; name: string }; user?: { employeeId: string; name: string };
+  attachments?: { id: string; kind: string; url: string }[];
+};
 
 /**
  * Review of everyone's readings, with the flagged-only filter a supervisor uses each morning — the
@@ -19,9 +23,8 @@ type Reading = {
 export default function ReadingsScreen() {
   const [rows, setRows] = useState<Reading[]>([]);
   const [flagged, setFlagged] = useState(false);
-  const [sel, setSel] = useState<Record<string, unknown> | null>(null);
+  const [sel, setSel] = useState<ReadingDetail | null>(null);
   const [selTitle, setSelTitle] = useState('');
-  const [selPhotos, setSelPhotos] = useState<{ id: string; kind: string; url: string }[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [threshold, setThreshold] = useState(DEFAULT_ALERT_THRESHOLD); // the server's alert rule (SRS §5.3), admin-configurable
@@ -35,11 +38,9 @@ export default function ReadingsScreen() {
 
   async function open(r: Reading) {
     setSelTitle(`${r.asset.assetNumber} · ${new Date(r.date).toLocaleDateString()}`);
-    setSelPhotos([]);
-    try { setSel(await api<Record<string, unknown>>(`/daily-readings/${r.id}`)); }
+    // The detail already carries the photos with signed URLs, so no separate attachments request is needed.
+    try { setSel(await api<ReadingDetail>(`/daily-readings/${r.id}`)); }
     catch (e) { setError((e as Error).message); }
-    try { setSelPhotos(await api<{ id: string; kind: string; url: string }[]>(`/attachments?ownerType=DailyReading&ownerId=${r.id}`)); }
-    catch { /* the figures matter more than the pictures */ }
   }
 
   function flagsOf(r: Reading) {
@@ -97,15 +98,20 @@ export default function ReadingsScreen() {
                 <View><Eyebrow>Daily reading</Eyebrow><Text style={s.sheetTitle}>{selTitle}</Text></View>
                 <Pressable onPress={() => setSel(null)} hitSlop={10}><Text style={s.close}>Close</Text></Pressable>
               </View>
-              {selPhotos.length > 0 && (
+              {!!sel?.attachments?.length && (
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
-                  {selPhotos.map((a) => <Image key={a.id} source={{ uri: a.url }} style={s.photo} resizeMode="cover" />)}
+                  {sel.attachments.map((a) => <Image key={a.id} source={{ uri: a.url }} style={s.photo} resizeMode="cover" />)}
                 </ScrollView>
               )}
-              {/* Same formatter the sync-conflicts screen uses, so a reading reads identically wherever it appears. */}
+              {/* Same formatter the sync-conflicts screen uses, so a reading reads identically wherever it appears. The
+                  machine and operator are relations, which the formatter skips, so they get their own rows here. */}
               {sel && (
                 <View style={{ borderTopWidth: 1, borderTopColor: colors.line }}>
-                  {describeSubmission(sel).map((f) => (
+                  {[
+                    ...(sel.asset ? [{ key: 'asset', label: 'Machine', value: `${sel.asset.assetNumber} · ${sel.asset.name}`, tone: undefined }] : []),
+                    ...(sel.user ? [{ key: 'user', label: 'Operator', value: `${sel.user.name} (${sel.user.employeeId})`, tone: undefined }] : []),
+                    ...describeSubmission(sel),
+                  ].map((f) => (
                     <View key={f.key} style={s.detail}>
                       <Text style={s.dk}>{f.label}</Text>
                       <Text style={[s.dv, f.tone === 'crit' && { color: colors.crit }, f.tone === 'warn' && { color: colors.hazard }]}>{f.value}</Text>
