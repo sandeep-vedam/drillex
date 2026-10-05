@@ -1,0 +1,71 @@
+name: Deploy to production
+
+# Manual only: Actions → "Deploy to production" → Run workflow. Needs the PROD_SSH_KEY repository secret
+# (a private key whose public half is in ubuntu@15.252.162.136:~/.ssh/authorized_keys).
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Branch, tag or commit SHA to deploy
+        required: true
+        default: master
+      dry_run:
+        description: Dry run — build and show which files would change on the server, but deploy nothing
+        type: boolean
+        default: false
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+env:
+  PROD_HOST: 15.252.162.136
+  PROD_USER: ubuntu
+  PROD_DIR: /opt/drillex
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with: { ref: '${{ inputs.ref }}' }
+      - uses: pnpm/action-setup@v4
+        with: { version: 9.15.4 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 20, cache: pnpm }
+
+      # Build here first so a broken ref fails on the runner, not on the prod box half-way through a deploy.
+      - name: Build check
+        run: |
+          pnpm install --frozen-lockfile --filter "@drillex/api..." --filter "@drillex/web..."
+          pnpm --filter @drillex/shared build
+          pnpm --filter @drillex/api exec prisma generate
+          pnpm --filter @drillex/api build
+          NEXT_PUBLIC_API_URL=/api/v1 pnpm --filter @drillex/web build
+
+      - name: Set up SSH
+        env: { PROD_SSH_KEY: '${{ secrets.PROD_SSH_KEY }}' }
+        run: |
+          test -n "$PROD_SSH_KEY" || { echo "::error::PROD_SSH_KEY secret is not set"; exit 1; }
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$PROD_SSH_KEY" > ~/.ssh/prod && chmod 600 ~/.ssh/prod
+          # Pinned host key — a changed key fails the deploy instead of trusting whoever answers.
+          echo "$PROD_HOST ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINVvKSGEVwofwHAS74a+/1J2oaMMir4JjEbIFUtAGv3L" > ~/.ssh/known_hosts
+          printf 'Host prod\n  HostName %s\n  User %s\n  IdentityFile ~/.ssh/prod\n  StrictHostKeyChecking yes\n' "$PROD_HOST" "$PROD_USER" > ~/.ssh/config
+
+      # /opt/drillex is not a git clone, so the source is mirrored with rsync. Excluded paths are neither
+      # uploaded nor deleted: server-only secrets (.env files), installed deps, build output, and apps/mobile.
+      # --delete also clears the macOS ._* files left by earlier hand uploads.
+      - name: Upload source
+        run: |
+          rsync -az --delete --itemize-changes ${{ inputs.dry_run && '--dry-run' || '' }} \
+            --exclude=.git/ --exclude=node_modules/ --exclude=dist/ --exclude=.next/ --exclude=.turbo/ \
+            --exclude=/apps/mobile/ --exclude='*.tsbuildinfo' \
+            --exclude=.env --exclude=.env.local --exclude=.env.bak --exclude=/infra/.env.prod-ip \
+            ./ prod:$PROD_DIR/ | grep -v '^\.d' || true
+
+      - name: Build, migrate and restart on the server
+        if: ${{ !inputs.dry_run }}
+        run: ssh prod "bash $PROD_DIR/infra/deploy-prod.sh $(git rev-parse --short HEAD)"
