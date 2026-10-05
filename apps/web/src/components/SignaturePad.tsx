@@ -16,7 +16,7 @@ export function SignaturePad({ onChange, label = 'Technician signature' }: { onC
     c.width = c.offsetWidth * ratio; c.height = c.offsetHeight * ratio;
     const ctx = c.getContext('2d')!; ctx.scale(ratio, ratio);
     ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height);
-    ctx.lineWidth = 2; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = '#0B1B30';
+    ctx.lineWidth = 2; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = '#061F38';
   }, []);
 
   const point = (e: React.PointerEvent<HTMLCanvasElement>) => { const r = e.currentTarget.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top] as const; };

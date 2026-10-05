@@ -1,16 +1,13 @@
 import React, { useState, type ReactNode } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View, type TextInputProps, type ViewStyle } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, TextInput, View, type TextInputProps, type ViewStyle } from 'react-native';
 import { colors, font } from './theme';
 
 export function Eyebrow({ children, light }: { children: ReactNode; light?: boolean }) {
   return <Text style={[s.eyebrow, light && { color: 'rgba(255,255,255,.55)' }]}>{children}</Text>;
 }
+/** SR Drilling & Mining emblem (from srdmining.com), the parent brand Drillex runs under. */
 export function Mark({ size = 36 }: { size?: number }) {
-  return (
-    <View style={{ width: size, height: size, backgroundColor: colors.hazard, alignItems: 'center', justifyContent: 'center' }}>
-      <Text style={{ color: colors.navy900, fontWeight: '900', fontSize: size * 0.62, lineHeight: size * 0.72 }}>D</Text>
-    </View>
-  );
+  return <Image source={require('../assets/sr-emblem.png')} style={{ width: size, height: size, backgroundColor: '#fff' }} accessibilityIgnoresInvertColors />;
 }
 export function Field({ label, hint, secureTextEntry, style, ...rest }: TextInputProps & { label: string; hint?: string }) {
   const [shown, setShown] = useState(false);

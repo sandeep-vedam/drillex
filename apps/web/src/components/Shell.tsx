@@ -45,8 +45,8 @@ export function Shell({ children, title, actions }: { children: ReactNode; title
   const Item = ({ href, label, icon: Icon }: { href: string; label: string; icon: typeof I.Dashboard }) => {
     const active = path.startsWith(href);
     return (
-      <Link href={href} onClick={() => setNavOpen(false)} className={`group flex items-center gap-3 px-4 py-3 text-[14px] transition border-l-2 ${active ? 'border-hazard bg-white/[.06] text-white' : 'border-transparent text-white/65 hover:text-white hover:bg-white/[.04]'}`}>
-        <Icon className={active ? 'text-hazard' : 'text-white/50 group-hover:text-white/80'} /> {label}
+      <Link href={href} onClick={() => setNavOpen(false)} className={`group flex items-center gap-3 px-4 py-3 text-[14px] transition border-l-2 ${active ? 'border-gold bg-white/[.06] text-white' : 'border-transparent text-white/65 hover:text-white hover:bg-white/[.04]'}`}>
+        <Icon className={active ? 'text-gold' : 'text-white/50 group-hover:text-white/80'} /> {label}
       </Link>
     );
   };
@@ -73,7 +73,7 @@ export function Shell({ children, title, actions }: { children: ReactNode; title
           {ADMIN.filter(visible(matrix, user?.role)).map((n) => <Item key={n.href} {...n} />)}
         </nav>
         <div className="border-t border-white/10 p-4 flex items-center gap-3">
-          <div className="h-9 w-9 grid place-items-center bg-hazard text-navy-900 font-display font-bold text-[15px]">{user?.employeeId?.slice(0, 2) ?? '··'}</div>
+          <div className="h-9 w-9 grid place-items-center bg-gold text-navy-900 font-display font-bold text-[15px]">{user?.employeeId?.slice(0, 2) ?? '··'}</div>
           <div className="min-w-0 flex-1 leading-tight"><div className="text-[13px] font-semibold truncate">{user?.employeeId ?? '—'}</div><div className="text-[11px] text-white/50 tracking-wide">{user?.role ?? ''}</div></div>
           <button onClick={signOut} className="text-white/50 hover:text-white" aria-label="Sign out"><I.Logout /></button>
         </div>

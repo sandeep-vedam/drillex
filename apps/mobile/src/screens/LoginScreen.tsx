@@ -71,7 +71,7 @@ const s = StyleSheet.create({
   hero: { padding: 24, paddingTop: 64, paddingBottom: 40, overflow: 'hidden' },
   brand: { color: '#fff', fontSize: 20, fontWeight: '800', letterSpacing: 1.2, lineHeight: 22 },
   brandSub: { color: 'rgba(255,255,255,.55)', fontSize: 9, letterSpacing: 3.5 },
-  kicker: { color: colors.hazard, fontSize: 10, letterSpacing: 2.4, fontWeight: '700', marginBottom: 10 },
+  kicker: { color: colors.gold, fontSize: 10, letterSpacing: 2.4, fontWeight: '700', marginBottom: 10 },
   h1: { color: '#fff', fontSize: 40, fontWeight: '800', lineHeight: 42, letterSpacing: -0.5 },
   ring: { position: 'absolute', right: -70, top: 30, width: 220, height: 220, borderRadius: 110, borderWidth: 18, borderColor: 'rgba(224,106,16,.18)' },
   ring2: { position: 'absolute', right: 6, top: 106, width: 70, height: 70, borderRadius: 35, borderWidth: 9, borderColor: 'rgba(224,106,16,.4)' },

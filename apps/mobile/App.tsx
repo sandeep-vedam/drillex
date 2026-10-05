@@ -37,6 +37,7 @@ import SyncConflictsScreen from './src/screens/SyncConflictsScreen';
 import { startSyncLoop } from './src/sync/outbox';
 import { loadSession, setSessionExpiredHandler } from './src/lib/api';
 import type { RootStackParamList } from './src/navigation';
+import { colors } from './src/ui/theme';
 import { IdleLockProvider, useIdleLock } from './src/security/IdleLock';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -49,7 +50,7 @@ function Root({ initial }: { initial: 'Login' | 'Home' }) {
   return (
     <>
       <NavigationContainer ref={navRef} onStateChange={() => setRoute(navRef.getCurrentRoute()?.name)}>
-        <Stack.Navigator initialRouteName={initial} screenOptions={{ headerStyle: { backgroundColor: '#0B1B30' }, headerTintColor: '#fff', headerTitleStyle: { fontWeight: '700' } }}>
+        <Stack.Navigator initialRouteName={initial} screenOptions={{ headerStyle: { backgroundColor: colors.navy900 }, headerTintColor: '#fff', headerTitleStyle: { fontWeight: '700' } }}>
           <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
           <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} options={({ route }) => ({ title: route.params?.forced ? 'Set your password' : 'Change password', headerBackVisible: !route.params?.forced, gestureEnabled: !route.params?.forced })} />
           <Stack.Screen name="TwoFaEnrol" component={TwoFaEnrolScreen} options={{ title: 'Two-factor setup' }} />

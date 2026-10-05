@@ -18,7 +18,7 @@ export function SignaturePad({ value, onChange, label = 'Operator signature' }: 
         <View style={{ flex: 1, backgroundColor: colors.canvas }}>
           <View style={s.modalHead}><Text style={s.modalTitle}>Sign below</Text><Pressable onPress={() => setOpen(false)}><Text style={{ color: colors.muted, fontWeight: '700' }}>Cancel</Text></Pressable></View>
           <View style={{ flex: 1, margin: 16, borderWidth: 1, borderColor: colors.line, backgroundColor: '#fff' }}>
-            <SignatureScreen ref={ref} onOK={(sig) => { onChange(sig); setOpen(false); }} onEmpty={() => {}} descriptionText="" webStyle={`.m-signature-pad--footer {display:none} .m-signature-pad {box-shadow:none;border:0} body,html {background:#fff}`} backgroundColor="#fff" penColor="#0B1B30" />
+            <SignatureScreen ref={ref} onOK={(sig) => { onChange(sig); setOpen(false); }} onEmpty={() => {}} descriptionText="" webStyle={`.m-signature-pad--footer {display:none} .m-signature-pad {box-shadow:none;border:0} body,html {background:#fff}`} backgroundColor="#fff" penColor={colors.navy900} />
           </View>
           <View style={{ flexDirection: 'row', gap: 10, padding: 16 }}>
             <Pressable onPress={() => ref.current?.clearSignature()} style={[s.btn, s.btnGhost]}><Text style={[s.btnText, { color: colors.navy800 }]}>Clear</Text></Pressable>

@@ -19,7 +19,7 @@ export default function TwoFactorSetup() {
     if (!raw) { r.replace('/login'); return; }
     const c = JSON.parse(raw); setCreds(c);
     api<{ otpauth: string; secret: string }>('/auth/2fa/setup', { method: 'POST', body: JSON.stringify(c) })
-      .then(async (res) => { setSecret(res.secret); setQr(await QRCode.toDataURL(res.otpauth, { margin: 1, width: 220, color: { dark: '#0B1B30', light: '#FFFFFF' } })); })
+      .then(async (res) => { setSecret(res.secret); setQr(await QRCode.toDataURL(res.otpauth, { margin: 1, width: 220, color: { dark: '#061F38', light: '#FFFFFF' } })); })
       .catch((e) => setError(e.message));
   }, [r]);
 
@@ -37,7 +37,7 @@ export default function TwoFactorSetup() {
       <div className="w-full max-w-[820px] card grid md:grid-cols-[1fr_1.1fr]">
         <section className="blueprint text-white p-8 flex flex-col justify-between">
           <Wordmark light />
-          <div><div className="font-display text-[11px] tracking-[.3em] text-hazard mb-3">SECURITY · STEP 1 OF 1</div><h1 className="font-display font-bold text-[40px] leading-none text-balance">Two-factor authentication</h1><p className="mt-4 text-white/65 text-[14px] leading-relaxed">Manager and Administrator accounts must use a second factor. Scan the code with Google Authenticator, Microsoft Authenticator or 1Password, then enter the 6-digit code.</p></div>
+          <div><div className="font-display text-[11px] tracking-[.3em] text-gold mb-3">SECURITY · STEP 1 OF 1</div><h1 className="font-display font-bold text-[40px] leading-none text-balance">Two-factor authentication</h1><p className="mt-4 text-white/65 text-[14px] leading-relaxed">Manager and Administrator accounts must use a second factor. Scan the code with Google Authenticator, Microsoft Authenticator or 1Password, then enter the 6-digit code.</p></div>
           <div className="text-[11px] text-white/40 tracking-wider">SRS §2.2 · 2FA REQUIRED FOR MANAGER &amp; ADMIN</div>
         </section>
         <form onSubmit={confirm} className="p-8 flex flex-col gap-5">

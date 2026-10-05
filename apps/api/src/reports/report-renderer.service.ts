@@ -14,7 +14,7 @@ export class ReportRendererService {
     s.columns = [{ width: 32 }, { width: 20 }, { width: 30 }];
     for (const sec of doc.sections) {
       const ws = wb.addWorksheet(sec.title.slice(0, 31).replace(/[\\/?*[\]:]/g, ' '));
-      const head = ws.addRow(sec.columns); head.font = { bold: true, color: { argb: 'FFFFFFFF' } }; head.eachCell((c) => { c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF132B4A' } }; });
+      const head = ws.addRow(sec.columns); head.font = { bold: true, color: { argb: 'FFFFFFFF' } }; head.eachCell((c) => { c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF092F53' } }; });
       sec.rows.forEach((r) => ws.addRow(r));
       ws.columns = sec.columns.map((c, i) => ({ width: Math.min(50, Math.max(12, c.length + 4, ...sec.rows.slice(0, 50).map((r) => String(r[i] ?? '').length + 2))) }));
       ws.views = [{ state: 'frozen', ySplit: 1 }];
@@ -27,7 +27,7 @@ export class ReportRendererService {
     return new Promise((resolve) => {
       const pdf = new PDFDocument({ size: 'A4', layout: 'landscape', margin: 36, bufferPages: true, info: { Title: doc.title, Author: 'Drillex Ops' } });
       const chunks: Buffer[] = []; pdf.on('data', (c) => chunks.push(c)); pdf.on('end', () => resolve(Buffer.concat(chunks)));
-      const W = pdf.page.width - 72; const navy = '#132B4A'; const hazard = '#E06A10';
+      const W = pdf.page.width - 72; const navy = '#092F53'; const hazard = '#F6B839'; // SR Drilling & Mining blue + gold
       const header = () => { pdf.rect(36, 24, W, 4).fill(hazard); pdf.fillColor(navy).font('Helvetica-Bold').fontSize(9).text('DRILLEX OPS', 36, 34); pdf.fillColor('#5B6877').font('Helvetica').fontSize(8).text(`${doc.title} · ${doc.subtitle}`, 36, 34, { width: W, align: 'right' }); pdf.moveDown(1.5); };
       header();
       pdf.fillColor(navy).font('Helvetica-Bold').fontSize(20).text(doc.title, 36, 56); pdf.fillColor('#5B6877').font('Helvetica').fontSize(10).text(`${doc.subtitle} · generated ${doc.generatedAt.toISOString().slice(0, 16).replace('T', ' ')} UTC`);

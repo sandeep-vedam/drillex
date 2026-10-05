@@ -29,7 +29,7 @@ export default function LoginPage() {
       <section className="blueprint relative hidden lg:flex flex-col justify-between p-12 text-white overflow-hidden">
         <Wordmark light />
         <div className="relative">
-          <div className="font-display text-[11px] tracking-[.3em] text-hazard mb-4">FIELD OPERATIONS · MAINTENANCE · REPORTING</div>
+          <div className="font-display text-[11px] tracking-[.3em] text-gold mb-4">FIELD OPERATIONS · MAINTENANCE · REPORTING</div>
           <h2 className="font-display font-bold text-[64px] leading-[.95] max-w-[12ch] text-balance">Every rig, every shift, one record.</h2>
           <p className="mt-6 max-w-[44ch] text-white/65 text-[16px] leading-relaxed">Shift production, daily machine readings, maintenance schedules and job cards — captured on site, synced to one ledger, approved by your supervisors.</p>
           <dl className="mt-10 grid grid-cols-3 gap-6 max-w-md">
@@ -39,8 +39,8 @@ export default function LoginPage() {
           </dl>
         </div>
         <div className="text-[11px] text-white/40 tracking-wider">CONFIDENTIAL · INTERNAL USE ONLY</div>
-        <div aria-hidden className="absolute -right-24 -bottom-24 h-[420px] w-[420px] rounded-full border-[28px] border-hazard/20" />
-        <div aria-hidden className="absolute right-10 bottom-10 h-[160px] w-[160px] rounded-full border-[14px] border-hazard/40" />
+        <div aria-hidden className="absolute -right-24 -bottom-24 h-[420px] w-[420px] rounded-full border-[28px] border-gold/20" />
+        <div aria-hidden className="absolute right-10 bottom-10 h-[160px] w-[160px] rounded-full border-[14px] border-gold/40" />
       </section>
       <section className="grid place-items-center p-8 bg-canvas">
         <form onSubmit={submit} className="w-full max-w-[400px] flex flex-col gap-5">
