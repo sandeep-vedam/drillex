@@ -54,6 +54,11 @@ export default function MoreScreen({ navigation }: Props) {
     ...(allow('shift_report:approve') ? [{ key: 'conflicts', icon: 'duplicate' as IconName, title: 'Duplicate entries', sub: 'Things sent twice by mistake', go: () => navigation.navigate('SyncConflicts') }] : []),
   ];
 
+  // Every account, whatever its role, so it sits outside the permission checks.
+  const account: Entry[] = [
+    { key: 'password', icon: 'key', title: 'Change password', sub: 'Pick a new sign-in password', go: () => navigation.navigate('ChangePassword') },
+  ];
+
   const grid = (items: Entry[]) =>
     items.reduce<Entry[][]>((acc, it, i) => (i % 2 ? acc[acc.length - 1].push(it) : acc.push([it]), acc), []);
 
@@ -83,9 +88,8 @@ export default function MoreScreen({ navigation }: Props) {
       {render(work, 'w')}
       {admin.length > 0 && <Eyebrow>Setting things up</Eyebrow>}
       {render(admin, 'a')}
-      {work.length === 0 && admin.length === 0 && (
-        <Text style={s.sub}>There is nothing else for your job type.</Text>
-      )}
+      <Eyebrow>My account</Eyebrow>
+      {render(account, 'm')}
     </ScrollView>
   );
 }

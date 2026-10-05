@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, FlatList, StyleSheet, Pressable, RefreshControl } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { api, clearSession, loadSession } from '../lib/api';
+import { api, loadSession } from '../lib/api';
 import { cached } from '../sync/cache';
 import type { RootStackParamList } from '../navigation';
 import type { Asset } from './AssetsScreen';
@@ -35,7 +35,6 @@ export default function HomeScreen({ navigation }: Props) {
   useEffect(() => { load(); }, [load]);
   // Refresh on return, so a newly registered asset appears without a manual pull.
   useEffect(() => navigation.addListener('focus', load), [navigation, load]);
-  async function signOut() { await clearSession(); navigation.replace('Login'); }
 
   const greeting = new Date().getHours() < 12 ? 'Good morning' : new Date().getHours() < 17 ? 'Good afternoon' : 'Good evening';
   // SRS FR-9.1.1: the same permission matrix the API enforces decides what this screen offers, so the app
@@ -77,10 +76,6 @@ export default function HomeScreen({ navigation }: Props) {
             <View><Eyebrow>{greeting}</Eyebrow><Text style={s.h1}>{who?.employeeId ?? '—'}</Text><Text style={s.role}>{who?.role ?? ''}</Text></View>
             <View style={{ alignItems: 'flex-end', gap: 6 }}>
               <Pressable onPress={() => navigation.navigate('Notifications')} hitSlop={10} style={s.bell}><Text style={s.bellText}>🔔 {unread ? unread : ''}</Text></Pressable>
-              <View style={{ flexDirection: 'row', gap: 14 }}>
-                <Pressable onPress={() => navigation.navigate('ChangePassword')} hitSlop={10}><Text style={s.link}>Password</Text></Pressable>
-                <Pressable onPress={signOut} hitSlop={10}><Text style={s.link}>Sign out</Text></Pressable>
-              </View>
             </View>
           </View>
           {error && <Text style={s.err}>{error}</Text>}
@@ -177,7 +172,6 @@ const s = StyleSheet.create({
   head: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', paddingTop: 8 },
   h1: { fontSize: 28, fontWeight: '800', color: colors.navy800, fontFamily: 'Menlo' },
   role: { color: colors.muted, fontSize: 12, letterSpacing: 1.2 },
-  link: { color: colors.navy700, fontWeight: '700', fontSize: 13, paddingVertical: 6, paddingHorizontal: 2 },
   bell: { borderWidth: 1, borderColor: colors.line, backgroundColor: colors.surface, paddingHorizontal: 10, paddingVertical: 6 }, bellText: { fontWeight: '800', color: colors.hazard },
   err: { color: colors.crit },
   taskTitle: { fontSize: 16, fontWeight: '700', color: colors.ink }, taskSub: { color: colors.muted, fontSize: 13, marginTop: 2 },
