@@ -13,11 +13,11 @@ export type Asset = {
   id: string; assetNumber: string; name: string; category: string; status: string;
   make: string; model: string; serialNumber: string; yearOfManufacture: number;
   commissionedAt: string; siteId: string; notes?: string | null;
-  operators?: { userId: string }[];
+  operators?: { userId: string; user?: { id: string; employeeId: string; name: string } }[];
 };
 
 const CATEGORY: Record<string, string> = {
-  DRILLING: 'Drilling', HAULAGE: 'Haulage', COMPRESSOR: 'Compressor', ANCILLARY: 'Ancillary', OTHER: 'Other',
+  DRILLING: 'Drilling', EXCAVATOR: 'Excavator', GRADER: 'Grader', TRUCK: 'Truck / tipper', HAULAGE: 'Haulage', COMPRESSOR: 'Compressor', ANCILLARY: 'Ancillary', OTHER: 'Other',
 };
 
 /** The full machine register, matching the web Assets page. Home only lists the machines assigned to you. */

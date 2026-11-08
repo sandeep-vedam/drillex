@@ -45,9 +45,9 @@ export default function LoginPage() {
       <section className="grid place-items-center p-8 bg-canvas">
         <form onSubmit={submit} className="w-full max-w-[400px] flex flex-col gap-5">
           <div className="lg:hidden mb-2"><Wordmark /></div>
-          <div><div className="eyebrow">Sign in</div><h1 className="font-display font-semibold text-[36px] text-navy-800 leading-tight">Welcome back</h1><p className="text-muted text-[14px]">Use your Employee ID and personal password. No shared logins.</p></div>
+          <div><div className="eyebrow">Sign in</div><h1 className="font-display font-semibold text-[36px] text-navy-800 leading-tight">Welcome back</h1><p className="text-muted text-[14px]">Use your Employee ID and your own PIN or password. No shared logins.</p></div>
           <label className="flex flex-col gap-1.5 text-[13px] font-medium">Employee ID<input className="input font-mono uppercase tracking-wider" value={employeeId} onChange={(e) => setEmployeeId(e.target.value)} required autoComplete="username" placeholder="OPR001" /></label>
-          <PasswordInput label="Password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={8} autoComplete="current-password" placeholder="••••••••" />
+          <PasswordInput label="PIN or password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={4} autoComplete="current-password" placeholder="••••" />
           <label className="flex flex-col gap-1.5 text-[13px] font-medium"><span>2FA code <span className="text-muted font-normal">— managers &amp; admins</span></span><input className="input font-mono tracking-[.4em]" inputMode="numeric" maxLength={6} value={totp} onChange={(e) => setTotp(e.target.value.replace(/\D/g, ''))} placeholder="000000" /></label>
           {error && <p role="alert" className="text-[13px] text-crit border-l-2 border-crit pl-3">{error}</p>}
           <button disabled={busy} className="btn-primary h-12 text-[15px]">{busy ? 'Signing in…' : 'Sign in'}</button>

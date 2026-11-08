@@ -17,6 +17,19 @@ export function Segmented<T extends string>({ label, value, options, onChange, t
     </View>
   );
 }
+/** Single choice that wraps onto more lines — for option lists too long for one Segmented row. */
+export function Chips<T extends string>({ label, value, options, onChange }: { label: string; value: T; options: { v: T; l: string }[]; onChange: (v: T) => void }) {
+  return (
+    <View style={{ gap: 6 }}>
+      <Text style={s.label}>{label}</Text>
+      <View style={s.chips}>
+        {options.map((o) => { const on = o.v === value; return (
+          <Pressable key={o.v} onPress={() => onChange(o.v)} style={[s.chip, on && { backgroundColor: colors.navy800, borderColor: colors.navy800 }]}><Text style={[s.chipText, on && { color: '#fff' }]}>{o.l}</Text></Pressable>
+        ); })}
+      </View>
+    </View>
+  );
+}
 export function NumberField({ label, value, onChange, unit, placeholder }: { label: string; value: string; onChange: (v: string) => void; unit?: string; placeholder?: string }) {
   return (
     <View style={{ gap: 6, flex: 1 }}>
@@ -53,6 +66,9 @@ const s = StyleSheet.create({
   seg: { flexDirection: 'row', borderWidth: 1, borderColor: colors.line, backgroundColor: colors.surface },
   segBtn: { flex: 1, paddingVertical: 10, alignItems: 'center' },
   segText: { fontSize: 12, fontWeight: '700', color: colors.muted },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  chip: { borderWidth: 1, borderColor: colors.line, backgroundColor: colors.surface, paddingHorizontal: 12, paddingVertical: 9 },
+  chipText: { fontSize: 13, fontWeight: '600', color: colors.ink },
   numWrap: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line },
   num: { flex: 1, paddingHorizontal: 12, paddingVertical: 12, fontSize: 18, color: colors.ink, fontVariant: ['tabular-nums'] },
   unit: { paddingHorizontal: 10, color: colors.muted, fontSize: 12, fontWeight: '700' },

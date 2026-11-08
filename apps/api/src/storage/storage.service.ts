@@ -15,7 +15,7 @@ export class StorageService {
   private s3 = this.driver === 's3' ? this.client(process.env.S3_ENDPOINT) : null;
   /** Presigned URLs are handed to browsers/devices, so they must be signed for an endpoint those can reach (S3_ENDPOINT is often loopback-only). */
   private s3Public = this.s3 && process.env.S3_PUBLIC_ENDPOINT ? this.client(process.env.S3_PUBLIC_ENDPOINT) : this.s3;
-  private localDir = process.env.UPLOAD_DIR ?? join(process.cwd(), 'uploads');
+  private localDir = process.env.UPLOAD_DIR || join(process.cwd(), 'uploads'); // empty UPLOAD_DIR= in .env falls back too
   private publicBase = process.env.PUBLIC_API_URL ?? `http://localhost:${process.env.PORT ?? 4000}`;
 
   private client(endpoint?: string) {

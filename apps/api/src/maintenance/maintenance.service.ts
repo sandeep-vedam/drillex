@@ -15,10 +15,22 @@ export class MaintenanceService {
   private assetScope(u: AuthUser) { return u.scope === 'site' ? { siteId: u.siteId ?? undefined } : {}; }
   private include = { asset: { select: { assetNumber: true, name: true, siteId: true, status: true } }, parts: { include: { part: { select: { partNo: true, name: true } } } } };
 
-  /** Latest hour meter per asset from daily readings (and job cards), used for hour-based due calc. */
+  /**
+   * Latest hour meter per asset, used for hour-based due calc: from daily readings (plant machines and the
+   * original form) and from shift reports' end meter (drilling rigs, whose daily check has no meter).
+   */
   async currentHours(assetIds: string[]) {
-    const rows = await this.prisma.dailyReading.groupBy({ by: ['assetId'], where: { assetId: { in: assetIds } }, _max: { hourMeter: true } });
-    return new Map(rows.map((r) => [r.assetId, r._max.hourMeter ? Number(r._max.hourMeter) : null]));
+    const [readings, shifts] = await Promise.all([
+      this.prisma.dailyReading.groupBy({ by: ['assetId'], where: { assetId: { in: assetIds } }, _max: { hourMeter: true } }),
+      this.prisma.shiftReport.groupBy({ by: ['assetId'], where: { assetId: { in: assetIds }, deletedAt: null }, _max: { endHourMeter: true } }),
+    ]);
+    const out = new Map<string, number | null>();
+    for (const r of readings) out.set(r.assetId, r._max.hourMeter != null ? Number(r._max.hourMeter) : null);
+    for (const s of shifts) {
+      const v = s._max.endHourMeter != null ? Number(s._max.endHourMeter) : null;
+      if (v != null && v > (out.get(s.assetId) ?? -1)) out.set(s.assetId, v);
+    }
+    return out;
   }
 
   async list(u: AuthUser, q: { assetId?: string; status?: string; mine?: string }) {

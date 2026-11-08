@@ -21,7 +21,7 @@ export class AssetsService {
   }
 
   /** Assignments are a validFrom/validTo window, so only the open ones are the current operators. */
-  private readonly include = { operators: { where: { validTo: null } } };
+  private readonly include = { operators: { where: { validTo: null }, include: { user: { select: { id: true, employeeId: true, name: true } } } } };
 
   list(u: AuthUser) {
     return this.prisma.asset.findMany({ where: { ...this.scopeWhere(u), deletedAt: null }, include: this.include, orderBy: { assetNumber: 'asc' } });

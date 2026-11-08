@@ -15,7 +15,8 @@
     "db:seed": "pnpm --filter @drillex/api db:seed",
     "infra:up": "docker compose -f infra/docker-compose.yml up -d",
     "infra:down": "docker compose -f infra/docker-compose.yml down",
-    "db:demo": "pnpm --filter @drillex/api db:demo"
+    "db:demo": "pnpm --filter @drillex/api db:demo",
+    "db:demo-finance": "pnpm --filter @drillex/api db:demo-finance"
   },
   "devDependencies": {
     "turbo": "^2.3.3",

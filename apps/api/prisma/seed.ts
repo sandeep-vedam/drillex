@@ -12,6 +12,8 @@ async function main() {
     { employeeId: 'SUP001', name: 'Shift Supervisor', role: 'SUPERVISOR' },
     { employeeId: 'TEC001', name: 'Fitter One', role: 'TECHNICIAN' },
     { employeeId: 'OPR001', name: 'Driller One', role: 'OPERATOR' },
+    { employeeId: 'FIN001', name: 'Finance Manager', role: 'FINANCE' },
+    { employeeId: 'PSV001', name: 'Plant Hire Supervisor', role: 'PLANT_HIRE_SUPERVISOR' },
   ] as const;
   const passwordHash = await argon2.hash('Password123');
   for (const u of users) {
@@ -30,6 +32,7 @@ async function main() {
   for (const [partNo, name, qty, min, cost] of [['FLT-OIL-01', 'Engine oil filter', 12, 4, 18.5], ['FLT-HYD-02', 'Hydraulic return filter', 6, 2, 42], ['FLT-AIR-03', 'Air filter element', 3, 4, 35], ['OIL-15W40-20L', 'Engine oil 15W40 (20 L)', 10, 3, 95], ['GRS-EP2-18KG', 'EP2 grease (18 kg)', 4, 2, 70], ['BLT-ALT-07', 'Alternator belt', 2, 2, 28]] as const) {
     await prisma.part.upsert({ where: { partNo }, update: {}, create: { partNo, name, qtyOnHand: qty, minQty: min, unitCost: cost } });
   }
-  console.log('Seeded. Logins: ADM001/MGR001/SUP001/TEC001/OPR001 with password Password123');
+  console.log('Seeded. Logins: ADM001/MGR001/SUP001/TEC001/OPR001/FIN001/PSV001 with password Password123');
+
 }
 main().finally(() => prisma.$disconnect());

@@ -32,7 +32,7 @@ export default function LoginScreen({ navigation }: Props) {
       navigation.replace('Home');
     } catch (e) {
       const m = (e as Error).message;
-      setError(m === 'Unauthorized' ? 'Employee ID or password is incorrect.' : m);
+      setError(m === 'Unauthorized' ? 'Employee ID, PIN or password is incorrect.' : m);
     } finally { setBusy(false); }
   }
 
@@ -53,13 +53,13 @@ export default function LoginScreen({ navigation }: Props) {
         <View style={s.sheet}>
           <Eyebrow>Sign in</Eyebrow>
           <Text style={s.h2}>Welcome back</Text>
-          <Text style={s.sub}>Use your Employee ID and personal password.</Text>
+          <Text style={s.sub}>Use your Employee ID and your own PIN or password.</Text>
           <View style={{ gap: 14, marginTop: 18 }}>
             <Field onFocus={revealForm} label="Employee ID" placeholder="OPR001" autoCapitalize="characters" autoCorrect={false} value={employeeId} onChangeText={setEmployeeId} textContentType="username" />
-            <Field onFocus={revealForm} label="Password" placeholder="••••••••" secureTextEntry value={password} onChangeText={setPassword} textContentType="password" onSubmitEditing={submit} />
+            <Field onFocus={revealForm} label="PIN or password" placeholder="••••" secureTextEntry value={password} onChangeText={setPassword} textContentType="password" onSubmitEditing={submit} />
             {error && <Text style={s.err}>{error}</Text>}
             <Button title={busy ? 'Signing in…' : 'Sign in'} onPress={submit} disabled={busy} />
-            <Text style={s.help}>Forgot your password? Ask your supervisor or administrator to reset it.</Text>
+            <Text style={s.help}>Forgot your PIN or password? Ask your administrator for a temporary one.</Text>
           </View>
         </View>
       </ScrollView>

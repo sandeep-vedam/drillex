@@ -6,8 +6,8 @@ import { PhotoPicker, uploadPhotos, type PendingPhoto } from './PhotoPicker';
 
 type Opt = { id: string; name: string; employeeId?: string };
 export type EditableAsset = { id: string; assetNumber: string; name: string; category: string; make: string; model: string; serialNumber: string; yearOfManufacture: number; commissionedAt: string; siteId?: string; notes?: string | null; operators?: { userId: string }[] };
-const CATS = ['DRILLING', 'HAULAGE', 'COMPRESSOR', 'ANCILLARY', 'OTHER'];
-const PREFIX: Record<string, string> = { DRILLING: 'DRL', HAULAGE: 'HAU', COMPRESSOR: 'CMP', ANCILLARY: 'ANC', OTHER: 'EQP' };
+const CATS = ['DRILLING', 'EXCAVATOR', 'GRADER', 'TRUCK', 'HAULAGE', 'COMPRESSOR', 'ANCILLARY', 'OTHER'];
+const PREFIX: Record<string, string> = { DRILLING: 'DRL', EXCAVATOR: 'EXC', GRADER: 'GRD', TRUCK: 'TRK', HAULAGE: 'HAU', COMPRESSOR: 'CMP', ANCILLARY: 'ANC', OTHER: 'EQP' };
 const blank = () => ({ name: '', category: 'DRILLING', make: '', model: '', serialNumber: '', yearOfManufacture: new Date().getFullYear(), commissionedAt: new Date().toISOString().slice(0, 10), siteId: '', operatorIds: [] as string[], notes: '' });
 
 export function AssetDrawer({ open, onClose, onSaved, asset }: { open: boolean; onClose: () => void; onSaved: () => void; asset?: EditableAsset | null }) {

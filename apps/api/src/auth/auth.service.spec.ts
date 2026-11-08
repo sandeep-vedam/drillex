@@ -64,12 +64,14 @@ describe('AuthService.login', () => {
     }));
   });
 
-  it('rejects a correct password for a non-ACTIVE (e.g. suspended) user', async () => {
+  it('rejects a correct password for a non-ACTIVE (e.g. suspended) user with the spec message', async () => {
     const prisma = makePrisma(makeUser({ status: 'SUSPENDED' }));
     const svc = new AuthService(prisma as never, makeJwt() as never);
+    // Client spec §10.3: blocked / suspended accounts are told so, rather than "invalid credentials".
     await expect(svc.login({ employeeId: 'OPR001', password: PASSWORD, deviceId: 'd1' }))
-      .rejects.toBeInstanceOf(UnauthorizedException);
+      .rejects.toThrow(new ForbiddenException('Account suspended. Contact your administrator.'));
   });
+
 
   it('logs in a role that does not require 2FA with no totp code needed', async () => {
     const prisma = makePrisma(makeUser());

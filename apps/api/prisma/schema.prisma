@@ -16,53 +16,82 @@ model SystemSetting {
   updatedBy String?
 }
 
+/// ACTIVE can sign in. BLOCKED: an admin blocked the account (staff left) — with a reason, sessions revoked.
+/// SUSPENDED: locked after too many failed sign-ins until an admin unlocks it. DISABLED: the original deactivate.
+/// None of the last three receive a token (client spec §10.3, §10.8).
 enum UserStatus {
   ACTIVE
   DISABLED
+  BLOCKED
+  SUSPENDED
 }
+
 enum AssetCategory {
   DRILLING
+  EXCAVATOR
+  GRADER
+  TRUCK
   HAULAGE
   COMPRESSOR
   ANCILLARY
   OTHER
 }
+
 enum AssetStatus {
   ACTIVE
   UNDER_MAINTENANCE
   IDLE
   DECOMMISSIONED
 }
+
 enum Shift {
   DAY
   NIGHT
 }
+
 enum SubmissionStatus {
   SUBMITTED
   APPROVED
   UNLOCKED
 }
+
 enum FluidLevel {
   OK
   LOW
   ADD
   CHANGE_REQUIRED
+  CRITICAL
 }
+
 enum AirFilterCondition {
   OK
   BLOCKED
   CHANGED
 }
+
 enum BatteryCondition {
   OK
   WEAK
   FLAT
 }
+
 enum ChemicalUnit {
   LITRES
   KG
+  G
+  ML
   BAGS
+  DRUMS
 }
+
+/// Which daily form a reading was captured on: RIG = drilling rig condition check, PLANT = plant machine
+/// readings, LEGACY = the original single form used before the split (client spec §9.5).
+enum DailyFormType {
+  LEGACY
+  RIG
+  PLANT
+}
+
 enum ServiceType {
   HR_250
   HR_500
@@ -71,34 +100,40 @@ enum ServiceType {
   CONDITION_BASED
   AD_HOC
 }
+
 enum ScheduleStatus {
   UPCOMING
   DUE_NOW
   OVERDUE
   COMPLETED
 }
+
 enum JobType {
   SCHEDULED_SERVICE
   BREAKDOWN_REPAIR
   MODIFICATION
   INSPECTION
 }
+
 enum JobStatus {
   OPEN
   IN_PROGRESS
   COMPLETED
   AWAITING_PARTS
 }
+
 enum TestResult {
   PASSED
   FAILED
   PENDING
 }
+
 enum StockMovementType {
   IN
   OUT
   ADJUST
 }
+
 enum PurchaseRequestStatus {
   OPEN
   ORDERED
@@ -113,15 +148,15 @@ enum AttachmentKind {
 }
 
 model Site {
-  id        String   @id @default(uuid())
-  name      String   @unique
-  latitude  Float?
-  longitude Float?
-  users     User[]
-  assets    Asset[]
+  id           String        @id @default(uuid())
+  name         String        @unique
+  latitude     Float?
+  longitude    Float?
+  users        User[]
+  assets       Asset[]
   shiftReports ShiftReport[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
 }
 
 /// An admin-editable role: `key` is the stable identifier stored on User.role and carried in the JWT
@@ -144,31 +179,42 @@ model RolePermission {
   roleId     String
   permission String
   scope      String // 'self' | 'site' | 'all'
+
   @@unique([roleId, permission])
 }
 
 model User {
-  id           String     @id @default(uuid())
-  employeeId   String     @unique
-  name         String
-  role         String
-  roleRef      Role       @relation(fields: [role], references: [key], onDelete: Restrict)
-  status       UserStatus @default(ACTIVE)
-  passwordHash String
-  totpSecret   String?
-  totpEnabled  Boolean    @default(false)
-  mustChangePassword Boolean @default(false)
-  site         Site?      @relation(fields: [siteId], references: [id])
-  siteId       String?
-  devices      Device[]
-  loginEvents  LoginEvent[]
-  refreshTokens RefreshToken[]
-  assetAssignments AssetOperator[]
-  shiftReports ShiftReport[]
-  dailyReadings DailyReading[]
-  notifications Notification[]
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
+  id                      String          @id @default(uuid())
+  employeeId              String          @unique
+  name                    String
+  role                    String
+  roleRef                 Role            @relation(fields: [role], references: [key], onDelete: Restrict)
+  status                  UserStatus      @default(ACTIVE)
+  passwordHash            String
+  totpSecret              String?
+  totpEnabled             Boolean         @default(false)
+  mustChangePassword      Boolean         @default(false)
+  /// A temporary PIN / password issued by an admin stops working after this (client spec §10.2: 24 h).
+  tempCredentialExpiresAt DateTime?
+  failedLogins            Int             @default(0)
+  statusReason            String?
+  statusChangedAt         DateTime?
+  phone                   String?
+  site                    Site?           @relation(fields: [siteId], references: [id])
+  siteId                  String?
+  devices                 Device[]
+  loginEvents             LoginEvent[]
+  refreshTokens           RefreshToken[]
+  assetAssignments        AssetOperator[]
+  shiftReports            ShiftReport[]   @relation("ShiftReportOperator")
+  dailyReadings           DailyReading[]  @relation("DailyReadingOperator")
+  shiftReportsEntered     ShiftReport[]   @relation("ShiftReportEnteredBy")
+  dailyReadingsEntered    DailyReading[]  @relation("DailyReadingEnteredBy")
+  notifications           Notification[]
+  requests                Request[]       @relation("RequestCreatedBy")
+  requestReplies          RequestReply[]
+  createdAt               DateTime        @default(now())
+  updatedAt               DateTime        @updatedAt
 }
 
 model Device {
@@ -180,105 +226,122 @@ model Device {
   pushToken String?
   approved  Boolean  @default(true)
   lastSeen  DateTime @default(now())
+
   @@unique([userId, deviceId])
 }
 
 model LoginEvent {
-  id        String   @id @default(uuid())
-  user      User?    @relation(fields: [userId], references: [id])
-  userId    String?
+  id         String   @id @default(uuid())
+  user       User?    @relation(fields: [userId], references: [id])
+  userId     String?
   employeeId String
-  deviceId  String
-  success   Boolean
-  ip        String?
-  createdAt DateTime @default(now())
+  deviceId   String
+  success    Boolean
+  ip         String?
+  createdAt  DateTime @default(now())
+
   @@index([employeeId, createdAt])
 }
 
 model RefreshToken {
-  id        String   @id @default(uuid())
-  user      User     @relation(fields: [userId], references: [id])
+  id        String    @id @default(uuid())
+  user      User      @relation(fields: [userId], references: [id])
   userId    String
-  tokenHash String   @unique
+  tokenHash String    @unique
   deviceId  String
   expiresAt DateTime
   revokedAt DateTime?
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
 }
 
 model Asset {
-  id                String        @id @default(uuid())
-  assetNumber       String        @unique // immutable (SRS 3.1)
-  name              String
-  category          AssetCategory
-  make              String
-  model             String
-  serialNumber      String
-  yearOfManufacture Int
-  commissionedAt    DateTime
-  site              Site          @relation(fields: [siteId], references: [id])
-  siteId            String
-  status            AssetStatus   @default(ACTIVE)
-  notes             String?
-  operators         AssetOperator[]
-  shiftReports      ShiftReport[]
-  dailyReadings     DailyReading[]
+  id                   String                @id @default(uuid())
+  assetNumber          String                @unique // immutable (SRS 3.1)
+  name                 String
+  category             AssetCategory
+  make                 String
+  model                String
+  serialNumber         String
+  yearOfManufacture    Int
+  commissionedAt       DateTime
+  site                 Site                  @relation(fields: [siteId], references: [id])
+  siteId               String
+  status               AssetStatus           @default(ACTIVE)
+  notes                String?
+  operators            AssetOperator[]
+  shiftReports         ShiftReport[]
+  dailyReadings        DailyReading[]
   maintenanceSchedules MaintenanceSchedule[]
-  jobCards          JobCard[]
-  alerts            Alert[]
-  createdAt         DateTime      @default(now())
-  updatedAt         DateTime      @updatedAt
-  deletedAt         DateTime?
+  jobCards             JobCard[]
+  alerts               Alert[]
+  deployments          Deployment[]
+  requests             Request[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 }
 
 model AssetOperator {
-  asset     Asset    @relation(fields: [assetId], references: [id])
+  asset     Asset     @relation(fields: [assetId], references: [id])
   assetId   String
-  user      User     @relation(fields: [userId], references: [id])
+  user      User      @relation(fields: [userId], references: [id])
   userId    String
-  validFrom DateTime @default(now())
+  validFrom DateTime  @default(now())
   validTo   DateTime?
+
   @@id([assetId, userId])
 }
 
 model Chemical {
-  id          String       @id @default(uuid())
-  name        String       @unique
-  defaultUnit ChemicalUnit
-  unitCost    Decimal?     @db.Decimal(12, 2)
-  monthlyBudget Decimal?   @db.Decimal(12, 2)
-  entries     ShiftReportChemical[]
+  id            String                @id @default(uuid())
+  name          String                @unique
+  defaultUnit   ChemicalUnit
+  unitCost      Decimal?              @db.Decimal(12, 2)
+  monthlyBudget Decimal?              @db.Decimal(12, 2)
+  entries       ShiftReportChemical[]
 }
 
 model ShiftReport {
-  id               String           @id @default(uuid())
-  asset            Asset            @relation(fields: [assetId], references: [id])
+  id               String                @id @default(uuid())
+  asset            Asset                 @relation(fields: [assetId], references: [id])
   assetId          String
-  user             User             @relation(fields: [userId], references: [id])
+  /// The operator the report is for. When a supervisor entered it on their behalf, enteredBy is the supervisor.
+  user             User                  @relation("ShiftReportOperator", fields: [userId], references: [id])
   userId           String
-  site             Site             @relation(fields: [siteId], references: [id])
+  enteredBy        User?                 @relation("ShiftReportEnteredBy", fields: [enteredById], references: [id])
+  enteredById      String?
+  supervisorReason String?
+  site             Site                  @relation(fields: [siteId], references: [id])
   siteId           String
-  date             DateTime         @db.Date
+  date             DateTime              @db.Date
   shift            Shift
+  startHourMeter   Decimal?              @db.Decimal(10, 1)
+  endHourMeter     Decimal?              @db.Decimal(10, 1)
+  engineHours      Decimal?              @db.Decimal(8, 1) // server-computed: end − start
+  bitNumber        String?
+  bitSize          String?
+  remarks          String?
   holeRef          String
-  startDepth       Decimal          @db.Decimal(10, 2)
-  endDepth         Decimal          @db.Decimal(10, 2)
-  totalMeters      Decimal          @db.Decimal(10, 2) // server-computed
+  startDepth       Decimal               @db.Decimal(10, 2)
+  endDepth         Decimal               @db.Decimal(10, 2)
+  totalMeters      Decimal               @db.Decimal(10, 2) // server-computed
   holesCompleted   Int
-  holeDiameterMm   Decimal          @db.Decimal(8, 2)
+  holeDiameterMm   Decimal               @db.Decimal(8, 2)
   rockType         String
-  penetrationRate  Decimal          @db.Decimal(8, 2)
-  downtimeHours    Decimal          @default(0) @db.Decimal(6, 2)
+  penetrationRate  Decimal               @db.Decimal(8, 2) // server-computed from metres ÷ engine hours when the meters are given
+  downtimeHours    Decimal               @default(0) @db.Decimal(6, 2)
   downtimeReason   String?
-  status           SubmissionStatus @default(SUBMITTED)
+  status           SubmissionStatus      @default(SUBMITTED)
   signatureId      String?
-  submittedAt      DateTime         @default(now())
+  submittedAt      DateTime              @default(now())
   approvedById     String?
   approvedAt       DateTime?
   chemicals        ShiftReportChemical[]
-  createdAt        DateTime         @default(now())
-  updatedAt        DateTime         @updatedAt
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
   deletedAt        DateTime?
+
   @@unique([assetId, date, shift])
   @@index([siteId, date])
 }
@@ -287,8 +350,11 @@ model ShiftReportChemical {
   id            String       @id @default(uuid())
   shiftReport   ShiftReport  @relation(fields: [shiftReportId], references: [id], onDelete: Cascade)
   shiftReportId String
-  chemical      Chemical     @relation(fields: [chemicalId], references: [id])
-  chemicalId    String
+  /// Linked when the typed name matches the chemical master list, so cost reports still group it.
+  chemical      Chemical?    @relation(fields: [chemicalId], references: [id])
+  chemicalId    String?
+  /// What the driller typed (client spec §4A: free entry).
+  name          String?
   quantity      Decimal      @db.Decimal(10, 2)
   unit          ChemicalUnit
   purpose       String?
@@ -296,58 +362,82 @@ model ShiftReportChemical {
 }
 
 model DailyReading {
-  id                   String             @id @default(uuid())
-  asset                Asset              @relation(fields: [assetId], references: [id])
-  assetId              String
-  user                 User               @relation(fields: [userId], references: [id])
-  userId               String
-  date                 DateTime           @db.Date
-  hourMeter            Decimal            @db.Decimal(10, 1)
-  fuelStart            Decimal            @db.Decimal(8, 2)
-  fuelEnd              Decimal            @db.Decimal(8, 2)
-  fuelConsumed         Decimal            @db.Decimal(8, 2) // server-computed
-  engineOil            FluidLevel
-  hydraulicOil         FluidLevel
-  coolant              FluidLevel
-  airFilter            AirFilterCondition
-  tyrePressures        Json               @default("{}")
-  battery              BatteryCondition
-  warningLights        Boolean
-  warningLightsNote    String?
-  unusualNoises        Boolean
-  unusualNoisesNote    String?
-  leaks                Boolean
-  leaksNote            String?
-  preStartChecklistDone Boolean
-  conditionRating      Int
-  notes                String?
-  signatureId          String?
-  createdAt            DateTime           @default(now())
-  updatedAt            DateTime           @updatedAt
-  deletedAt            DateTime?
+  id                    String              @id @default(uuid())
+  asset                 Asset               @relation(fields: [assetId], references: [id])
+  assetId               String
+  user                  User                @relation("DailyReadingOperator", fields: [userId], references: [id])
+  userId                String
+  enteredBy             User?               @relation("DailyReadingEnteredBy", fields: [enteredById], references: [id])
+  enteredById           String?
+  supervisorReason      String?
+  formType              DailyFormType       @default(LEGACY)
+  date                  DateTime            @db.Date
+  /// Machine hours at the reading. A plant reading stores its end reading here so maintenance due-hours keep working.
+  hourMeter             Decimal?            @db.Decimal(10, 1)
+  fuelStart             Decimal?            @db.Decimal(8, 2)
+  fuelEnd               Decimal?            @db.Decimal(8, 2)
+  fuelConsumed          Decimal?            @db.Decimal(8, 2) // server-computed
+  engineOil             FluidLevel?
+  hydraulicOil          FluidLevel?
+  coolant               FluidLevel?
+  airFilter             AirFilterCondition?
+  tyrePressures         Json                @default("{}")
+  battery               BatteryCondition?
+  // Rig condition check (RIG) and plant machine readings (PLANT) — answers validated by @drillex/shared
+  gearOil               FluidLevel?
+  flushPump             FluidLevel?
+  fuelLevel             FluidLevel?
+  rodCondition          String?
+  bitCondition          String?
+  brakeFluid            String?
+  trackCondition        String?
+  tyreCondition         String?
+  attachmentCondition   String?
+  lights                String?
+  brakes                String?
+  startReading          Decimal?            @db.Decimal(10, 1)
+  endReading            Decimal?            @db.Decimal(10, 1)
+  usage                 Decimal?            @db.Decimal(10, 1) // server-computed: end − start (hours or km)
+  fuelAdded             Decimal?            @db.Decimal(8, 2)
+  faults                String?
+  warningLights         Boolean
+  warningLightsNote     String?
+  unusualNoises         Boolean
+  unusualNoisesNote     String?
+  leaks                 Boolean
+  leaksNote             String?
+  preStartChecklistDone Boolean?
+
+  conditionRating Int
+  notes           String?
+  signatureId     String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  deletedAt       DateTime?
+
   @@unique([assetId, date])
 }
 
 model MaintenanceSchedule {
-  id               String         @id @default(uuid())
-  asset            Asset          @relation(fields: [assetId], references: [id])
+  id               String                    @id @default(uuid())
+  asset            Asset                     @relation(fields: [assetId], references: [id])
   assetId          String
   serviceType      ServiceType
   description      String
   intervalHours    Int?
   intervalDays     Int?
   lastServiceAt    DateTime?
-  lastServiceHours Decimal?       @db.Decimal(10, 1)
+  lastServiceHours Decimal?                  @db.Decimal(10, 1)
   nextDueAt        DateTime?
-  nextDueHours     Decimal?       @db.Decimal(10, 1)
-  reminderLeadDays Int            @default(3)
-  status           ScheduleStatus @default(UPCOMING)
-  estDowntimeHours Decimal?       @db.Decimal(6, 2)
+  nextDueHours     Decimal?                  @db.Decimal(10, 1)
+  reminderLeadDays Int                       @default(3)
+  status           ScheduleStatus            @default(UPCOMING)
+  estDowntimeHours Decimal?                  @db.Decimal(6, 2)
   notes            String?
   technicianIds    String[]
   parts            MaintenanceSchedulePart[]
-  createdAt        DateTime       @default(now())
-  updatedAt        DateTime       @updatedAt
+  createdAt        DateTime                  @default(now())
+  updatedAt        DateTime                  @updatedAt
   deletedAt        DateTime?
 }
 
@@ -361,42 +451,42 @@ model MaintenanceSchedulePart {
 }
 
 model JobCard {
-  id              String      @id @default(uuid())
-  jobNo           String      @unique
-  asset           Asset       @relation(fields: [assetId], references: [id])
+  id              String        @id @default(uuid())
+  jobNo           String        @unique
+  asset           Asset         @relation(fields: [assetId], references: [id])
   assetId         String
-  date            DateTime    @db.Date
+  date            DateTime      @db.Date
   jobType         JobType
   reportedFault   String?
   workPerformed   String
-  hourMeter       Decimal?    @db.Decimal(10, 1)
-  labourHours     Decimal?    @db.Decimal(6, 2)
+  hourMeter       Decimal?      @db.Decimal(10, 1)
+  labourHours     Decimal?      @db.Decimal(6, 2)
   technicianIds   String[]
   toolsUsed       String?
   conditionBefore Int?
   conditionAfter  Int?
   testResult      TestResult?
   nextAction      String?
-  status          JobStatus   @default(OPEN)
+  status          JobStatus     @default(OPEN)
   techSignatureId String?
   approvedById    String?
   approvedAt      DateTime?
   parts           JobCardPart[]
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
   deletedAt       DateTime?
 }
 
 model Part {
-  id         String   @id @default(uuid())
-  partNo     String   @unique
-  name       String
-  qtyOnHand  Int      @default(0)
-  minQty     Int      @default(0)
-  unitCost   Decimal? @db.Decimal(12, 2)
-  movements  PartStockMovement[]
-  jobCardParts JobCardPart[]
-  scheduleParts MaintenanceSchedulePart[]
+  id               String                    @id @default(uuid())
+  partNo           String                    @unique
+  name             String
+  qtyOnHand        Int                       @default(0)
+  minQty           Int                       @default(0)
+  unitCost         Decimal?                  @db.Decimal(12, 2)
+  movements        PartStockMovement[]
+  jobCardParts     JobCardPart[]
+  scheduleParts    MaintenanceSchedulePart[]
   purchaseRequests PurchaseRequest[]
 }
 
@@ -443,19 +533,21 @@ model Attachment {
   sha256     String?
   createdBy  String
   createdAt  DateTime       @default(now())
+
   @@index([ownerType, ownerId])
 }
 
 model Notification {
-  id        String   @id @default(uuid())
-  user      User     @relation(fields: [userId], references: [id])
+  id        String    @id @default(uuid())
+  user      User      @relation(fields: [userId], references: [id])
   userId    String
   type      String
   title     String
   body      String?
   payload   Json?
   readAt    DateTime?
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
+
   @@index([userId, readAt])
 }
 
@@ -490,6 +582,7 @@ model AuditLog {
   action    String
   diff      Json?
   createdAt DateTime @default(now())
+
   @@index([entity, entityId])
 }
 
@@ -512,4 +605,192 @@ model SyncConflict {
   resolvedBy String?
   resolvedAt DateTime?
   createdAt  DateTime  @default(now())
+}
+
+// ───────────── Finance & plant hire (client spec §6, §11) ─────────────
+// One set of tables serves both the Finance Manager module and the Plant Hire Supervisor's entries: a deployment is
+// the spec's "machine–client mapping" (§6.1) and its "plant_deployments" (§11.5) at once.
+
+enum PaymentMode {
+  CASH
+  CREDIT
+}
+
+enum DeploymentStatus {
+  ACTIVE
+  STANDBY
+  MOBILISING
+  DEMOBILISED
+}
+
+/// Entries by a Plant Hire Supervisor start PENDING_REVIEW; Finance or Admin approve (locked) or reject (with a reason).
+/// Entries made by finance staff themselves are APPROVED on save.
+enum ReviewStatus {
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
+}
+
+enum WorkShift {
+  DAY
+  NIGHT
+  FULL_DAY
+}
+
+enum PaymentMethod {
+  BANK_TRANSFER
+  CHEQUE
+  CASH
+  MOBILE_MONEY
+}
+
+model Client {
+  id          String       @id @default(uuid())
+  name        String       @unique
+  contactName String?
+  phone       String?
+  email       String?
+  deployments Deployment[]
+  payments    Payment[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+}
+
+model Deployment {
+  id              String           @id @default(uuid())
+  asset           Asset            @relation(fields: [assetId], references: [id])
+  assetId         String
+  client          Client           @relation(fields: [clientId], references: [id])
+  clientId        String
+  site            String
+  contractRef     String?
+  startDate       DateTime         @db.Date
+  expectedEndDate DateTime?        @db.Date
+  ratePerDay      Decimal          @db.Decimal(12, 2)
+  currency        String           @default("ZMW")
+  paymentMode     PaymentMode      @default(CASH)
+  creditTermDays  Int?
+  status          DeploymentStatus @default(ACTIVE)
+  notes           String?
+  createdById     String
+  reviewStatus    ReviewStatus     @default(PENDING_REVIEW)
+  reviewedById    String?
+  reviewedAt      DateTime?
+  rejectionReason String?
+  /// A rejected entry may be corrected and resubmitted once (client spec §11.4).
+  resubmitted     Boolean          @default(false)
+  daysWorked      DaysWorked[]
+  payments        Payment[]
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  deletedAt       DateTime?
+
+  @@index([assetId, status])
+  @@index([clientId])
+}
+
+model DaysWorked {
+  id                 String       @id @default(uuid())
+  deployment         Deployment   @relation(fields: [deploymentId], references: [id])
+  deploymentId       String
+  workDate           DateTime     @db.Date
+  shift              WorkShift
+  hoursWorked        Decimal      @db.Decimal(4, 1)
+  standbyHours       Decimal      @default(0) @db.Decimal(4, 1)
+  operatorEmployeeId String
+  billable           Boolean      @default(true)
+  productionNotes    String?
+  createdById        String
+  reviewStatus       ReviewStatus @default(PENDING_REVIEW)
+  reviewedById       String?
+  reviewedAt         DateTime?
+  rejectionReason    String?
+  resubmitted        Boolean      @default(false)
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+
+  @@unique([deploymentId, workDate, shift])
+}
+
+model Payment {
+  id              String        @id @default(uuid())
+  client          Client        @relation(fields: [clientId], references: [id])
+  clientId        String
+  deployment      Deployment?   @relation(fields: [deploymentId], references: [id])
+  deploymentId    String?
+  paymentDate     DateTime      @db.Date
+  amount          Decimal       @db.Decimal(14, 2)
+  currency        String        @default("ZMW")
+  method          PaymentMethod
+  reference       String?
+  /// Credit deployments: the block of days this payment covers (client spec §6.2). Expiry = paidFrom + daysCovered.
+  paidFrom        DateTime?     @db.Date
+  daysCovered     Int?
+  notes           String?
+  createdById     String
+  reviewStatus    ReviewStatus  @default(PENDING_REVIEW)
+  reviewedById    String?
+  reviewedAt      DateTime?
+  rejectionReason String?
+  resubmitted     Boolean       @default(false)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([clientId, paymentDate])
+}
+
+// ───────────── Requests (client spec §4A tab 7, §4B tab 6) ─────────────
+
+enum RequestType {
+  CONSUMABLES
+  EQUIPMENT
+  SAFETY
+  HR
+  FINANCE
+  OTHER
+}
+
+enum RequestPriority {
+  LOW
+  MEDIUM
+  URGENT
+}
+
+enum RequestStatus {
+  RECEIVED
+  IN_PROGRESS
+  RESOLVED
+}
+
+model Request {
+  id          String          @id @default(uuid())
+  number      Int             @unique @default(autoincrement())
+  type        RequestType
+  priority    RequestPriority
+  details     String
+  status      RequestStatus   @default(RECEIVED)
+  asset       Asset?          @relation(fields: [assetId], references: [id])
+  assetId     String?
+  siteId      String?
+  createdBy   User            @relation("RequestCreatedBy", fields: [createdById], references: [id])
+  createdById String
+  resolvedAt  DateTime?
+  replies     RequestReply[]
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  @@index([status, createdAt])
+  @@index([createdById])
+}
+
+model RequestReply {
+  id        String         @id @default(uuid())
+  request   Request        @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  requestId String
+  author    User           @relation(fields: [authorId], references: [id])
+  authorId  String
+  body      String
+  /// Set when the reply also moved the request along (e.g. to IN_PROGRESS).
+  status    RequestStatus?
+  createdAt DateTime       @default(now())
 }

@@ -1,13 +1,14 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { FlatList, Image, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { api } from '../lib/api';
-import { describeSubmission, DEFAULT_ALERT_THRESHOLD } from '@drillex/shared';
+import { describeSubmission, DEFAULT_ALERT_THRESHOLD, readingFlags, readingSummary } from '@drillex/shared';
 import { cached } from '../sync/cache';
 import { Card, Eyebrow } from '../ui';
 import { colors } from '../ui/theme';
 
 type Reading = {
-  id: string; date: string; hourMeter: string; conditionRating: number;
+  id: string; date: string; hourMeter: string | null; conditionRating: number; formType?: string;
+  enteredBy?: { employeeId: string; name: string } | null; supervisorReason?: string | null;
   warningLights: boolean; leaks: boolean; unusualNoises: boolean;
   asset: { assetNumber: string; name: string }; user: { employeeId: string; name: string };
 };
@@ -44,10 +45,7 @@ export default function ReadingsScreen() {
   }
 
   function flagsOf(r: Reading) {
-    const f: string[] = [];
-    if (r.warningLights) f.push('Warning lights');
-    if (r.leaks) f.push('Leaks');
-    if (r.unusualNoises) f.push('Unusual noises');
+    const f = readingFlags(r);
     if (r.conditionRating <= threshold) f.push('Poor condition');
     return f;
   }
@@ -82,7 +80,9 @@ export default function ReadingsScreen() {
                   <Text style={s.num}>{item.asset.assetNumber}</Text>
                   <Text style={s.rating}>{item.conditionRating} / 5</Text>
                 </View>
-                <Text style={s.meta}>{new Date(item.date).toLocaleDateString()} · {Number(item.hourMeter)} h · {item.user.employeeId}</Text>
+                <Text style={s.meta}>{new Date(item.date).toLocaleDateString()} · {readingSummary(item)} · {item.user.employeeId}</Text>
+                {item.enteredBy && <Text style={s.flags}>Entered by supervisor {item.enteredBy.employeeId}</Text>}
+
                 {!!flags.length && <Text style={s.flags}>{flags.join(' · ')}</Text>}
               </Card>
             </Pressable>

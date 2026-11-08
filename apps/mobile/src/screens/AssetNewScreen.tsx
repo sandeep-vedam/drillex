@@ -5,14 +5,14 @@ import { AssetCategories, AssetPrefix, type AssetCategory } from '@drillex/share
 import { api } from '../lib/api';
 import type { RootStackParamList } from '../navigation';
 import { Button, Field } from '../ui';
-import { Section, Segmented } from '../ui/form';
+import { Chips, Section, Segmented } from '../ui/form';
 import { colors } from '../ui/theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'AssetNew'>;
 type Opt = { id: string; name: string; employeeId?: string };
 
 const today = () => new Date().toISOString().slice(0, 10);
-const CATEGORY_LABEL: Record<AssetCategory, string> = { DRILLING: 'Drilling', HAULAGE: 'Haulage', COMPRESSOR: 'Compressor', ANCILLARY: 'Ancillary', OTHER: 'Other' };
+const CATEGORY_LABEL: Record<AssetCategory, string> = { DRILLING: 'Drilling', EXCAVATOR: 'Excavator', GRADER: 'Grader', TRUCK: 'Truck / tipper', HAULAGE: 'Haulage', COMPRESSOR: 'Compressor', ANCILLARY: 'Ancillary', OTHER: 'Other' };
 
 export default function AssetNewScreen({ navigation }: Props) {
   const [sites, setSites] = useState<Opt[]>([]);
@@ -66,7 +66,7 @@ export default function AssetNewScreen({ navigation }: Props) {
 
         <Section title="Machine">
           <Field label="Asset name" placeholder="Drill Rig #3" value={f.name} onChangeText={(v) => set('name', v)} />
-          <Segmented label="Category" value={f.category} options={AssetCategories.map((c) => ({ v: c, l: CATEGORY_LABEL[c] }))} onChange={(v) => set('category', v)} />
+          <Chips label="Category" value={f.category} options={AssetCategories.map((c) => ({ v: c, l: CATEGORY_LABEL[c] }))} onChange={(v) => set('category', v)} />
           <Field label="Make" placeholder="Sandvik" value={f.make} onChangeText={(v) => set('make', v)} />
           <Field label="Model" placeholder="DP1500i" value={f.model} onChangeText={(v) => set('model', v)} />
           <Field label="Serial number" autoCapitalize="characters" value={f.serialNumber} onChangeText={(v) => set('serialNumber', v)} />

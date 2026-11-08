@@ -7,13 +7,14 @@ import { StatusChip } from '@/components/StatusChip';
 import { I } from '@/components/Icons';
 import { api, getUser } from '@/lib/api';
 import { useRoleMatrix } from '@/lib/permissions';
-import { can } from '@drillex/shared';
+import { can, readingFlags, readingSummary } from '@drillex/shared';
 import { AssetDrawer } from '@/components/AssetDrawer';
 import { PhotoPicker, uploadPhotos, type AssetPhoto, type PendingPhoto } from '@/components/PhotoPicker';
 
 type Asset = { id: string; assetNumber: string; name: string; category: string; status: string; make: string; model: string; serialNumber: string; yearOfManufacture: number; commissionedAt: string; siteId?: string; notes?: string | null; operators: { userId: string }[] };
 type JobCard = { id: string; jobNo: string; date: string; jobType: string; status: string; approvedAt?: string; workPerformed: string; hourMeter?: string; parts?: { id: string }[] };
-type Reading = { id: string; date: string; hourMeter: string; fuelConsumed: string; conditionRating: number; warningLights: boolean; leaks: boolean; unusualNoises: boolean; user: { employeeId: string } };
+type Reading = { id: string; date: string; formType?: string; hourMeter: string | null; fuelConsumed: string | null;
+ conditionRating: number; warningLights: boolean; leaks: boolean; unusualNoises: boolean; user: { employeeId: string } };
 type Sched = { id: string; serviceType: string; description: string; nextDueAt?: string; nextDueHours?: string; status: string; hoursRemaining?: number | null };
 type Shift = { id: string; date: string; shift: string; holeRef: string; totalMeters: string; status: string; user: { employeeId: string } };
 
@@ -126,10 +127,10 @@ export default function AssetDetailPage() {
               ])} empty="No job cards for this asset." total={jobCards.length} />
             )}
             {tab === 'readings' && (
-              <Table head={['Date', 'Hour meter', 'Fuel used', 'Condition', 'Flags', 'By']} rows={readings.slice(0, MAX_ROWS).map((r) => [
-                fmtDate(r.date), <span key="h" className="tnum">{r.hourMeter}</span>, <span key="f" className="tnum">{r.fuelConsumed}</span>,
+              <Table head={['Date', 'Reading', 'Condition', 'Flags', 'By']} rows={readings.slice(0, MAX_ROWS).map((r) => [
+                fmtDate(r.date), <span key="h" className="tnum text-[13px]">{readingSummary(r)}</span>,
                 <span key="c" className={`font-mono text-[12px] ${r.conditionRating <= 2 ? 'text-crit' : r.conditionRating === 3 ? 'text-hazard' : 'text-ok'}`}>{'★'.repeat(r.conditionRating)}{'☆'.repeat(5 - r.conditionRating)}</span>,
-                <span key="fl" className="text-[12px] text-crit font-semibold">{[r.warningLights && 'Warning lights', r.leaks && 'Leaks', r.unusualNoises && 'Noises'].filter(Boolean).join(' · ') || <span className="text-muted font-normal">—</span>}</span>,
+                <span key="fl" className="text-[12px] text-crit font-semibold">{readingFlags(r).join(' · ') || <span className="text-muted font-normal">—</span>}</span>,
                 <span key="u" className="font-mono text-[12px] text-muted">{r.user?.employeeId}</span>,
               ])} empty="No daily readings for this asset." total={readings.length} />
             )}

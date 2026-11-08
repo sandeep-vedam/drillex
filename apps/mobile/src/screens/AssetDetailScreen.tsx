@@ -14,7 +14,7 @@ import type { Asset } from './AssetsScreen';
 type Props = NativeStackScreenProps<RootStackParamList, 'AssetDetail'>;
 
 const CATEGORY: Record<string, string> = {
-  DRILLING: 'Drilling', HAULAGE: 'Haulage', COMPRESSOR: 'Compressor', ANCILLARY: 'Ancillary', OTHER: 'Other',
+  DRILLING: 'Drilling', EXCAVATOR: 'Excavator', GRADER: 'Grader', TRUCK: 'Truck / tipper', HAULAGE: 'Haulage', COMPRESSOR: 'Compressor', ANCILLARY: 'Ancillary', OTHER: 'Other',
 };
 const STATUS_LABEL: Record<string, string> = {
   ACTIVE: 'Active', UNDER_MAINTENANCE: 'Maintenance', IDLE: 'Idle', DECOMMISSIONED: 'Decommissioned',

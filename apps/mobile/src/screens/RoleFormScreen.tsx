@@ -13,7 +13,7 @@ type Scope = 'self' | 'site' | 'all';
 const SCOPES: { v: Scope; l: string }[] = [{ v: 'self', l: 'Self' }, { v: 'site', l: 'Site' }, { v: 'all', l: 'All' }];
 
 const GROUP_LABEL: Record<string, string> = {
-  user: 'User management', asset: 'Assets', shift_report: 'Shift reports', daily_reading: 'Daily readings',
+  user: 'User management', asset: 'Assets', shift_report: 'Shift reports', daily_reading: 'Daily readings', submission: 'Supervisor mode',
   maintenance: 'Maintenance', job_card: 'Job cards', parts: 'Parts', report: 'Reports', role: 'Roles',
   notification: 'Notifications', audit: 'Audit',
 };

@@ -1,9 +1,21 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { ReportDoc, ReportType, REPORT_META } from './report-types';
+import { formatPerCurrency, monthlyFinancial, perCurrency } from '../finance/finance.calc';
 import { getOperationsSettings } from '../settings/settings.util';
 
 const n = (v: unknown) => (v == null ? 0 : Number(v));
+/** A chemical line's name: what the driller typed, else the master-list name (lines from before free entry). */
+const chemName = (c: { name: string | null; chemical: { name: string } | null }) => c.name ?? c.chemical?.name ?? 'Unnamed';
+/** Fuel per daily reading: consumed on the original form, added on the plant machine form. */
+const fuelOf = (x: { fuelConsumed: unknown; fuelAdded: unknown }) => n(x.fuelConsumed ?? x.fuelAdded);
+/** Hours operated across a run of readings: summed per-shift usage (plant form), else the hour meter's rise (original form). */
+const hoursOperated = (g: { usage: unknown; hourMeter: unknown }[]) => {
+  const usage = g.filter((x) => x.usage != null);
+  if (usage.length) return usage.reduce((a, x) => a + n(x.usage), 0);
+  const m = g.filter((x) => x.hourMeter != null);
+  return m.length > 1 ? n(m[m.length - 1].hourMeter) - n(m[0].hourMeter) : 0;
+};
 const r1 = (v: number) => Math.round(v * 10) / 10;
 const pct = (a: number, b: number) => (b ? `${Math.round((a / b) * 100)}%` : '—');
 const d = (x: Date) => x.toISOString().slice(0, 10);
@@ -25,7 +37,7 @@ export class ReportBuildersService {
         const bySite = group(rows, (r) => r.site.name, (g) => [g[0].site.name, r1(sum(g, (x) => n(x.totalMeters))), sum(g, (x) => x.holesCompleted), g.length]);
         const byShift = group(rows, (r) => r.shift, (g) => [g[0].shift, r1(sum(g, (x) => n(x.totalMeters))), sum(g, (x) => x.holesCompleted), r1(sum(g, (x) => n(x.downtimeHours)))]);
         const down = group(rows.filter((r) => n(r.downtimeHours) > 0), (r) => r.downtimeReason ?? 'Unspecified', (g) => [g[0].downtimeReason ?? 'Unspecified', r1(sum(g, (x) => n(x.downtimeHours))), g.length]);
-        const chem = group(rows.flatMap((r) => r.chemicals), (c) => `${c.chemical.name}|${c.unit}`, (g) => [g[0].chemical.name, r1(sum(g, (x) => n(x.quantity))), g[0].unit.toLowerCase()]);
+        const chem = group(rows.flatMap((r) => r.chemicals), (c) => `${chemName(c).toLowerCase()}|${c.unit}`, (g) => [chemName(g[0]), r1(sum(g, (x) => n(x.quantity))), g[0].unit.toLowerCase()]);
         const totalM = sum(rows, (x) => n(x.totalMeters));
         return { ...base, kpis: [{ label: 'Total meters drilled', value: `${r1(totalM).toLocaleString()} m` }, { label: 'Holes completed', value: sum(rows, (x) => x.holesCompleted) }, { label: 'Shift reports', value: rows.length, hint: `${rows.filter((x) => x.status === 'APPROVED').length} approved` }, { label: 'Downtime', value: `${r1(sum(rows, (x) => n(x.downtimeHours)))} h` }],
           sections: [{ title: 'Per machine', columns: ['Asset', 'Name', 'Meters', 'Holes', 'Downtime h', 'Shifts', 'Avg penetration m/h'], rows: byAsset }, { title: 'Per site', columns: ['Site', 'Meters', 'Holes', 'Shifts'], rows: bySite }, { title: 'Per shift', columns: ['Shift', 'Meters', 'Holes', 'Downtime h'], rows: byShift }, { title: 'Downtime analysis', columns: ['Reason', 'Hours', 'Occurrences'], rows: down }, { title: 'Chemical consumption', columns: ['Chemical', 'Quantity', 'Unit'], rows: chem }] };
@@ -33,10 +45,10 @@ export class ReportBuildersService {
       case 'MACHINE_UTILISATION': {
         const readings = await this.prisma.dailyReading.findMany({ where: { date: range, deletedAt: null, asset: assetWhere }, include: { asset: true, user: true }, orderBy: { date: 'asc' } });
         const days = Math.max(1, Math.round((to.getTime() - from.getTime()) / 864e5) + 1);
-        const byAsset = group(readings, (r) => r.asset.assetNumber, (g) => { const hrs = n(g[g.length - 1].hourMeter) - n(g[0].hourMeter); const fuel = sum(g, (x) => n(x.fuelConsumed)); return [g[0].asset.assetNumber, g[0].asset.name, r1(hrs), g.length, pct(g.length, days), r1(fuel), hrs > 0 ? r1(fuel / hrs) : '—', r1(avg(g, (x) => x.conditionRating))]; });
+        const byAsset = group(readings, (r) => r.asset.assetNumber, (g) => { const hrs = hoursOperated(g); const fuel = sum(g, fuelOf); return [g[0].asset.assetNumber, g[0].asset.name, r1(hrs), g.length, pct(g.length, days), r1(fuel), hrs > 0 ? r1(fuel / hrs) : '—', r1(avg(g, (x) => x.conditionRating))]; });
         const byOp = group(readings, (r) => r.user.employeeId, (g) => [g[0].user.employeeId, g[0].user.name, g.length, r1(avg(g, (x) => x.conditionRating)), g.filter((x) => x.warningLights || x.leaks || x.unusualNoises).length]);
-        const trend = group(readings, (r) => d(r.date), (g) => [d(g[0].date), r1(sum(g, (x) => n(x.fuelConsumed))), g.length]);
-        return { ...base, kpis: [{ label: 'Machines reporting', value: new Set(readings.map((r) => r.assetId)).size }, { label: 'Readings submitted', value: readings.length }, { label: 'Fuel consumed', value: r1(sum(readings, (x) => n(x.fuelConsumed))) }, { label: 'Avg availability', value: pct(readings.length, days * Math.max(1, new Set(readings.map((r) => r.assetId)).size)) }],
+        const trend = group(readings, (r) => d(r.date), (g) => [d(g[0].date), r1(sum(g, fuelOf)), g.length]);
+        return { ...base, kpis: [{ label: 'Machines reporting', value: new Set(readings.map((r) => r.assetId)).size }, { label: 'Readings submitted', value: readings.length }, { label: 'Fuel consumed', value: r1(sum(readings, fuelOf)) }, { label: 'Avg availability', value: pct(readings.length, days * Math.max(1, new Set(readings.map((r) => r.assetId)).size)) }],
           sections: [{ title: 'Hours, availability & fuel per asset', columns: ['Asset', 'Name', 'Hours operated', 'Days reported', 'Availability', 'Fuel', 'Fuel / hour', 'Avg condition'], rows: byAsset }, { title: 'Operator performance summary', columns: ['Employee', 'Name', 'Readings', 'Avg condition', 'Issues flagged'], rows: byOp }, { title: 'Fuel consumption trend', columns: ['Date', 'Fuel', 'Readings'], rows: trend }] };
       }
       case 'MAINTENANCE_SUMMARY': {
@@ -59,10 +71,10 @@ export class ReportBuildersService {
       case 'CHEMICAL_USAGE': {
         const rows = await this.prisma.shiftReportChemical.findMany({ where: { shiftReport: { date: range, deletedAt: null, asset: assetWhere } }, include: { chemical: true, shiftReport: { include: { asset: true } } } });
         const shifts = new Set(rows.map((r) => r.shiftReportId)).size;
-        const byType = group(rows, (r) => r.chemical.name, (g) => { const qty = sum(g, (x) => n(x.quantity)); const c = qty * n(g[0].chemical.unitCost); const b = n(g[0].chemical.monthlyBudget); return [g[0].chemical.name, r1(qty), g[0].unit.toLowerCase(), r1(c), b ? r1(b) : '—', b ? r1(c - b) : '—']; });
-        const total = sum(rows, (x) => n(x.quantity) * n(x.chemical.unitCost));
-        return { ...base, kpis: [{ label: 'Chemical lines', value: rows.length }, { label: 'Total cost', value: `$${r1(total).toLocaleString()}` }, { label: 'Cost per shift', value: shifts ? `$${r1(total / shifts)}` : '—' }, { label: 'Types used', value: new Set(rows.map((r) => r.chemicalId)).size }],
-          sections: [{ title: 'By type with budget variance', columns: ['Chemical', 'Quantity', 'Unit', 'Cost $', 'Budget $', 'Variance $'], rows: byType, note: 'Variance = cost − budget; set unit cost & monthly budget on the chemical master list.' }, { title: 'By machine', columns: ['Asset', 'Chemical', 'Quantity', 'Unit'], rows: group(rows, (r) => `${r.shiftReport.asset.assetNumber}|${r.chemical.name}|${r.unit}`, (g) => [g[0].shiftReport.asset.assetNumber, g[0].chemical.name, r1(sum(g, (x) => n(x.quantity))), g[0].unit.toLowerCase()]) }] };
+        const byType = group(rows, (r) => chemName(r).toLowerCase(), (g) => { const qty = sum(g, (x) => n(x.quantity)); const c = qty * n(g[0].chemical?.unitCost); const b = n(g[0].chemical?.monthlyBudget); return [chemName(g[0]), r1(qty), g[0].unit.toLowerCase(), r1(c), b ? r1(b) : '—', b ? r1(c - b) : '—']; });
+        const total = sum(rows, (x) => n(x.quantity) * n(x.chemical?.unitCost));
+        return { ...base, kpis: [{ label: 'Chemical lines', value: rows.length }, { label: 'Total cost', value: `$${r1(total).toLocaleString()}` }, { label: 'Cost per shift', value: shifts ? `$${r1(total / shifts)}` : '—' }, { label: 'Types used', value: new Set(rows.map((r) => chemName(r).toLowerCase())).size }],
+          sections: [{ title: 'By type with budget variance', columns: ['Chemical', 'Quantity', 'Unit', 'Cost $', 'Budget $', 'Variance $'], rows: byType, note: 'Variance = cost − budget; set unit cost & monthly budget on the chemical master list.' }, { title: 'By machine', columns: ['Asset', 'Chemical', 'Quantity', 'Unit'], rows: group(rows, (r) => `${r.shiftReport.asset.assetNumber}|${chemName(r).toLowerCase()}|${r.unit}`, (g) => [g[0].shiftReport.asset.assetNumber, chemName(g[0]), r1(sum(g, (x) => n(x.quantity))), g[0].unit.toLowerCase()]) }] };
       }
       case 'ASSET_HEALTH': {
         const assets = await this.prisma.asset.findMany({ where: { deletedAt: null, ...assetWhere }, include: { dailyReadings: { where: { date: range }, orderBy: { date: 'desc' } }, alerts: { where: { createdAt: range } } }, orderBy: { assetNumber: 'asc' } });
@@ -87,6 +99,19 @@ export class ReportBuildersService {
         const incomplete = ops.map((u) => { const r = cnt(readings, (x: { userId: string }) => x.userId === u.id); return [u.employeeId, u.name, r, days, Math.max(0, days - r)]; }).filter((x) => n(x[4]) > 0);
         return { ...base, kpis: [{ label: 'Active employees', value: users.length }, { label: 'Logins', value: cnt(logins, (l: { success: boolean }) => l.success) }, { label: 'Failed logins', value: cnt(logins, (l: { success: boolean }) => !l.success) }, { label: 'Submissions', value: readings.reduce((s, x) => s + x._count, 0) + shifts.reduce((s, x) => s + x._count, 0) + jobs.length }],
           sections: [{ title: 'Per employee', columns: ['Employee', 'Name', 'Role', 'Logins', 'Failed', 'Readings', 'Shift reports', 'Job cards', 'Approvals'], rows }, { title: 'Shift coverage — incomplete daily readings', columns: ['Operator', 'Name', 'Readings', 'Days in period', 'Missing'], rows: incomplete, note: 'Assumes one reading per operator per calendar day.' }] };
+      }
+      case 'MONTHLY_FINANCIAL': {
+        // Same arithmetic as the finance screens (finance.calc). Amounts stay per currency — never converted or added across currencies.
+        const rows = await monthlyFinancial(this.prisma, from, to);
+        const money2 = (v: number) => Math.round(v * 100) / 100;
+        const billed = perCurrency(rows, (r) => r.currency, (r) => r.billed);
+        const received = perCurrency(rows, (r) => r.currency, (r) => r.received);
+        const balance = perCurrency(rows, (r) => r.currency, (r) => r.outstanding);
+        return { ...base, subtitle: `${d(from)} to ${d(to)} · all machines on hire`,
+          kpis: [{ label: 'Machines billed', value: new Set(rows.map((r) => r.assetId)).size }, { label: 'Total billed', value: formatPerCurrency(billed) }, { label: 'Amount received', value: formatPerCurrency(received) }, { label: 'Balance', value: formatPerCurrency(balance) }],
+          sections: [{ title: 'Per machine', columns: ['Machine', 'Client', 'Site', 'Mode', 'Days worked', 'Daily rate', 'Currency', 'Total billed', 'Amount received', 'Balance'],
+            rows: rows.map((r) => [r.asset.assetNumber, r.client.name, r.site, r.paymentMode, r.daysWorked, money2(n(r.ratePerDay)), r.currency, money2(r.billed), money2(r.received), money2(r.outstanding)]),
+            note: 'Days worked: dates with a billable days-worked entry, plus shift-report dates for drilling rigs. Received: approved payments dated in the month and linked to the deployment.' }] };
       }
     }
   }

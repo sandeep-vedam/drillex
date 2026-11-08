@@ -12,6 +12,9 @@ import ShiftReportsScreen from './screens/ShiftReportsScreen';
 import MaintenanceScreen from './screens/MaintenanceScreen';
 import HistoryScreen from './screens/HistoryScreen';
 import MoreScreen from './screens/MoreScreen';
+import RequestsScreen from './screens/RequestsScreen';
+import SiteScreen from './screens/SiteScreen';
+
 import type { RootStackParamList } from './navigation';
 import { SyncBadge } from './ui/SyncBadge';
 import { Icon, type IconName } from './ui/icons';
@@ -67,6 +70,11 @@ export default function MainTabs({ navigation }: { navigation: { navigate: (n: '
     : allow('maintenance:complete')
       ? { name: 'Maintenance' as const, component: MaintenanceScreen, title: 'Servicing', icon: 'cog' as IconName }
       : { name: 'History' as const, component: HistoryScreen, title: 'Sent', icon: 'clock' as IconName };
+  // Field operators get the spec's Location / Client Tracker tab in place of the machine register (client spec §4A, §4B);
+  // everyone who can raise or handle requests gets a Requests tab. At most five tabs, so labels stay readable.
+  const fieldOperator = (allow('daily_reading:create') || allow('shift_report:create')) && !allow('shift_report:approve') && !allow('maintenance:complete');
+  const requests = allow('request:create') || allow('request:read') || allow('request:manage');
+  const tabCount = 3 + (fieldOperator || allow('asset:read') ? 1 : 0) + (requests ? 1 : 0);
 
   return (
     <Tab.Navigator
@@ -80,7 +88,7 @@ export default function MainTabs({ navigation }: { navigation: { navigate: (n: '
         tabBarActiveBackgroundColor: colors.navy700,
         tabBarStyle: { backgroundColor: colors.navy900, borderTopWidth: 3, borderTopColor: colors.gold, height: 78 + insets.bottom, paddingBottom: insets.bottom },
         tabBarItemStyle: { paddingVertical: 8 },
-        tabBarLabelStyle: { fontSize: 14, fontWeight: '700', marginTop: 4 },
+        tabBarLabelStyle: { fontSize: tabCount > 4 ? 12 : 14, fontWeight: '700', marginTop: 4 },
         headerRight: () => (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, marginRight: 14 }}>
             <SyncBadge onPress={() => navigation.navigate('Outbox')} />
@@ -96,7 +104,9 @@ export default function MainTabs({ navigation }: { navigation: { navigate: (n: '
         component={HomeScreen}
         options={{ title: 'Drillex', tabBarLabel: 'Home', tabBarIcon: icon('home') }}
       />
-      {allow('asset:read') && (
+      {fieldOperator ? (
+        <Tab.Screen name="Site" component={SiteScreen} options={{ title: 'Site & client', tabBarLabel: 'Site', tabBarIcon: icon('pin') }} />
+      ) : allow('asset:read') && (
         <Tab.Screen
           name="Assets"
           component={AssetsScreen}
@@ -108,6 +118,7 @@ export default function MainTabs({ navigation }: { navigation: { navigate: (n: '
         component={primary.component}
         options={{ title: primary.title, tabBarLabel: primary.title, tabBarIcon: icon(primary.icon) }}
       />
+      {requests && <Tab.Screen name="Requests" component={RequestsScreen} options={{ title: 'Requests', tabBarLabel: 'Requests', tabBarIcon: icon('chat') }} />}
       <Tab.Screen
         name="More"
         component={MoreScreen}

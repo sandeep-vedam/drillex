@@ -68,7 +68,7 @@ export class ReportsService {
     const from = new Date(Date.UTC(ref.getUTCFullYear(), ref.getUTCMonth() - 1, 1)); const to = new Date(Date.UTC(ref.getUTCFullYear(), ref.getUTCMonth(), 0));
     const made: string[] = [];
     for (const type of REPORT_TYPES) { try { const r = await this.generate(null, type, from, to); made.push(r.title); } catch (e) { this.log.error(`Month-end ${type} failed: ${(e as Error).message}`); } }
-    await this.notify.notifyRoles(null, ['MANAGER'], { type: 'report_ready', title: `Monthly reports ready — ${from.toLocaleString('en', { month: 'long', year: 'numeric', timeZone: 'UTC' })}`, body: made.join(', ') });
+    await this.notify.notifyRoles(null, ['MANAGER', 'FINANCE'], { type: 'report_ready', title: `Monthly reports ready — ${from.toLocaleString('en', { month: 'long', year: 'numeric', timeZone: 'UTC' })}`, body: made.join(', ') });
     await this.prisma.auditLog.create({ data: { entity: 'ScheduledJob', entityId: 'month-end-reports', action: 'RUN', diff: { from, to, generated: made } } });
     return { period: [from, to], generated: made };
   }

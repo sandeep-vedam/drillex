@@ -15,9 +15,12 @@ export class NotificationsService {
     return userIds.length;
   }
 
-  async notifyRoles(siteId: string | null, roles: Array<'SUPERVISOR' | 'TECHNICIAN' | 'MANAGER' | 'ADMIN'>, n: { type: string; title: string; body?: string; payload?: object }) {
-    const siteRoles = roles.filter((r) => r !== 'MANAGER' && r !== 'ADMIN');
-    const globalRoles = roles.filter((r) => r === 'MANAGER' || r === 'ADMIN');
+  /** Site roles are notified on the given site only; office roles (manager, finance, admin, plant hire) everywhere. */
+  async notifyRoles(siteId: string | null, roles: string[], n: { type: string; title: string; body?: string; payload?: object }) {
+    const SITE_ROLES = ['SUPERVISOR', 'TECHNICIAN', 'OPERATOR'];
+    const siteRoles = roles.filter((r) => SITE_ROLES.includes(r));
+    const globalRoles = roles.filter((r) => !SITE_ROLES.includes(r));
+
     const users = await this.prisma.user.findMany({
       where: { status: 'ACTIVE', OR: [
         ...(siteRoles.length ? [{ role: { in: siteRoles }, ...(siteId ? { siteId } : {}) }] : []),

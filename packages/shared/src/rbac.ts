@@ -19,6 +19,7 @@ export const Permissions = [
   'asset:read', 'asset:write',
   'shift_report:create', 'shift_report:read', 'shift_report:approve', 'shift_report:unlock',
   'daily_reading:create', 'daily_reading:read',
+  'submission:on_behalf', // enter a shift report / daily form for an operator who has not submitted (client spec §9.3)
   'maintenance:read', 'maintenance:write', 'maintenance:complete',
   'job_card:create', 'job_card:read', 'job_card:approve',
   'parts:read', 'parts:write',
@@ -26,6 +27,10 @@ export const Permissions = [
   'notification:read',
   'audit:read',
   'role:manage',
+  // Finance & plant hire (client spec §6, §11)
+  'finance:read', 'finance:write', 'finance:review', 'plant_hire:write',
+  // Requests (client spec §4A tab 7)
+  'request:create', 'request:read', 'request:manage',
 ] as const;
 export type Permission = (typeof Permissions)[number];
 
@@ -49,9 +54,12 @@ export const ROLES_REQUIRING_2FA: Role[] = [];
 export const RoleDescriptions: Record<string, string> = {
   OPERATOR: 'Submits daily machine readings and shift production reports for their own machines.',
   TECHNICIAN: 'Completes assigned maintenance services, raises job cards and keeps parts stock up to date.',
-  SUPERVISOR: 'Approves shift reports and runs maintenance, job cards and assets for their own site.',
+  SUPERVISOR: 'Approves shift reports, enters them for operators who have not, and runs maintenance, job cards and assets for their own site.',
   MANAGER: 'Full operational oversight across every site, including approvals, report generation and the audit trail.',
   ADMIN: 'Manages roles, users, devices and security. Can edit master data, but cannot approve shift reports.',
+  FINANCE: 'Runs billing and collections: client deployments, payments, follow-ups and financial reports, with read access to the whole fleet.',
+  PLANT_HIRE_SUPERVISOR: 'Records which plant machine is with which client, days worked and payments received; finance reviews every entry.',
+
 };
 
 /** The description for a role key, or undefined for custom roles. */
@@ -74,6 +82,7 @@ export const PermissionDescriptions: Record<Permission, string> = {
   'shift_report:unlock': 'Reopen a report so the driller can correct and resubmit it.',
   'daily_reading:create': 'Submit a daily machine reading.',
   'daily_reading:read': 'View daily machine readings, including flagged ones.',
+  'submission:on_behalf': 'Enter a shift report or daily check for an operator who has not submitted, with a mandatory reason (Supervisor Mode).',
   'maintenance:read': 'View the maintenance schedule and upcoming services.',
   'maintenance:write': 'Schedule services and change when they are due.',
   'maintenance:complete': 'Mark a maintenance service as carried out.',
@@ -87,6 +96,13 @@ export const PermissionDescriptions: Record<Permission, string> = {
   'notification:read': 'Receive and read notifications.',
   'audit:read': 'View the audit trail of who changed what, and when.',
   'role:manage': 'Create roles and change which permissions each one grants.',
+  'finance:read': 'View the finance module: client deployments, payments, balances, follow-up alerts and financial reports.',
+  'finance:write': 'Record client deployments and payments directly (saved as approved), and correct any entry.',
+  'finance:review': 'Approve or reject entries made by the Plant Hire Supervisor.',
+  'plant_hire:write': 'Enter plant hire deployments, days worked and payments for plant machines; entries wait for finance review.',
+  'request:create': 'Raise a request for consumables, equipment, safety items, HR or finance.',
+  'request:read': 'See requests (own, site or all, by scope).',
+  'request:manage': 'Reply to requests and move them through Received, In Progress and Resolved.',
 };
 
 /** The description for a permission key. */

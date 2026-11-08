@@ -9,5 +9,5 @@ export class DailyReadingsController {
   constructor(private svc: DailyReadingsService) {}
   @Get() @RequirePermission('daily_reading:read') list(@CurrentUser() u: AuthUser, @Query() q: Record<string, string>) { return this.svc.list(u, q); }
   @Get(':id') @RequirePermission('daily_reading:read') get(@CurrentUser() u: AuthUser, @Param('id') id: string) { return this.svc.get(u, id); }
-  @Post() @RequirePermission('daily_reading:create') create(@CurrentUser() u: AuthUser, @Body(new ZodPipe(DailyReadingSchema)) b: DailyReadingInput) { return this.svc.create(u, b); }
+  @Post() @RequirePermission('daily_reading:create', 'submission:on_behalf') create(@CurrentUser() u: AuthUser, @Body(new ZodPipe(DailyReadingSchema)) b: DailyReadingInput) { return this.svc.create(u, b); }
 }

@@ -5,12 +5,13 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation';
 import { api } from '../lib/api';
 import { cached } from '../sync/cache';
-import { DEFAULT_ALERT_THRESHOLD } from '@drillex/shared';
+import { DEFAULT_ALERT_THRESHOLD, readingFlags, readingSummary } from '@drillex/shared';
 import { Action, Card, Eyebrow, StatusChip } from '../ui';
 import { colors } from '../ui/theme';
 
 type Asset = { assetNumber: string; name: string };
-type Reading = { id: string; date: string; hourMeter: string; fuelConsumed: string; conditionRating: number; warningLights: boolean; leaks: boolean; unusualNoises: boolean; asset: Asset; user: { employeeId: string } };
+type Reading = { id: string; date: string; formType?: string; hourMeter: string | null; fuelConsumed: string | null; conditionRating: number;
+ warningLights: boolean; leaks: boolean; unusualNoises: boolean; asset: Asset; user: { employeeId: string } };
 type Shift = { id: string; assetId: string; siteId: string; date: string; shift: string; holeRef: string; totalMeters: string; holesCompleted: number; status: string; asset: Asset; user: { employeeId: string } };
 
 const fmtDate = (d: string) => new Date(d).toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' });
@@ -71,12 +72,12 @@ export default function HistoryScreen() {
 }
 
 function ReadingRow({ r, threshold }: { r: Reading; threshold: number }) {
-  const flags = [r.warningLights && 'Warning lights', r.leaks && 'Leaks', r.unusualNoises && 'Unusual noises'].filter(Boolean) as string[];
+  const flags = readingFlags(r);
   return (
     <Card stripe={flags.length || r.conditionRating <= threshold ? colors.crit : colors.ok}>
       <View style={s.rowTop}><Text style={s.num}>{r.asset?.assetNumber}</Text><Text style={s.date}>{fmtDate(r.date)}</Text></View>
       <Text style={s.name}>{r.asset?.name}</Text>
-      <Text style={s.meta}>Hour meter {r.hourMeter} · Fuel used {r.fuelConsumed} · Condition {r.conditionRating}/5</Text>
+      <Text style={s.meta}>{readingSummary(r)} · Condition {r.conditionRating}/5</Text>
       {flags.length > 0 && <Text style={s.flags}>{flags.join(' · ')}</Text>}
       <Text style={s.by}>Submitted by {r.user?.employeeId}</Text>
     </Card>

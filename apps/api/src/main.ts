@@ -18,7 +18,8 @@ async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, { bodyParser: true, rawBody: false });
   app.useBodyParser('json', { limit: '12mb' });
   app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
-  app.useStaticAssets(process.env.UPLOAD_DIR ?? join(process.cwd(), 'uploads'), { prefix: '/uploads/' });
+  // `||` not `??`: the .env template ships `UPLOAD_DIR=` (empty), which must fall back too — an empty root crashed startup.
+  app.useStaticAssets(process.env.UPLOAD_DIR || join(process.cwd(), 'uploads'), { prefix: '/uploads/' });
   const origins = process.env.CORS_ORIGINS?.split(',').map((o) => o.trim()).filter(Boolean);
   app.enableCors({ origin: origins?.length ? origins : true, credentials: true });
   app.enableShutdownHooks();

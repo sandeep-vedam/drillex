@@ -22,6 +22,9 @@ import { ReportsModule } from './reports/reports.module';
 import { DevicesModule } from './devices/devices.module';
 import { SettingsModule } from './settings/settings.module';
 import { RolesModule } from './roles/roles.module';
+import { AuditModule } from './audit/audit.controller';
+import { FinanceModule } from './finance/finance.controller';
+import { RequestsModule } from './requests/requests.controller';
 import { HealthController } from './common/health.controller';
 import { SitesController } from './common/sites.controller';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
@@ -32,7 +35,8 @@ import { RbacGuard } from './auth/rbac.guard';
     ConfigModule.forRoot({ isGlobal: true }),
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 120 }]),
     ScheduleModule.forRoot(),
-    PrismaModule, AuthModule, UsersModule, AssetsModule, DashboardModule, NotificationsModule, DailyReadingsModule, ShiftReportsModule, StorageModule, AttachmentsModule, SyncModule, MaintenanceModule, JobCardsModule, PartsModule, PushModule, ReportsModule, DevicesModule, SettingsModule, RolesModule,
+    PrismaModule, AuthModule, UsersModule, AssetsModule, DashboardModule, NotificationsModule, DailyReadingsModule, ShiftReportsModule, StorageModule, AttachmentsModule, SyncModule, MaintenanceModule, JobCardsModule, PartsModule, PushModule, ReportsModule, DevicesModule, SettingsModule, RolesModule, AuditModule, FinanceModule, RequestsModule,
+
   ],
   controllers: [HealthController, SitesController],
   providers: [

@@ -10,7 +10,7 @@ import { can } from '@drillex/shared';
 import { AssetDrawer } from '@/components/AssetDrawer';
 
 type Asset = { id: string; assetNumber: string; name: string; category: string; status: string; make: string; model: string; serialNumber: string; yearOfManufacture: number; commissionedAt: string; operators: { userId: string }[] };
-const CATS = ['ALL', 'DRILLING', 'HAULAGE', 'COMPRESSOR', 'ANCILLARY', 'OTHER'];
+const CATS = ['ALL', 'DRILLING', 'EXCAVATOR', 'GRADER', 'TRUCK', 'HAULAGE', 'COMPRESSOR', 'ANCILLARY', 'OTHER'];
 
 export default function AssetsPage() {
   const router = useRouter();

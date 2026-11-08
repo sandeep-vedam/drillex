@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { ShiftReportSchema, DailyReadingSchema, readingAlerts, fuelConsumed, can, totalMetersDrilled, type PermissionMatrix } from './index';
+import { ShiftReportSchema, DailyReadingSchema, readingAlerts, criticalChecks, engineHours, penetrationRate, fuelConsumed, can, totalMetersDrilled, type PermissionMatrix } from './index';
 
 const validShift = {
   assetId: '00000000-0000-0000-0000-000000000001', date: '2026-08-21', shift: 'DAY',
@@ -55,8 +55,51 @@ describe('DailyReadingSchema', () => {
   });
   it('defaults tyrePressures to an empty object when omitted', () => {
     const r = DailyReadingSchema.safeParse(validReading);
-    expect(r.success && r.data.tyrePressures).toEqual({});
+    expect(r.success && r.data.formType === 'LEGACY' && r.data.tyrePressures).toEqual({});
   });
+  it('tags a payload without formType as the original (LEGACY) form', () => {
+    const r = DailyReadingSchema.safeParse(validReading);
+    expect(r.success && r.data.formType).toBe('LEGACY');
+  });
+});
+
+const base = { assetId: '00000000-0000-4000-8000-000000000001', date: '2026-11-08', warningLights: false, unusualNoises: false, leaks: false, conditionRating: 4 };
+const rig = { ...base, formType: 'RIG', engineOil: 'OK', hydraulicOil: 'OK', coolant: 'LOW', gearOil: 'OK', flushPump: 'OK', rodCondition: 'GOOD', bitCondition: 'FAIR' };
+const plant = { ...base, formType: 'PLANT', startReading: 1200, endReading: 1208.5, coolant: 'OK', engineOil: 'OK', gearOil: 'OK', hydraulicOil: 'OK', brakeFluid: 'NA', fuelLevel: 'OK', trackCondition: 'GOOD', tyreCondition: 'NA', attachmentCondition: 'GOOD', lights: 'OK', brakes: 'OK' };
+
+describe('Rig check and plant readings (client spec §4A / §4B)', () => {
+  it('accepts a valid rig check', () => expect(DailyReadingSchema.safeParse(rig).success).toBe(true));
+  it('accepts a valid plant reading', () => expect(DailyReadingSchema.safeParse(plant).success).toBe(true));
+  it('rejects an answer from the wrong list (rods cannot be "Worn")', () =>
+    expect(DailyReadingSchema.safeParse({ ...rig, rodCondition: 'WORN' }).success).toBe(false));
+  it('rejects a plant end reading below the start reading', () =>
+    expect(DailyReadingSchema.safeParse({ ...plant, endReading: 1100 }).success).toBe(false));
+  it('requires a reason when a supervisor enters for an operator', () => {
+    const behalf = { ...rig, operatorId: '00000000-0000-4000-8000-000000000002' };
+    expect(DailyReadingSchema.safeParse(behalf).success).toBe(false);
+    expect(DailyReadingSchema.safeParse({ ...behalf, supervisorReason: 'Operator off sick' }).success).toBe(true);
+  });
+  it('raises CRITICAL_CHECK for a critical, damaged, faulty or flat answer', () => {
+    expect(readingAlerts(rig as never)).toEqual([]);
+    expect(readingAlerts({ ...rig, flushPump: 'CRITICAL' } as never)).toEqual(['CRITICAL_CHECK']);
+    expect(readingAlerts({ ...plant, brakes: 'FAULTY' } as never)).toEqual(['CRITICAL_CHECK']);
+    expect(criticalChecks({ ...plant, tyreCondition: 'FLAT', lights: 'FAULTY' })).toEqual(['Tyres', 'Lights & indicators']);
+  });
+});
+
+describe('engine hours and penetration rate (client spec §4A)', () => {
+  it('computes engine hours as end − start, to one decimal', () => expect(engineHours(1520.2, 1528.7)).toBe(8.5));
+  it('computes penetration as metres ÷ engine hours', () => expect(penetrationRate(42, 8)).toBe(5.25));
+  it('returns 0 m/h when the engine did not run', () => expect(penetrationRate(10, 0)).toBe(0));
+  it('requires both hour meters or neither', () => {
+    expect(ShiftReportSchema.safeParse({ ...validShift, startHourMeter: 100 }).success).toBe(false);
+    expect(ShiftReportSchema.safeParse({ ...validShift, startHourMeter: 100, endHourMeter: 99 }).success).toBe(false);
+    expect(ShiftReportSchema.safeParse({ ...validShift, startHourMeter: 100, endHourMeter: 108 }).success).toBe(true);
+  });
+  it('accepts a free-text chemical name without a master-list id', () =>
+    expect(ShiftReportSchema.safeParse({ ...validShift, chemicals: [{ name: 'CAP 21', quantity: 2, unit: 'DRUMS' }] }).success).toBe(true));
+  it('rejects a chemical line with neither a name nor an id', () =>
+    expect(ShiftReportSchema.safeParse({ ...validShift, chemicals: [{ quantity: 2, unit: 'KG' }] }).success).toBe(false));
 });
 
 describe('fuelConsumed', () => {

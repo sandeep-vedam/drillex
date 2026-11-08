@@ -10,7 +10,7 @@ import { colors } from './theme';
  */
 export type IconName =
   | 'home' | 'check' | 'gauge' | 'cog' | 'clipboard' | 'parts' | 'rig' | 'plus'
-  | 'report' | 'clock' | 'people' | 'key' | 'phone' | 'shield' | 'duplicate' | 'more';
+  | 'report' | 'clock' | 'people' | 'key' | 'phone' | 'shield' | 'duplicate' | 'more' | 'pin' | 'chat';
 
 export function Icon({ name, size = 28, color = colors.navy800 }: { name: IconName; size?: number; color?: string }) {
   const u = size / 24; // all shapes are described on a 24-unit grid, then scaled
@@ -152,8 +152,26 @@ export function Icon({ name, size = 28, color = colors.navy800 }: { name: IconNa
           <View style={bar(3.6, 3.6, { borderRadius: 3.6 * u, transform: [{ translateX: 6 * u }] })} />
         </View>
       );
+    case 'pin': // map pin — location / site
+      return (
+        <View style={box}>
+          <View style={bar(9, 9, { transform: [{ translateY: 3 * u }, { rotate: '45deg' }] })} />
+          <View style={ring(15, 2.6, { backgroundColor: color, transform: [{ translateY: -2.5 * u }] })} />
+          <View style={bar(5, 5, { borderRadius: 2.5 * u, backgroundColor: colors.surface, transform: [{ translateY: -2.5 * u }] })} />
+        </View>
+      );
+    case 'chat': // speech bubble — requests
+      return (
+        <View style={box}>
+          <View style={bar(20, 14, { backgroundColor: 'transparent', borderWidth: 2.4 * u, borderColor: color, transform: [{ translateY: -2 * u }] })} />
+          <View style={bar(6, 6, { transform: [{ translateX: -4 * u }, { translateY: 6 * u }, { rotate: '45deg' }] })} />
+          <View style={bar(10, 2.2, { transform: [{ translateY: -4 * u }] })} />
+          <View style={bar(7, 2.2, { transform: [{ translateX: -1.5 * u }, { translateY: 0 }] })} />
+        </View>
+      );
     default:
       return <View style={box} />;
+
   }
 }
 

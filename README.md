@@ -4,8 +4,8 @@ Mobile operations & equipment management platform — React Native app (Android-
 Plan & budget: [docs/DEVELOPMENT_PLAN.md](docs/DEVELOPMENT_PLAN.md).
 
 ## Layout
-- `apps/mobile` — React Native CLI app: login, 15-min idle lock + biometrics, daily readings, shift reports, job cards, maintenance, notifications, reports — **offline-first** (outbox sync, signatures, photos)
-- `apps/web` — Next.js: dashboard, asset register, shift production approval, daily readings review, maintenance, job cards, parts inventory, reports, notifications; admin: users, devices, sync conflicts
+- `apps/mobile` — React Native CLI app: PIN / password login, 15-min idle lock + biometrics, rig condition check (drilling rigs) and machine readings (plant machines), shift reports with engine hours and free-text chemicals, Supervisor Mode, requests, site & client tracker (GPS), job cards, maintenance, notifications, reports — **offline-first** (outbox sync, signatures, photos)
+- `apps/web` — Next.js: dashboard, asset register, shift production approval, daily readings review, maintenance, job cards, parts inventory, requests inbox, **Finance** (deployments, payments, credit countdown, follow-ups, monthly report) and **Plant hire** (entries reviewed by finance), reports, notifications; admin: users (block / unlock / PIN reset / CSV), audit log, devices, sync conflicts, settings (PIN roles, currencies)
 - `apps/api` — NestJS + Prisma + PostgreSQL: RBAC at API level, JWT + TOTP 2FA, offline `/sync/push`, attachments (S3/local), cron jobs (maintenance reminders, weekly digest, month-end reports), push (FCM v1), email (SMTP)
 - `packages/shared` — Zod schemas, enums, RBAC matrix and business rules shared by all three
 - `infra/` — docker-compose (Postgres, Redis, MinIO) and k6 load test
@@ -16,12 +16,18 @@ corepack enable && pnpm install
 pnpm infra:up                       # or use a local Postgres 16 (brew services start postgresql@16)
 cp apps/api/.env.example apps/api/.env && cp apps/web/.env.example apps/web/.env.local
 pnpm --filter @drillex/api prisma migrate deploy
-pnpm db:seed                        # ADM001 / MGR001 / SUP001 / TEC001 / OPR001 — password Password123
+pnpm db:seed                        # ADM001 / MGR001 / SUP001 / TEC001 / OPR001 / FIN001 / PSV001 — password Password123
 pnpm db:demo                        # optional: 30 days of realistic readings & shift reports
+pnpm db:demo-finance                # optional: the client's fleet + active deployments (spec §6.4); adds plant operator OPR002
+pnpm --filter @drillex/shared build # the API and apps import the built package
 pnpm --filter @drillex/api dev      # http://localhost:4000/api/v1  · Swagger at /api/docs
 pnpm --filter @drillex/web dev      # http://localhost:3000
 ```
-Managers/admins enrol in 2FA on first web sign-in (scan the QR with any authenticator app).
+Managers/admins enrol in 2FA on first web sign-in when an admin requires it (Settings → Security).
+
+Sign-in: field roles (operator, technician, supervisor, plant hire supervisor) use a 4-digit PIN and office roles a password — configurable in Settings → PIN sign-in. New users and resets get a temporary PIN (6 digits) or password that the admin passes on; it expires after 24 hours. Five wrong attempts suspend an account until an admin unlocks it (People). The seeded accounts keep `Password123` until it is changed.
+
+`pnpm test` runs the API integration tests against `DATABASE_URL` and leaves `[e2e]`-tagged rows behind — use a separate database for tests if you keep demo data in your dev one.
 
 ### Mobile
 ```bash

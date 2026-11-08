@@ -20,7 +20,9 @@ export type RootStackParamList = {
   Maintenance: undefined;
   JobCards: undefined;
   JobCardNew: { assetId?: string };
-  DailyReading: { assetId: string; assetNumber: string; assetName: string };
+  /** `category` picks the form: drilling rigs get the rig condition check, everything else the plant machine readings. */
+  DailyReading: { assetId: string; assetNumber: string; assetName: string; category?: string };
+
   ShiftReport: { assetId: string; assetNumber: string; assetName: string; siteId: string; correctId?: string };
   Roles: undefined;
   RoleForm: { role?: RoleRow };
@@ -32,4 +34,9 @@ export type RootStackParamList = {
   OperationsSettings: undefined;
   Chemicals: undefined;
   SyncConflicts: undefined;
+  // Requests (client spec §4A tab 7) and the Location / Client Tracker tab (§4A tabs 4–5)
+  Requests: undefined;
+  RequestNew: undefined;
+  RequestDetail: { id: string };
+  Site: undefined;
 };

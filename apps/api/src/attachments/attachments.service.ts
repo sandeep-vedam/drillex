@@ -1,6 +1,6 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { createHash, randomUUID } from 'crypto';
-import { can } from '@drillex/shared';
+import { can, type Permission } from '@drillex/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
 import { AuthUser } from '../auth/decorators';
@@ -12,22 +12,26 @@ const EXT: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', '
 
 /** Mirrors the scope rules each owning module already enforces on its own endpoints (SRS §9.3) — an
  * attachment is only as accessible as the record it's attached to, never open to any authenticated user. */
-const OWNER_PERMISSION = {
-  DailyReading: { read: 'daily_reading:read', write: 'daily_reading:create' },
-  ShiftReport: { read: 'shift_report:read', write: 'shift_report:create' },
-  JobCard: { read: 'job_card:read', write: 'job_card:create' },
-  Asset: { read: 'asset:read', write: 'asset:write' },
-} as const;
+// Any one of the listed permissions admits; a supervisor entering a report for an operator (submission:on_behalf)
+// must be able to attach its signature and photos too.
+const OWNER_PERMISSION: Record<string, { read: Permission[]; write: Permission[] }> = {
+  DailyReading: { read: ['daily_reading:read'], write: ['daily_reading:create', 'submission:on_behalf'] },
+  ShiftReport: { read: ['shift_report:read'], write: ['shift_report:create', 'submission:on_behalf'] },
+  JobCard: { read: ['job_card:read'], write: ['job_card:create'] },
+  Asset: { read: ['asset:read'], write: ['asset:write'] },
+  Request: { read: ['request:read', 'request:manage'], write: ['request:create', 'request:manage'] },
+};
 
 @Injectable()
 export class AttachmentsService {
   constructor(private prisma: PrismaService, private storage: StorageService, private roles: RolesService) {}
 
   private async assertOwnerAccess(u: AuthUser, ownerType: string, ownerId: string, mode: 'read' | 'write') {
-    const perms = OWNER_PERMISSION[ownerType as keyof typeof OWNER_PERMISSION];
+    const perms = OWNER_PERMISSION[ownerType];
     if (!perms) throw new BadRequestException(`Unknown ownerType: ${ownerType}`);
-    const scope = can(await this.roles.getMatrix(), u.role, perms[mode]);
-    if (!scope) throw new ForbiddenException(`Missing permission ${perms[mode]}`);
+    const matrix = await this.roles.getMatrix();
+    const scope = perms[mode].map((p) => can(matrix, u.role, p)).find(Boolean);
+    if (!scope) throw new ForbiddenException(`Missing permission ${perms[mode].join(' or ')}`);
     if (scope === 'all') return;
 
     let siteId: string | null | undefined;
@@ -45,7 +49,12 @@ export class AttachmentsService {
       const row = await this.prisma.asset.findUnique({ where: { id: ownerId }, select: { siteId: true, operators: { where: { userId: u.id, validTo: null }, select: { userId: true } } } });
       if (!row) throw new NotFoundException('Asset not found');
       siteId = row.siteId; isSelf = row.operators.length > 0;
+    } else if (ownerType === 'Request') {
+      const row = await this.prisma.request.findUnique({ where: { id: ownerId }, select: { siteId: true, createdById: true } });
+      if (!row) throw new NotFoundException('Request not found');
+      siteId = row.siteId; isSelf = row.createdById === u.id;
     }
+
 
     if (scope === 'site' && siteId !== u.siteId) throw new ForbiddenException('This record is not on your site');
     if (scope === 'self' && !isSelf) throw new ForbiddenException('You do not have access to this record');

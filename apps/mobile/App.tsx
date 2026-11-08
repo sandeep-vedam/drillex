@@ -34,6 +34,10 @@ import TwoFaSettingsScreen from './src/screens/TwoFaSettingsScreen';
 import OperationsSettingsScreen from './src/screens/OperationsSettingsScreen';
 import ChemicalsScreen from './src/screens/ChemicalsScreen';
 import SyncConflictsScreen from './src/screens/SyncConflictsScreen';
+import RequestsScreen from './src/screens/RequestsScreen';
+import RequestNewScreen from './src/screens/RequestNewScreen';
+import RequestDetailScreen from './src/screens/RequestDetailScreen';
+import SiteScreen from './src/screens/SiteScreen';
 import { startSyncLoop } from './src/sync/outbox';
 import { loadSession, setSessionExpiredHandler } from './src/lib/api';
 import type { RootStackParamList } from './src/navigation';
@@ -80,6 +84,10 @@ function Root({ initial }: { initial: 'Login' | 'Home' }) {
           <Stack.Screen name="OperationsSettings" component={OperationsSettingsScreen} options={{ title: 'Operations' }} />
           <Stack.Screen name="Chemicals" component={ChemicalsScreen} options={{ title: 'Chemicals' }} />
           <Stack.Screen name="SyncConflicts" component={SyncConflictsScreen} options={{ title: 'Sync conflicts' }} />
+          <Stack.Screen name="Requests" component={RequestsScreen} options={{ title: 'Requests' }} />
+          <Stack.Screen name="Site" component={SiteScreen} options={{ title: 'Site & client' }} />
+          <Stack.Screen name="RequestNew" component={RequestNewScreen} options={{ title: 'New request' }} />
+          <Stack.Screen name="RequestDetail" component={RequestDetailScreen} options={{ title: 'Request' }} />
         </Stack.Navigator>
       </NavigationContainer>
       {locked && signedIn && (

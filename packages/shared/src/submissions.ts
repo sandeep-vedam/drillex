@@ -5,6 +5,9 @@
  * the values that would have raised an alert marked so they stand out on review.
  */
 
+import { CRITICAL_ANSWERS, ChemicalUnitLabel, WARN_ANSWERS } from './enums';
+import { CHECK_LABELS, criticalChecks } from './schemas';
+
 export type FieldTone = 'warn' | 'crit';
 export type SubmissionField = { key: string; label: string; value: string; tone?: FieldTone };
 
@@ -16,6 +19,7 @@ export type SubmissionField = { key: string; label: string; value: string; tone?
 const HIDDEN = new Set([
   'id', 'assetId', 'siteId', 'userId', 'signatureId', 'signatureAttachmentId',
   'createdAt', 'updatedAt', 'deletedAt', 'asset', 'user', 'attachments',
+  'formType', 'operatorId', 'enteredById', 'enteredBy', 'chemicalId',
 ]);
 
 const LABELS: Record<string, string> = {
@@ -29,19 +33,32 @@ const LABELS: Record<string, string> = {
   holesCompleted: 'Holes completed', holeDiameterMm: 'Hole diameter', rockType: 'Rock type',
   penetrationRate: 'Penetration rate', downtimeHours: 'Downtime', downtimeReason: 'Downtime reason',
   chemicals: 'Consumables',
+  startHourMeter: 'Start hour meter', endHourMeter: 'End hour meter', engineHours: 'Engine hours this shift',
+  bitNumber: 'Bit number', bitSize: 'Bit size', remarks: 'Shift remarks',
+  supervisorReason: 'Reason for supervisor entry',
+  gearOil: 'Gear oil', flushPump: 'Water / flush pump', rodCondition: 'Rods', bitCondition: 'Bit',
+  startReading: 'Start reading', endReading: 'End reading', usage: 'Hours / distance this shift',
+  brakeFluid: 'Brake fluid', fuelLevel: 'Fuel level', trackCondition: 'Tracks', tyreCondition: 'Tyres',
+  attachmentCondition: 'Bucket / blade / attachment', lights: 'Lights & indicators', brakes: 'Brakes',
+  faults: 'Faults / defects', fuelAdded: 'Fuel added',
 };
 
 const UNITS: Record<string, string> = {
   hourMeter: 'h', fuelStart: 'L', fuelEnd: 'L', fuelConsumed: 'L', startDepth: 'm', endDepth: 'm',
   holeDiameterMm: 'mm', penetrationRate: 'm/h', downtimeHours: 'h',
+  startHourMeter: 'h', endHourMeter: 'h', engineHours: 'h', fuelAdded: 'L',
 };
 
 /** Schema order reads like the form the operator filled in; unknown keys are appended rather than dropped. */
 const ORDER = [
-  'date', 'shift', 'holeRef', 'rockType', 'hourMeter', 'fuelStart', 'fuelEnd', 'fuelConsumed',
+  'date', 'shift', 'supervisorReason', 'startHourMeter', 'endHourMeter', 'engineHours',
+  'holeRef', 'bitNumber', 'bitSize', 'rockType', 'hourMeter', 'fuelStart', 'fuelEnd', 'fuelConsumed',
+  'startReading', 'endReading', 'usage',
   'startDepth', 'endDepth', 'holesCompleted', 'holeDiameterMm', 'penetrationRate',
-  'downtimeHours', 'downtimeReason', 'chemicals',
-  'engineOil', 'hydraulicOil', 'coolant', 'airFilter', 'battery', 'tyrePressures',
+  'downtimeHours', 'downtimeReason', 'chemicals', 'remarks',
+  'engineOil', 'hydraulicOil', 'coolant', 'gearOil', 'flushPump', 'rodCondition', 'bitCondition',
+  'brakeFluid', 'fuelLevel', 'trackCondition', 'tyreCondition', 'attachmentCondition', 'lights', 'brakes',
+  'fuelAdded', 'faults', 'airFilter', 'battery', 'tyrePressures',
   'warningLights', 'warningLightsNote', 'unusualNoises', 'unusualNoisesNote',
   'leaks', 'leaksNote', 'preStartChecklistDone', 'conditionRating', 'notes',
 ];
@@ -60,12 +77,16 @@ function titleFromKey(key: string) {
 
 /** Mirrors readingAlerts plus the condition enums, so a reviewer sees why this was worth a look. */
 function toneFor(key: string, value: unknown): FieldTone | undefined {
+  if (key === 'supervisorReason') return 'warn';
+  if (key in CHECK_LABELS && key !== 'engineOil' && key !== 'hydraulicOil' && key !== 'coolant' && typeof value === 'string') {
+    return CRITICAL_ANSWERS.includes(value) ? 'crit' : WARN_ANSWERS.includes(value) ? 'warn' : undefined;
+  }
   if ((key === 'warningLights' || key === 'leaks' || key === 'unusualNoises') && value === true) return 'warn';
   if (key === 'conditionRating' && typeof value === 'number') return value <= 2 ? 'crit' : undefined;
   if (key === 'battery') return value === 'FLAT' ? 'crit' : value === 'WEAK' ? 'warn' : undefined;
   if (key === 'airFilter') return value === 'BLOCKED' ? 'warn' : undefined;
   if (key === 'engineOil' || key === 'hydraulicOil' || key === 'coolant') {
-    return value === 'CHANGE_REQUIRED' ? 'crit' : value === 'LOW' || value === 'ADD' ? 'warn' : undefined;
+    return value === 'CHANGE_REQUIRED' || value === 'CRITICAL' ? 'crit' : value === 'LOW' || value === 'ADD' ? 'warn' : undefined;
   }
   if (key === 'preStartChecklistDone' && value === false) return 'warn';
   return undefined;
@@ -89,7 +110,10 @@ function formatValue(key: string, value: unknown): string | null {
     return unit ? `${value} ${unit}` : String(value);
   }
   // Free text (notes, reasons, hole references) is shown as typed — "ABS" must not become "Abs".
-  if (typeof value === 'string') return /note|reason|ref/i.test(key) ? value : humanizeEnum(value);
+  if (typeof value === 'string') {
+    if (/note|reason|ref|remarks|faults|bitNumber/i.test(key)) return value;
+    return value === 'NA' ? 'N/A' : humanizeEnum(value);
+  }
 
   // Tyre pressures: { FL: 12, FR: 25 } -> "FL 12 · FR 25 psi"
   if (key === 'tyrePressures' && typeof value === 'object') {
@@ -104,9 +128,11 @@ function formatValue(key: string, value: unknown): string | null {
       .map((row) => {
         if (row && typeof row === 'object') {
           const r = row as Record<string, unknown>;
-          const name = r.name ?? r.chemical ?? r.item;
+          const chem = r.chemical && typeof r.chemical === 'object' ? (r.chemical as { name?: unknown }).name : r.chemical;
+          const name = r.name ?? chem ?? r.item;
+
           const qty = r.quantity ?? r.qty;
-          const unit = typeof r.unit === 'string' ? humanizeEnum(r.unit).toLowerCase() : '';
+          const unit = typeof r.unit === 'string' ? (ChemicalUnitLabel as Record<string, string>)[r.unit] ?? r.unit.toLowerCase() : '';
           if (name !== undefined && qty !== undefined) return `${name} — ${qty} ${unit}`.trim();
         }
         return String(row);
@@ -130,4 +156,25 @@ export function describeSubmission(incoming: Record<string, unknown>): Submissio
     out.push({ key, label: LABELS[key] ?? titleFromKey(key), value, tone: toneFor(key, incoming[key]) });
   }
   return out;
+}
+
+const numOrDash = (v: unknown) => (v == null || v === '' ? '—' : String(Number(v)));
+
+/** One line describing a daily reading for a list row, whichever form it was captured on. */
+export function readingSummary(r: Record<string, unknown>): string {
+  if (r.formType === 'RIG') return 'Rig condition check';
+  if (r.formType === 'PLANT') {
+    const fuel = r.fuelAdded != null ? ` · ${numOrDash(r.fuelAdded)} L fuel added` : '';
+    return `Machine readings · ${numOrDash(r.usage)} h/km this shift${fuel}`;
+  }
+  return `Hour meter ${numOrDash(r.hourMeter)} h · Fuel used ${numOrDash(r.fuelConsumed)} L`;
+}
+
+/** Flags for a reading row: the issue toggles plus any check answered Critical / Damaged / Faulty / Flat. */
+export function readingFlags(r: Record<string, unknown>): string[] {
+  const out: string[] = [];
+  if (r.warningLights) out.push('Warning lights');
+  if (r.leaks) out.push('Leaks');
+  if (r.unusualNoises) out.push('Unusual noises');
+  return [...out, ...criticalChecks(r).map((c) => `${c} critical`)];
 }

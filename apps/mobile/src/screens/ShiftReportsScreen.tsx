@@ -1,16 +1,19 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { FlatList, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { api, loadSession } from '../lib/api';
-import { can, type PermissionMatrix } from '@drillex/shared';
+import { can, ChemicalUnitLabel, type PermissionMatrix } from '@drillex/shared';
 import { cached } from '../sync/cache';
 import { Button, Card, Eyebrow } from '../ui';
 import { colors } from '../ui/theme';
 
-type Chem = { id: string; name?: string; quantity: string; unit: string };
+type Chem = { id: string; name?: string | null; chemical?: { name: string } | null; quantity: string; unit: string };
+
 export type Report = {
   id: string; date: string; shift: 'DAY' | 'NIGHT'; holeRef: string; startDepth: string; endDepth: string;
   totalMeters: string; holesCompleted: number; holeDiameterMm: string; rockType: string; penetrationRate: string;
   downtimeHours: string; downtimeReason?: string;
+  startHourMeter?: string | null; endHourMeter?: string | null; engineHours?: string | null; bitNumber?: string | null; bitSize?: string | null; remarks?: string | null;
+  enteredBy?: { employeeId: string; name: string } | null; supervisorReason?: string | null;
   status: 'SUBMITTED' | 'APPROVED' | 'UNLOCKED'; submittedAt: string; approvedAt?: string;
   asset: { assetNumber: string; name: string }; user: { employeeId: string; name: string };
   site?: { name: string }; chemicals?: Chem[];
@@ -125,18 +128,27 @@ export default function ShiftReportsScreen() {
 
                 <Text style={[s.status, { color: TONE[sel.status], fontSize: 13 }]}>{LABEL[sel.status]}</Text>
 
+                {sel.enteredBy && (
+                  <View style={s.supBox}>
+                    <Text style={s.supTitle}>Entered by supervisor {sel.enteredBy.employeeId} — {sel.enteredBy.name}</Text>
+                    {sel.supervisorReason ? <Text style={s.supBody}>{sel.supervisorReason}</Text> : null}
+                  </View>
+                )}
                 <View style={s.grid}>
                   <Detail k="Total drilled" v={`${sel.totalMeters} m`} strong />
+                  {sel.engineHours != null ? <Detail k="Engine hours" v={`${Number(sel.engineHours)} h (${Number(sel.startHourMeter)} → ${Number(sel.endHourMeter)})`} /> : null}
                   <Detail k="Holes completed" v={String(sel.holesCompleted)} />
                   <Detail k="Hole reference" v={sel.holeRef} />
                   <Detail k="Start depth" v={`${sel.startDepth} m`} />
                   <Detail k="End depth" v={`${sel.endDepth} m`} />
                   <Detail k="Hole diameter" v={`${sel.holeDiameterMm} mm`} />
+                  {sel.bitNumber ? <Detail k="Bit number" v={sel.bitNumber} /> : null}
+                  {sel.bitSize ? <Detail k="Bit size" v={sel.bitSize} /> : null}
                   <Detail k="Penetration rate" v={`${sel.penetrationRate} m/h`} />
                   <Detail k="Rock type" v={sel.rockType} />
                   <Detail k="Downtime" v={`${sel.downtimeHours} h`} />
                   {sel.downtimeReason ? <Detail k="Downtime reason" v={sel.downtimeReason} /> : null}
-                  <Detail k="Submitted by" v={`${sel.user.employeeId} — ${sel.user.name}`} />
+                  <Detail k="Operator" v={`${sel.user.employeeId} — ${sel.user.name}`} />
                   <Detail k="Submitted" v={new Date(sel.submittedAt).toLocaleString()} />
                   {sel.approvedAt ? <Detail k="Approved" v={new Date(sel.approvedAt).toLocaleString()} /> : null}
                 </View>
@@ -145,8 +157,14 @@ export default function ShiftReportsScreen() {
                   <View style={{ gap: 4 }}>
                     <Eyebrow>Consumables</Eyebrow>
                     {sel.chemicals.map((c) => (
-                      <Text key={c.id} style={s.chem}>{c.name ?? 'Item'} — {c.quantity} {c.unit.toLowerCase()}</Text>
+                      <Text key={c.id} style={s.chem}>{c.name ?? c.chemical?.name ?? 'Item'} — {Number(c.quantity)} {(ChemicalUnitLabel as Record<string, string>)[c.unit] ?? c.unit.toLowerCase()}</Text>
                     ))}
+                  </View>
+                )}
+                {!!sel.remarks && (
+                  <View style={{ gap: 4 }}>
+                    <Eyebrow>Shift remarks</Eyebrow>
+                    <Text style={s.chem}>{sel.remarks}</Text>
                   </View>
                 )}
 
@@ -230,6 +248,9 @@ const s = StyleSheet.create({
   dk: { color: colors.muted, fontSize: 13, flexShrink: 0 },
   dv: { color: colors.ink, fontSize: 14, fontWeight: '600', flexShrink: 1, textAlign: 'right', fontVariant: ['tabular-nums'] },
   chem: { color: colors.ink, fontSize: 13 },
+  supBox: { borderLeftWidth: 4, borderLeftColor: colors.supervisor, backgroundColor: '#F59E0B1F', padding: 10, gap: 2 },
+  supTitle: { fontWeight: '700', color: colors.ink, fontSize: 13 },
+  supBody: { color: colors.ink, fontSize: 13 },
   note: { color: colors.muted, fontSize: 12, lineHeight: 17 },
   dialog: { backgroundColor: colors.surface, margin: 16, padding: 16, gap: 8, borderWidth: 1, borderColor: colors.line },
   dialogText: { color: colors.ink, fontSize: 14, fontWeight: '600' },

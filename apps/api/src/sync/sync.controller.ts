@@ -1,6 +1,8 @@
 import { Body, Controller, Get, Param, Post } from '@nestjs/common';
 import { z } from 'zod';
-import { DailyReadingSchema, JobCardSchema, ShiftReportSchema } from '@drillex/shared';
+import { can, DailyReadingSchema, JobCardSchema, RequestSchema, ShiftReportSchema } from '@drillex/shared';
+import { RolesService } from '../roles/roles.service';
+import { RequestsService } from '../requests/requests.controller';
 import { PrismaService } from '../prisma/prisma.service';
 import { DailyReadingsService } from '../daily-readings/daily-readings.service';
 import { ShiftReportsService } from '../shift-reports/shift-reports.service';
@@ -10,7 +12,7 @@ import { AttachmentSchema } from '../attachments/attachments.controller';
 import { AuthUser, CurrentUser, RequirePermission } from '../auth/decorators';
 import { ZodPipe } from '../common/zod.pipe';
 
-const OpSchema = z.object({ opId: z.string().min(1), kind: z.enum(['attachment', 'daily_reading', 'shift_report', 'job_card']), payload: z.unknown(), queuedAt: z.string().optional() });
+const OpSchema = z.object({ opId: z.string().min(1), kind: z.enum(['attachment', 'daily_reading', 'shift_report', 'job_card', 'request']), payload: z.unknown(), queuedAt: z.string().optional() });
 // ops are unknown at this layer so one malformed envelope (bad opId/kind) rejects only that op, not the whole batch — validated per-op below.
 const PushSchema = z.object({ ops: z.array(z.unknown()).max(200) });
 const OWNER_MISSING = /not found$/i; // AttachmentsService throws `${ownerType} not found` when the owning record is not there yet
@@ -23,7 +25,7 @@ type Result = { opId: string; status: 'applied' | 'duplicate' | 'conflict' | 're
  */
 @Controller('sync')
 export class SyncController {
-  constructor(private prisma: PrismaService, private readings: DailyReadingsService, private shifts: ShiftReportsService, private attachments: AttachmentsService, private jobCards: JobCardsService) {}
+  constructor(private prisma: PrismaService, private readings: DailyReadingsService, private shifts: ShiftReportsService, private attachments: AttachmentsService, private jobCards: JobCardsService, private requests: RequestsService, private roles: RolesService) {}
 
   @Post('push')
   async push(@CurrentUser() u: AuthUser, @Body(new ZodPipe(PushSchema)) b: z.infer<typeof PushSchema>) {
@@ -96,7 +98,16 @@ export class SyncController {
           return { opId: op.opId, status: 'conflict', error: (e as Error).message };
         }
       }
+      if (op.kind === 'request') {
+        // Requests are not unique by business key, so a replay is only ever a duplicate of the same client id.
+        const d = RequestSchema.parse(op.payload);
+        if (!can(await this.roles.getMatrix(), u.role, 'request:create')) return { opId: op.opId, status: 'rejected', error: 'Missing permission request:create' };
+        if (d.id && (await this.prisma.request.findUnique({ where: { id: d.id } }))) return { opId: op.opId, status: 'duplicate', id: d.id };
+        const r = await this.requests.create(u, d);
+        return { opId: op.opId, status: 'applied', id: r.id };
+      }
       const d = JobCardSchema.parse(op.payload);
+
       if (d.id && (await this.prisma.jobCard.findUnique({ where: { id: d.id } }))) return { opId: op.opId, status: 'duplicate', id: d.id };
       const r = await this.jobCards.create(u, d);
       return { opId: op.opId, status: 'applied', id: r.id };

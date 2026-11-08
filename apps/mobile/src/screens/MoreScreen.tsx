@@ -40,13 +40,16 @@ export default function MoreScreen({ navigation }: Props) {
     ...(allow('parts:read') ? [{ key: 'parts', icon: 'parts' as IconName, title: 'Parts store', sub: 'Stock levels and ordering', go: () => navigation.navigate('Parts') }] : []),
     ...(allow('parts:read') ? [{ key: 'chemicals', icon: 'parts' as IconName, title: 'Chemicals', sub: 'The list for shift reports', go: () => navigation.navigate('Chemicals') }] : []),
     ...(allow('asset:read') ? [{ key: 'assets', icon: 'rig' as IconName, title: 'All machines', sub: 'The full machine list', go: () => navigation.navigate('Assets') }] : []),
+    ...(allow('asset:read') ? [{ key: 'site', icon: 'pin' as IconName, title: 'Site & client', sub: 'Where a machine is, who it is with', go: () => navigation.navigate('Site') }] : []),
+    ...(allow('request:create') || allow('request:read') || allow('request:manage') ? [{ key: 'requests', icon: 'chat' as IconName, title: 'Requests', sub: 'Consumables, equipment, safety, HR', go: () => navigation.navigate('Requests') }] : []),
     ...(allow('asset:write') ? [{ key: 'newasset', icon: 'plus' as IconName, title: 'Add a machine', sub: 'Put a new one on the list', go: () => navigation.navigate('AssetNew') }] : []),
     ...(allow('report:read') ? [{ key: 'reports', icon: 'report' as IconName, title: 'Reports', sub: 'Monthly figures to download', go: () => navigation.navigate('Reports') }] : []),
     ...(allow('daily_reading:read') || allow('shift_report:read') ? [{ key: 'history', icon: 'clock' as IconName, title: 'What I sent', sub: 'Your past checks and reports', go: () => navigation.navigate('History') }] : []),
   ];
 
   const admin: Entry[] = [
-    ...(allow('user:manage') ? [{ key: 'users', icon: 'people' as IconName, title: 'People', sub: 'Add staff, reset passwords', go: () => navigation.navigate('Users') }] : []),
+    ...(allow('user:manage') ? [{ key: 'users', icon: 'people' as IconName, title: 'People', sub: 'Add staff, block leavers, reset PINs', go: () => navigation.navigate('Users') }] : []),
+
     ...(allow('role:manage') ? [{ key: 'roles', icon: 'key' as IconName, title: 'What people can do', sub: 'Job types and their permissions', go: () => navigation.navigate('Roles') }] : []),
     ...(allow('user:manage') ? [{ key: 'devices', icon: 'phone' as IconName, title: 'Phones', sub: 'Allow or block a phone', go: () => navigation.navigate('Devices') }] : []),
     ...(allow('user:manage') ? [{ key: 'security', icon: 'shield' as IconName, title: 'Extra sign-in code', sub: 'Which jobs need a code', go: () => navigation.navigate('TwoFaSettings') }] : []),
@@ -56,7 +59,7 @@ export default function MoreScreen({ navigation }: Props) {
 
   // Every account, whatever its role, so it sits outside the permission checks.
   const account: Entry[] = [
-    { key: 'password', icon: 'key', title: 'Change password', sub: 'Pick a new sign-in password', go: () => navigation.navigate('ChangePassword') },
+    { key: 'password', icon: 'key', title: 'Change PIN or password', sub: 'Pick a new sign-in PIN or password', go: () => navigation.navigate('ChangePassword') },
   ];
 
   const grid = (items: Entry[]) =>

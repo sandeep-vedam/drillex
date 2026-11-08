@@ -7,9 +7,45 @@ import type { RootStackParamList } from '../navigation';
 import type { Asset } from './AssetsScreen';
 import { Card, Eyebrow, StatusChip } from '../ui';
 import { colors } from '../ui/theme';
-import { can, type PermissionMatrix } from '@drillex/shared';
+import { can, dailyFormFor, type PermissionMatrix } from '@drillex/shared';
+
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
+
+/**
+ * The operator's welcome card (client spec §4A tab 1, §4B tab 1): machine ID, current client, today's date and whether
+ * today's machine check and shift report have been submitted.
+ */
+function TodayCard({ asset, onSite }: { asset: Asset; onSite: () => void }) {
+  const [client, setClient] = useState<string | null | undefined>();
+  const [checkDone, setCheckDone] = useState<boolean | null>(null);
+  const [shiftDone, setShiftDone] = useState<boolean | null>(null);
+  const today = new Date().toISOString().slice(0, 10);
+  const rig = asset.category === 'DRILLING';
+  useEffect(() => {
+    cached(`current.${asset.id}`, () => api<{ client: string } | null>(`/finance/current?assetId=${asset.id}`)).then((r) => setClient(r.data?.client ?? null)).catch(() => setClient(null));
+    cached(`today.reading.${asset.id}`, () => api<unknown[]>(`/daily-readings?assetId=${asset.id}&from=${today}&to=${today}`)).then((r) => setCheckDone(r.data.length > 0)).catch(() => {});
+    if (rig) cached(`today.shift.${asset.id}`, () => api<unknown[]>(`/shift-reports?assetId=${asset.id}&from=${today}&to=${today}`)).then((r) => setShiftDone(r.data.length > 0)).catch(() => {});
+  }, [asset.id, rig, today]);
+  const status = (done: boolean | null, label: string) => (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+      <View style={{ width: 9, height: 9, backgroundColor: done == null ? colors.line : done ? colors.ok : colors.hazard }} />
+      <Text style={{ color: colors.ink, fontSize: 14 }}>{label}: <Text style={{ fontWeight: '700', color: done ? colors.ok : colors.hazard }}>{done == null ? '…' : done ? 'Submitted' : 'Not yet'}</Text></Text>
+    </View>
+  );
+  return (
+    <Pressable onPress={onSite}>
+      <Card stripe={colors.gold} style={{ paddingLeft: 18, gap: 6 }}>
+        <Eyebrow>{new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })}</Eyebrow>
+        <Text style={{ fontFamily: 'Menlo', fontSize: 24, fontWeight: '800', color: colors.navy800 }}>{asset.assetNumber}</Text>
+        <Text style={{ color: colors.muted }}>{asset.name} · {client === undefined ? '…' : client ?? 'Not on hire'}</Text>
+        {status(checkDone, rig ? 'Rig check' : 'Machine readings')}
+        {rig && status(shiftDone, 'Shift report')}
+      </Card>
+    </Pressable>
+  );
+}
+
 type Summary = {
   readingsToday: number; pendingApprovals: number; openAlerts: number; overdueMaintenance: number;
   assets: { total: number; active: number; underMaintenance: number; idle: number; decommissioned: number };
@@ -50,7 +86,7 @@ export default function HomeScreen({ navigation }: Props) {
   const readingDone = !!summary?.readingsToday;
   const job =
     allow('daily_reading:create') && !readingDone
-      ? { title: 'Today\u2019s machine check is not done', body: 'Open your machine below and tap Daily reading.', cta: null, tone: colors.hazard }
+      ? { title: 'Today\u2019s machine check is not done', body: 'Open your machine below and tap Rig check or Machine readings.', cta: null, tone: colors.hazard }
     : allow('shift_report:approve') && pending > 0
       ? { title: `${pending} production report${pending > 1 ? 's' : ''} waiting for you`, body: 'Check the figures, then approve or send back.', cta: { label: 'Review them', go: () => navigation.navigate('ShiftReports') }, tone: colors.hazard }
     : allow('maintenance:read') && overdue > 0
@@ -79,6 +115,8 @@ export default function HomeScreen({ navigation }: Props) {
             </View>
           </View>
           {error && <Text style={s.err}>{error}</Text>}
+
+          {!overview && assets[0] && <TodayCard asset={assets[0]} onSite={() => navigation.navigate('Site')} />}
 
           {/* The one thing that needs doing, stated as a sentence rather than a number on a tile. */}
           <Card stripe={job.tone} style={{ paddingLeft: 18, gap: 8 }}>
@@ -136,10 +174,10 @@ export default function HomeScreen({ navigation }: Props) {
           </View>
           <Text style={s.name}>{item.name}</Text>
           <Text style={s.meta}>{item.make} {item.model}</Text>
-          {(allow('daily_reading:create') || allow('shift_report:create')) && (
+          {(allow('daily_reading:create') || allow('shift_report:create') || allow('submission:on_behalf')) && (
             <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
-              {allow('daily_reading:create') && <Pressable style={s.action} onPress={() => navigation.navigate('DailyReading', { assetId: item.id, assetNumber: item.assetNumber, assetName: item.name })}><Text style={s.actionText}>Daily reading</Text></Pressable>}
-              {allow('shift_report:create') && item.category === 'DRILLING' && <Pressable style={[s.action, { backgroundColor: colors.hazard }]} onPress={() => navigation.navigate('ShiftReport', { assetId: item.id, assetNumber: item.assetNumber, assetName: item.name, siteId: item.siteId })}><Text style={s.actionText}>Shift report</Text></Pressable>}
+              {(allow('daily_reading:create') || allow('submission:on_behalf')) && <Pressable style={s.action} onPress={() => navigation.navigate('DailyReading', { assetId: item.id, assetNumber: item.assetNumber, assetName: item.name, category: item.category })}><Text style={s.actionText}>{dailyFormFor(item.category) === 'RIG' ? 'Rig check' : 'Machine readings'}</Text></Pressable>}
+              {(allow('shift_report:create') || allow('submission:on_behalf')) && item.category === 'DRILLING' && <Pressable style={[s.action, { backgroundColor: colors.hazard }]} onPress={() => navigation.navigate('ShiftReport', { assetId: item.id, assetNumber: item.assetNumber, assetName: item.name, siteId: item.siteId })}><Text style={s.actionText}>Shift report</Text></Pressable>}
             </View>
           )}
         </Card>

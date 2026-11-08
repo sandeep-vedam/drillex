@@ -19,17 +19,23 @@ const NAV = [
   { href: '/job-cards', label: 'Repair records', icon: I.Card, perm: 'job_card:read' },
   { href: '/parts', label: 'Parts store', icon: I.Box, perm: 'parts:read' },
   { href: '/chemicals', label: 'Chemicals', icon: I.Box, perm: 'parts:read' },
+  { href: '/requests', label: 'Requests', icon: I.Bell, perm: ['request:read', 'request:create', 'request:manage'] },
+  { href: '/finance', label: 'Finance', icon: I.Card, perm: 'finance:read' },
+  { href: '/plant-hire', label: 'Plant hire', icon: I.Asset, perm: ['plant_hire:write', 'finance:write'] },
   { href: '/reports', label: 'Reports', icon: I.Report, perm: 'report:read' },
 ] as const;
 const ADMIN = [
   { href: '/sync-conflicts', label: 'Duplicate entries', icon: I.Sync, perm: 'shift_report:approve' },
   { href: '/users', label: 'People', icon: I.Users, perm: 'user:manage' },
   { href: '/roles', label: 'What people can do', icon: I.Shield, perm: 'role:manage' },
+  { href: '/audit', label: 'Audit log', icon: I.Eye, perm: 'audit:read' },
   { href: '/devices', label: 'Phones', icon: I.Settings, perm: 'user:manage' },
   { href: '/settings', label: 'Settings', icon: I.Settings, perm: null },
 ] as const;
-const visible = (matrix: PermissionMatrix | null, role: string | undefined) => (n: { perm: Permission | null }) =>
-  n.perm === null || (!!role && !!matrix && !!can(matrix, role, n.perm));
+/** An entry needs no permission (null), one, or any one of several. */
+const visible = (matrix: PermissionMatrix | null, role: string | undefined) => (n: { perm: Permission | readonly Permission[] | null }) =>
+  n.perm === null || (!!role && !!matrix && (typeof n.perm === 'string' ? [n.perm] : n.perm).some((p) => !!can(matrix, role, p)));
+
 
 export function Shell({ children, title, actions }: { children: ReactNode; title: string; actions?: ReactNode }) {
   const path = usePathname();
