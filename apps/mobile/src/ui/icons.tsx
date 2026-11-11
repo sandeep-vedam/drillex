@@ -10,7 +10,7 @@ import { colors } from './theme';
  */
 export type IconName =
   | 'home' | 'check' | 'gauge' | 'cog' | 'clipboard' | 'parts' | 'rig' | 'plus'
-  | 'report' | 'clock' | 'people' | 'key' | 'phone' | 'shield' | 'duplicate' | 'more' | 'pin' | 'chat';
+  | 'report' | 'clock' | 'people' | 'key' | 'phone' | 'shield' | 'duplicate' | 'more' | 'pin' | 'chat' | 'money';
 
 export function Icon({ name, size = 28, color = colors.navy800 }: { name: IconName; size?: number; color?: string }) {
   const u = size / 24; // all shapes are described on a 24-unit grid, then scaled
@@ -24,6 +24,15 @@ export function Icon({ name, size = 28, color = colors.navy800 }: { name: IconNa
   });
 
   switch (name) {
+    case 'money': // a banknote with a coin in the middle — finance and plant hire billing
+      return (
+        <View style={box}>
+          <View style={bar(21, 13, { backgroundColor: 'transparent', borderWidth: 2 * u, borderColor: color })} />
+          <View style={ring(7, 2)} />
+          <View style={bar(2.4, 2.4, { transform: [{ translateX: -6.5 * u }] })} />
+          <View style={bar(2.4, 2.4, { transform: [{ translateX: 6.5 * u }] })} />
+        </View>
+      );
     case 'home': // roof over a body
       return (
         <View style={box}>

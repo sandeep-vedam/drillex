@@ -1,4 +1,4 @@
-import { Injectable, ConflictException } from '@nestjs/common';
+import { Injectable, ConflictException, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { CRITICAL_ANSWERS, criticalChecks, DailyReadingInput, fuelConsumed, machineUsage, readingAlerts } from '@drillex/shared';
 import { PrismaService } from '../prisma/prisma.service';
@@ -8,6 +8,7 @@ import { RolesService } from '../roles/roles.service';
 import { AuthUser } from '../auth/decorators';
 import { getOperationsSettings } from '../settings/settings.util';
 import { resolveSubmitter } from '../common/submitter';
+import { plantOnlyAssetWhere } from '../common/plant-only';
 
 const ALERT_LABEL: Record<string, string> = { WARNING_LIGHTS: 'Warning lights active', LEAKS: 'Leak observed', UNUSUAL_NOISES: 'Unusual noise / vibration', CRITICAL_CHECK: 'Critical check', MAINTENANCE_REVIEW: 'Condition rated poor — maintenance review' };
 const FORM_NAME: Record<string, string> = { RIG: 'rig condition check', PLANT: 'machine readings', LEGACY: 'daily reading' };
@@ -30,14 +31,16 @@ export class DailyReadingsService {
     return rest;
   }
 
-  private assetScope(u: AuthUser) {
-    return u.scope === 'self' ? { operators: { some: { userId: u.id, validTo: null } } } : u.scope === 'site' ? { siteId: u.siteId ?? undefined } : {};
+  /** Assigned machines / own site / everything — and never drilling rigs for a plant hire supervisor. */
+  private async assetScope(u: AuthUser): Promise<Prisma.AssetWhereInput> {
+    const base = u.scope === 'self' ? { operators: { some: { userId: u.id, validTo: null } } } : u.scope === 'site' ? { siteId: u.siteId ?? undefined } : {};
+    return { ...base, ...(await plantOnlyAssetWhere(this.roles, u)) };
   }
 
   async list(u: AuthUser, q: { assetId?: string; from?: string; to?: string; flagged?: string }) {
     return this.prisma.dailyReading.findMany({
       where: {
-        asset: this.assetScope(u), deletedAt: null,
+        asset: await this.assetScope(u), deletedAt: null,
         ...(q.assetId ? { assetId: q.assetId } : {}),
         ...(q.from || q.to ? { date: { ...(q.from ? { gte: new Date(q.from) } : {}), ...(q.to ? { lte: new Date(q.to) } : {}) } } : {}),
         ...(q.flagged === '1' ? { OR: [{ warningLights: true }, { leaks: true }, { unusualNoises: true }, ...CRITICAL_WHERE, { conditionRating: { lte: (await getOperationsSettings(this.prisma)).readingAlertThreshold } }] } : {}),
@@ -48,7 +51,8 @@ export class DailyReadingsService {
   }
 
   async get(u: AuthUser, id: string) {
-    const r = await this.prisma.dailyReading.findFirstOrThrow({ where: { id, asset: this.assetScope(u) }, include: { asset: true, user: { select: { employeeId: true, name: true } }, enteredBy: { select: { employeeId: true, name: true } } } });
+    const r = await this.prisma.dailyReading.findFirst({ where: { id, asset: await this.assetScope(u) }, include: { asset: true, user: { select: { employeeId: true, name: true } }, enteredBy: { select: { employeeId: true, name: true } } } });
+    if (!r) throw new NotFoundException('Reading not found');
     const atts = await this.prisma.attachment.findMany({ where: { ownerType: 'DailyReading', ownerId: id }, orderBy: { createdAt: 'asc' } });
     const attachments = await Promise.all(atts.map(async (a) => ({ id: a.id, kind: a.kind, url: await this.storage.urlFor(a.storageKey) })));
     return { ...r, attachments };

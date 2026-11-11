@@ -43,6 +43,9 @@ export default function MoreScreen({ navigation }: Props) {
     ...(allow('asset:read') ? [{ key: 'site', icon: 'pin' as IconName, title: 'Site & client', sub: 'Where a machine is, who it is with', go: () => navigation.navigate('Site') }] : []),
     ...(allow('request:create') || allow('request:read') || allow('request:manage') ? [{ key: 'requests', icon: 'chat' as IconName, title: 'Requests', sub: 'Consumables, equipment, safety, HR', go: () => navigation.navigate('Requests') }] : []),
     ...(allow('asset:write') ? [{ key: 'newasset', icon: 'plus' as IconName, title: 'Add a machine', sub: 'Put a new one on the list', go: () => navigation.navigate('AssetNew') }] : []),
+    // Finance and plant hire staff have these as a tab; this is the way in for managers and admins.
+    ...(allow('finance:read') && (allow('shift_report:approve') || allow('user:manage')) ? [{ key: 'finance', icon: 'money' as IconName, title: 'Finance', sub: 'Billing, payments, follow-ups', go: () => navigation.navigate('Finance') }] : []),
+    ...(allow('finance:read') && (allow('shift_report:approve') || allow('user:manage')) ? [{ key: 'planthire', icon: 'money' as IconName, title: 'Plant hire', sub: 'Plant machines on hire, days worked', go: () => navigation.navigate('PlantHire') }] : []),
     ...(allow('report:read') ? [{ key: 'reports', icon: 'report' as IconName, title: 'Reports', sub: 'Monthly figures to download', go: () => navigation.navigate('Reports') }] : []),
     ...(allow('daily_reading:read') || allow('shift_report:read') ? [{ key: 'history', icon: 'clock' as IconName, title: 'What I sent', sub: 'Your past checks and reports', go: () => navigation.navigate('History') }] : []),
   ];

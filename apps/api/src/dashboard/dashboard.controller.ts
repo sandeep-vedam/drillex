@@ -1,18 +1,22 @@
 import { Controller, Get } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthUser, CurrentUser, RequirePermission } from '../auth/decorators';
+import { RolesService } from '../roles/roles.service';
+import { plantOnlyAssetWhere } from '../common/plant-only';
 
 @Controller('dashboard')
 export class DashboardController {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService, private roles: RolesService) {}
 
   /** Role-scoped summary for the home dashboard (SRS §10.1 Home Dashboard). */
   @Get('summary')
   @RequirePermission('asset:read')
   async summary(@CurrentUser() u: AuthUser) {
-    const assetWhere =
-      u.scope === 'self' ? { operators: { some: { userId: u.id, validTo: null } } }
-      : u.scope === 'site' ? { siteId: u.siteId ?? undefined } : {};
+    const assetWhere = {
+      ...(u.scope === 'self' ? { operators: { some: { userId: u.id, validTo: null } } }
+        : u.scope === 'site' ? { siteId: u.siteId ?? undefined } : {}),
+      ...(await plantOnlyAssetWhere(this.roles, u)),
+    };
     // Date columns compare by calendar day: build today's date from local components at UTC midnight.
     const now = new Date(); const start = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
     const [byStatus, readingsToday, pendingShift, openAlerts, overdue, recentLogins, alerts] = await Promise.all([

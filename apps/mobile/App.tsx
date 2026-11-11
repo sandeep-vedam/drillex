@@ -38,6 +38,12 @@ import RequestsScreen from './src/screens/RequestsScreen';
 import RequestNewScreen from './src/screens/RequestNewScreen';
 import RequestDetailScreen from './src/screens/RequestDetailScreen';
 import SiteScreen from './src/screens/SiteScreen';
+import FinanceScreen from './src/screens/FinanceScreen';
+import PlantHireScreen from './src/screens/PlantHireScreen';
+import DeploymentFormScreen from './src/screens/DeploymentFormScreen';
+import DaysWorkedFormScreen from './src/screens/DaysWorkedFormScreen';
+import PaymentFormScreen from './src/screens/PaymentFormScreen';
+import { FINANCE_HEADER } from './src/ui/finance';
 import { startSyncLoop } from './src/sync/outbox';
 import { loadSession, setSessionExpiredHandler } from './src/lib/api';
 import type { RootStackParamList } from './src/navigation';
@@ -88,6 +94,12 @@ function Root({ initial }: { initial: 'Login' | 'Home' }) {
           <Stack.Screen name="Site" component={SiteScreen} options={{ title: 'Site & client' }} />
           <Stack.Screen name="RequestNew" component={RequestNewScreen} options={{ title: 'New request' }} />
           <Stack.Screen name="RequestDetail" component={RequestDetailScreen} options={{ title: 'Request' }} />
+          {/* Reached from More by managers and admins; finance and plant hire staff have these as a tab. */}
+          <Stack.Screen name="Finance" component={FinanceScreen} options={{ title: 'Finance', headerStyle: { backgroundColor: FINANCE_HEADER } }} />
+          <Stack.Screen name="PlantHire" component={PlantHireScreen} options={{ title: 'Plant hire' }} />
+          <Stack.Screen name="DeploymentForm" component={DeploymentFormScreen} options={({ route }) => ({ title: route.params?.initial ? `Edit ${route.params.initial.asset.assetNumber}` : 'Machine & client' })} />
+          <Stack.Screen name="DaysWorkedForm" component={DaysWorkedFormScreen} options={({ route }) => ({ title: route.params?.initial ? 'Correct days worked' : 'Days worked' })} />
+          <Stack.Screen name="PaymentForm" component={PaymentFormScreen} options={({ route }) => ({ title: route.params?.initial ? 'Correct payment' : 'Record payment' })} />
         </Stack.Navigator>
       </NavigationContainer>
       {locked && signedIn && (

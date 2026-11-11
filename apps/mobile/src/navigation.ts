@@ -1,5 +1,6 @@
 import type { RoleRow } from './screens/RolesScreen';
 import type { Asset as AssetRow } from './screens/AssetsScreen';
+import type { DaysWorked, Deployment, Payment } from './lib/finance';
 
 export type RootStackParamList = {
   Login: undefined;
@@ -39,4 +40,10 @@ export type RootStackParamList = {
   RequestNew: undefined;
   RequestDetail: { id: string };
   Site: undefined;
+  // Finance Manager (client spec §6) and Plant Hire Supervisor (§11) modules
+  Finance: undefined;
+  PlantHire: undefined;
+  DeploymentForm: { initial?: Deployment };
+  DaysWorkedForm: { initial?: DaysWorked };
+  PaymentForm: { initial?: Payment; preset?: { clientId: string; deploymentId?: string } };
 };

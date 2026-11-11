@@ -6,10 +6,12 @@ import { AuthUser } from '../auth/decorators';
 import { nextSequence } from '../common/sequence';
 import { openJobCardWhere } from '../job-cards/open-jobs';
 import { getOperationsSettings } from '../settings/settings.util';
+import { RolesService } from '../roles/roles.service';
+import { plantOnlyAssetWhere } from '../common/plant-only';
 
 @Injectable()
 export class AssetsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService, private roles: RolesService) {}
 
   /** Operators see the assets they are assigned to, site roles their own site, managers and admins everything. */
   private scopeWhere(u: AuthUser) {
@@ -23,13 +25,13 @@ export class AssetsService {
   /** Assignments are a validFrom/validTo window, so only the open ones are the current operators. */
   private readonly include = { operators: { where: { validTo: null }, include: { user: { select: { id: true, employeeId: true, name: true } } } } };
 
-  list(u: AuthUser) {
-    return this.prisma.asset.findMany({ where: { ...this.scopeWhere(u), deletedAt: null }, include: this.include, orderBy: { assetNumber: 'asc' } });
+  async list(u: AuthUser) {
+    return this.prisma.asset.findMany({ where: { ...this.scopeWhere(u), ...(await plantOnlyAssetWhere(this.roles, u)), deletedAt: null }, include: this.include, orderBy: { assetNumber: 'asc' } });
   }
 
   /** Out-of-scope assets 404 rather than 403 so the register does not leak which assets exist elsewhere. */
   async get(u: AuthUser, id: string) {
-    const asset = await this.prisma.asset.findFirst({ where: { id, deletedAt: null, ...this.scopeWhere(u) }, include: this.include });
+    const asset = await this.prisma.asset.findFirst({ where: { id, deletedAt: null, ...this.scopeWhere(u), ...(await plantOnlyAssetWhere(this.roles, u)) }, include: this.include });
     if (!asset) throw new NotFoundException('Asset not found');
     return asset;
   }

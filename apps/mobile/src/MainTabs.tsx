@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Alert, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, Text, View } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api, clearSession, loadSession } from './lib/api';
@@ -14,6 +14,9 @@ import HistoryScreen from './screens/HistoryScreen';
 import MoreScreen from './screens/MoreScreen';
 import RequestsScreen from './screens/RequestsScreen';
 import SiteScreen from './screens/SiteScreen';
+import FinanceScreen from './screens/FinanceScreen';
+import PlantHireScreen from './screens/PlantHireScreen';
+import { FINANCE_HEADER } from './ui/finance';
 
 import type { RootStackParamList } from './navigation';
 import { SyncBadge } from './ui/SyncBadge';
@@ -34,6 +37,7 @@ export default function MainTabs({ navigation }: { navigation: { navigate: (n: '
   const insets = useSafeAreaInsets();
   const [matrix, setMatrix] = useState<PermissionMatrix | null>(null);
   const [role, setRole] = useState<string | undefined>();
+  const [ready, setReady] = useState(false);
 
   const load = useCallback(async () => {
     const [perms, sess] = await Promise.all([
@@ -42,7 +46,8 @@ export default function MainTabs({ navigation }: { navigation: { navigate: (n: '
     ]);
     setMatrix(perms.data); setRole(sess?.user.role);
   }, []);
-  useEffect(() => { load().catch(() => {}); }, [load]);
+  // The tabs depend on the role, and the first tab shown is fixed when the navigator mounts, so wait for both.
+  useEffect(() => { load().catch(() => {}).finally(() => setReady(true)); }, [load]);
 
   // In the header of every tab rather than on Home only, so it is one tap away wherever you are. Confirmed
   // first, since a header button is easy to hit by accident, and it warns when entries are still unsent.
@@ -64,20 +69,30 @@ export default function MainTabs({ navigation }: { navigation: { navigate: (n: '
   const icon = (name: IconName) =>
     ({ color }: { color: string }) => <Icon name={name} size={28} color={color} />;
 
+  // Finance staff and plant hire supervisors work in their own module (client spec §6, §11): it takes the role-specific
+  // slot and is where they land. Managers and admins, who also hold finance access, reach it from More instead.
+  const ownModule = allow('finance:read') && !allow('shift_report:approve') && !allow('user:manage')
+    ? { name: 'Finance' as const, component: FinanceScreen, title: 'Finance', icon: 'money' as IconName }
+    : allow('plant_hire:write') && !allow('finance:read')
+      ? { name: 'PlantHire' as const, component: PlantHireScreen, title: 'Plant hire', icon: 'money' as IconName }
+      : null;
   // One role-specific tab, so the bar stays at four items on any handset width.
-  const primary = allow('shift_report:approve')
+  const primary = ownModule ?? (allow('shift_report:approve')
     ? { name: 'ShiftReports' as const, component: ShiftReportsScreen, title: 'Approve', icon: 'check' as IconName }
     : allow('maintenance:complete')
       ? { name: 'Maintenance' as const, component: MaintenanceScreen, title: 'Servicing', icon: 'cog' as IconName }
-      : { name: 'History' as const, component: HistoryScreen, title: 'Sent', icon: 'clock' as IconName };
+      : { name: 'History' as const, component: HistoryScreen, title: 'Sent', icon: 'clock' as IconName });
   // Field operators get the spec's Location / Client Tracker tab in place of the machine register (client spec §4A, §4B);
   // everyone who can raise or handle requests gets a Requests tab. At most five tabs, so labels stay readable.
   const fieldOperator = (allow('daily_reading:create') || allow('shift_report:create')) && !allow('shift_report:approve') && !allow('maintenance:complete');
   const requests = allow('request:create') || allow('request:read') || allow('request:manage');
   const tabCount = 3 + (fieldOperator || allow('asset:read') ? 1 : 0) + (requests ? 1 : 0);
 
+  if (!ready) return <View style={{ flex: 1, justifyContent: 'center', backgroundColor: colors.canvas }}><ActivityIndicator color={colors.navy800} /></View>;
+
   return (
     <Tab.Navigator
+      initialRouteName={ownModule?.name ?? 'Home'}
       screenOptions={{
         headerStyle: { backgroundColor: colors.navy900 },
         headerTintColor: '#fff',
@@ -116,7 +131,7 @@ export default function MainTabs({ navigation }: { navigation: { navigate: (n: '
       <Tab.Screen
         name={primary.name}
         component={primary.component}
-        options={{ title: primary.title, tabBarLabel: primary.title, tabBarIcon: icon(primary.icon) }}
+        options={{ title: primary.title, tabBarLabel: primary.title, tabBarIcon: icon(primary.icon), ...(primary.name === 'Finance' ? { headerStyle: { backgroundColor: FINANCE_HEADER } } : {}) }}
       />
       {requests && <Tab.Screen name="Requests" component={RequestsScreen} options={{ title: 'Requests', tabBarLabel: 'Requests', tabBarIcon: icon('chat') }} />}
       <Tab.Screen

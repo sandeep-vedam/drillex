@@ -8,6 +8,7 @@ import { uuid } from '../sync/outbox';
 import { SignaturePad } from '../ui/SignaturePad';
 import { Action, Button, Card, Eyebrow } from '../ui';
 import { colors } from '../ui/theme';
+import { DateField, Picker } from '../ui/finance';
 import type { RootStackParamList } from '../navigation';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'JobCards'>;
@@ -29,13 +30,20 @@ export default function JobCardsScreen({ navigation }: Props) {
   const [tab, setTab] = useState('ALL');
   const [matrix, setMatrix] = useState<PermissionMatrix | null>(null); const [role, setRole] = useState<string | undefined>(); const [busy, setBusy] = useState(false);
   const [finishing, setFinishing] = useState<JC | null>(null); const [signature, setSignature] = useState<string | null>(null);
+  /** Maintenance history search (client spec, Technician): one machine and/or a date range. */
+  const [f, setF] = useState({ assetId: '', from: '', to: '' });
+  const [machines, setMachines] = useState<{ id: string; assetNumber: string; name: string }[]>([]);
+  useEffect(() => { cached('assets', () => api<{ id: string; assetNumber: string; name: string }[]>('/assets')).then((r) => setMachines(r.data)).catch(() => {}); }, []);
+  const qs = Object.entries(f).filter(([k, v]) => v && (k === 'assetId' || /^\d{4}-\d{2}-\d{2}$/.test(v))).map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join('&');
+  const filtered = !!(f.assetId || f.from || f.to);
   const load = useCallback(async () => {
     try {
-      const [r, perms, sess] = await Promise.all([cached('jobcards', () => api<JC[]>('/job-cards')), cached('permissions', () => api<PermissionMatrix>('/roles/matrix')), loadSession()]);
+      const [r, perms, sess] = await Promise.all([cached(qs ? `jobcards.${qs}` : 'jobcards', () => api<JC[]>(`/job-cards${qs ? `?${qs}` : ''}`)), cached('permissions', () => api<PermissionMatrix>('/roles/matrix')), loadSession()]);
       setRows(r.data); setMatrix(perms.data); setRole(sess?.user.role);
       setError(r.fromCache ? 'Offline — showing last synced list.' : null);
     } catch (e) { setError((e as Error).message); }
-  }, []);
+  }, [qs]);
+  useEffect(() => { load(); }, [load]);
   const canApprove = !!role && !!matrix && !!can(matrix, role, 'job_card:approve');
 
   async function openCard(c: JC) {
@@ -100,6 +108,14 @@ export default function JobCardsScreen({ navigation }: Props) {
           <Button title="+ New job card" onPress={() => navigation.navigate('JobCardNew', {})} />
           {error && <Text style={{ color: colors.hazard, fontSize: 12 }}>{error}</Text>}
           <Eyebrow>{canApprove ? 'Job cards' : 'My job cards'}</Eyebrow>
+          <Card style={{ gap: 8 }}>
+            <Picker label="Machine" value={f.assetId} allowNone="All machines" options={machines.map((m) => ({ v: m.id, l: `${m.assetNumber} — ${m.name}` }))} onChange={(v) => setF({ ...f, assetId: v })} />
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              <DateField label="From" value={f.from} onChange={(v) => setF({ ...f, from: v })} quick={false} />
+              <DateField label="To" value={f.to} onChange={(v) => setF({ ...f, to: v })} quick={false} />
+            </View>
+            {filtered && <Action title="Clear search" onPress={() => setF({ assetId: '', from: '', to: '' })} />}
+          </Card>
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             <View style={s.tabs}>
               {TABS.map(([k, l]) => (
@@ -111,7 +127,7 @@ export default function JobCardsScreen({ navigation }: Props) {
           </ScrollView>
         </View>
       }
-      ListEmptyComponent={<Card><Text style={{ color: colors.muted }}>{tab === 'ALL' ? 'No job cards yet.' : 'Nothing in this list.'}</Text></Card>}
+      ListEmptyComponent={<Card><Text style={{ color: colors.muted }}>{filtered ? 'No job cards for this machine and dates.' : tab === 'ALL' ? 'No job cards yet.' : 'Nothing in this list.'}</Text></Card>}
       renderItem={({ item }) => (
         <Card stripe={TONE[item.status]} style={{ paddingLeft: 18, gap: 4 }}>
           <Pressable onPress={() => openCard(item)} accessibilityRole="button">

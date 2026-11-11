@@ -84,6 +84,7 @@ export default function HomeScreen({ navigation }: Props) {
   const pending = summary?.pendingApprovals ?? 0;
   const overdue = summary?.overdueMaintenance ?? 0;
   const readingDone = !!summary?.readingsToday;
+  const fieldWork = allow('daily_reading:create') || allow('shift_report:create');
   const job =
     allow('daily_reading:create') && !readingDone
       ? { title: 'Today\u2019s machine check is not done', body: 'Open your machine below and tap Rig check or Machine readings.', cta: null, tone: colors.hazard }
@@ -93,9 +94,13 @@ export default function HomeScreen({ navigation }: Props) {
       ? { title: `${overdue} service${overdue > 1 ? 's are' : ' is'} overdue`, body: 'These machines are past their service point.', cta: { label: 'See servicing', go: () => navigation.navigate('Maintenance') }, tone: colors.crit }
     : allow('daily_reading:create') && readingDone
       ? { title: 'Today\u2019s check is done', body: 'Nothing else is waiting for you.', cta: null, tone: colors.ok }
+    : allow('shift_report:create')
+      ? { title: 'Ready for your shift', body: 'Open your rig below and tap Shift report at the end of the shift.', cta: null, tone: colors.ok }
     : { title: 'Nothing is waiting for you', body: 'Everything is up to date right now.', cta: null, tone: colors.ok };
-  // Office roles (anyone who doesn't file readings) get the web dashboard's overview; operators keep the one-job screen.
-  const overview = !!role && !!matrix && !allow('daily_reading:create');
+  // Office roles get the web dashboard's overview; anyone who files field forms keeps the one-job screen with the
+  // per-machine buttons. Either form counts — an admin can take the daily check away from a role and leave it shift
+  // reports only, and those operators still need their machines and the Shift report button.
+  const overview = !!role && !!matrix && !fieldWork;
   const alerts = summary?.alerts ?? [];
   const alertLimit = 3;
 
@@ -152,7 +157,7 @@ export default function HomeScreen({ navigation }: Props) {
           )}
 
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Eyebrow>{allow('daily_reading:create') ? 'My machines' : 'Machines'}</Eyebrow>
+            <Eyebrow>{fieldWork ? 'My machines' : 'Machines'}</Eyebrow>
             {overview && allow('asset:write') && <Pressable onPress={() => navigation.navigate('AssetNew')} hitSlop={10}><Text style={s.more}>+ Add</Text></Pressable>}
           </View>
         </View>

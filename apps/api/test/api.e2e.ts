@@ -729,6 +729,24 @@ describe('finance & plant hire (client spec §6, §11)', () => {
     expect(await prisma.auditLog.count({ where: { entity: 'Deployment', entityId: d.body.id, action: 'REJECT' } })).toBe(2);
   });
 
+  it('a plant hire supervisor never sees drilling rigs or their checks; finance still does', async () => {
+    const { plant, rig } = await setup(); const psv = await login('PSV001'); const fin = await login('FIN001');
+    const op = await prisma.user.findUniqueOrThrow({ where: { employeeId: 'OPR001' } });
+    const date = new Date(); date.setUTCHours(0, 0, 0, 0);
+    await prisma.dailyReading.deleteMany({ where: { assetId: rig.id } });
+    const reading = await prisma.dailyReading.create({ data: { assetId: rig.id, userId: op.id, date, formType: 'RIG', engineOil: 'OK', hydraulicOil: 'OK', coolant: 'OK', gearOil: 'OK', flushPump: 'OK', rodCondition: 'GOOD', bitCondition: 'GOOD', warningLights: false, unusualNoises: false, leaks: false, conditionRating: 5 } as never });
+    const get = (t: string, path: string) => request(app.getHttpServer()).get(`/api/v1${path}`).set(auth(t));
+    const assets = await get(psv, '/assets');
+    expect(assets.body.some((a: { id: string }) => a.id === plant.id)).toBe(true);
+    expect(assets.body.some((a: { category: string }) => a.category === 'DRILLING')).toBe(false);
+    expect((await get(psv, `/assets/${rig.id}`)).status).toBe(404);
+    expect((await get(psv, '/daily-readings')).body.some((r: { id: string }) => r.id === reading.id)).toBe(false);
+    expect((await get(psv, `/daily-readings/${reading.id}`)).status).toBe(404);
+    expect((await get(fin, '/assets')).body.some((a: { id: string }) => a.id === rig.id)).toBe(true);
+    expect((await get(fin, '/daily-readings')).body.some((r: { id: string }) => r.id === reading.id)).toBe(true);
+    await prisma.dailyReading.delete({ where: { id: reading.id } });
+  });
+
   it('computes days worked, billing, credit expiry and badges; PSV cannot change a saved payment', async () => {
     const { plant } = await setup(); const psv = await login('PSV001'); const fin = await login('FIN001');
     const d = (await request(app.getHttpServer()).post('/api/v1/finance/deployments').set(auth(fin)).send(dep(plant.id))).body;
@@ -767,6 +785,29 @@ describe('finance & plant hire (client spec §6, §11)', () => {
     // An operator cannot see finance; the Client Tracker gives them dates only
     const op = await login('OPR001');
     expect((await request(app.getHttpServer()).get('/api/v1/finance/dashboard').set(auth(op))).status).toBe(403);
+  });
+
+  it('days worked and payments queued offline on the phone apply once, with the same review and permission rules', async () => {
+    const { plant, rig } = await setup(); const psv = await login('PSV001'); const fin = await login('FIN001'); const op = await login('OPR001');
+    const d = (await request(app.getHttpServer()).post('/api/v1/finance/deployments').set(auth(fin)).send(dep(plant.id))).body;
+    const push = (t: string, kind: string, payload: object, opId: string = crypto.randomUUID()) => request(app.getHttpServer()).post('/api/v1/sync/push').set(auth(t)).send({ ops: [{ opId, kind, payload }] });
+    const days = { deploymentId: d.id, workDate: day(2), shift: 'DAY', hoursWorked: 9, operatorEmployeeId: 'opr002' };
+    const opId = crypto.randomUUID();
+    const first = await push(psv, 'finance_days', days, opId);
+    expect(first.body.results[0].status).toBe('applied');
+    expect((await push(psv, 'finance_days', days, opId)).body.results[0].status).toBe('duplicate'); // resent after a dropped reply
+    const row = await prisma.daysWorked.findUniqueOrThrow({ where: { id: first.body.results[0].id } });
+    expect(row.reviewStatus).toBe('PENDING_REVIEW'); expect(row.operatorEmployeeId).toBe('OPR002');
+    expect(await prisma.daysWorked.count({ where: { deploymentId: d.id } })).toBe(1);
+    // A queued payment from the PSV also waits for review; a bad one comes back with the reason, not a crash
+    expect((await push(psv, 'finance_payment', { clientId: d.clientId, deploymentId: d.id, paymentDate: day(1), amount: 250, currency: 'ZMW', method: 'CASH' })).body.results[0].status).toBe('applied');
+    expect(await prisma.payment.count({ where: { deploymentId: d.id, reviewStatus: 'PENDING_REVIEW' } })).toBe(1);
+    const bad = await push(psv, 'finance_payment', { clientId: d.clientId, paymentDate: day(1), amount: 5, currency: 'ZMW', method: 'CHEQUE' });
+    expect(bad.body.results[0].status).toBe('rejected'); expect(bad.body.results[0].error).toMatch(/cheque|reference/i);
+    // Same limits as online: no drilling rigs for the PSV, and no finance entries at all for an operator
+    const r = await push(psv, 'finance_deployment', dep(rig.id));
+    expect(r.body.results[0].status).toBe('rejected');
+    expect((await push(op, 'finance_days', { ...days, workDate: day(3) })).body.results[0].status).toBe('rejected');
   });
 });
 
